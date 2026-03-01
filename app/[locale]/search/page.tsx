@@ -1,0 +1,299 @@
+"use client"
+
+import { useState, useMemo, useCallback } from "react"
+import { useSearchParams } from "next/navigation"
+import { useTranslation } from "@/lib/i18n/context"
+import { searchRooms, rooms as allRooms } from "@/lib/data/rooms"
+import { RoomCard } from "@/components/room-card"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Slider } from "@/components/ui/slider"
+import { Badge } from "@/components/ui/badge"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
+import { Checkbox } from "@/components/ui/checkbox"
+import { SlidersHorizontal, List, Map, Search } from "lucide-react"
+import { formatVND } from "@/lib/format"
+import type { Amenity } from "@/lib/types"
+
+const districts = ["Thu Duc", "District 1", "District 7", "District 10", "Binh Thanh"]
+const amenityOptions: Amenity[] = ["wifi", "tv", "whiteboard", "ac", "hdmi", "projector", "power_outlets", "coffee", "parking"]
+
+export default function SearchPage() {
+  const { locale, t } = useTranslation()
+  const searchParams = useSearchParams()
+
+  const initialQuery = searchParams.get("q") || ""
+  const initialDistrict = searchParams.get("district") || ""
+  const initialCapacity = searchParams.get("capacity") || ""
+  const initialMaxPrice = searchParams.get("maxPrice") || ""
+  const initialAmenities = searchParams.get("amenities")?.split(",").filter(Boolean) || []
+  const initialVibes = searchParams.get("vibes")?.split(",").filter(Boolean) || []
+
+  const [query, setQuery] = useState(initialQuery)
+  const [district, setDistrict] = useState(initialDistrict)
+  const [maxPrice, setMaxPrice] = useState(initialMaxPrice ? [parseInt(initialMaxPrice)] : [300000])
+  const [minCapacity, setMinCapacity] = useState(initialCapacity ? parseInt(initialCapacity) : 0)
+  const [selectedAmenities, setSelectedAmenities] = useState<string[]>(initialAmenities)
+  const [sortBy, setSortBy] = useState("rating")
+  const [viewMode, setViewMode] = useState<"list" | "map">("list")
+
+  const toggleAmenity = useCallback((amenity: string) => {
+    setSelectedAmenities(prev =>
+      prev.includes(amenity) ? prev.filter(a => a !== amenity) : [...prev, amenity]
+    )
+  }, [])
+
+  const results = useMemo(() => {
+    let filtered = searchRooms({
+      district: district || undefined,
+      minCapacity: minCapacity || undefined,
+      maxPrice: maxPrice[0],
+      amenities: selectedAmenities.length > 0 ? selectedAmenities : undefined,
+      vibeTags: initialVibes.length > 0 ? initialVibes : undefined,
+      query: query || undefined,
+    })
+
+    // Sort
+    switch (sortBy) {
+      case "price_asc":
+        filtered.sort((a, b) => a.pricePerHour - b.pricePerHour)
+        break
+      case "price_desc":
+        filtered.sort((a, b) => b.pricePerHour - a.pricePerHour)
+        break
+      case "rating":
+        filtered.sort((a, b) => b.rating - a.rating)
+        break
+    }
+
+    return filtered
+  }, [query, district, maxPrice, minCapacity, selectedAmenities, sortBy, initialVibes])
+
+  const clearFilters = () => {
+    setQuery("")
+    setDistrict("")
+    setMaxPrice([300000])
+    setMinCapacity(0)
+    setSelectedAmenities([])
+  }
+
+  const FilterPanel = () => (
+    <div className="flex flex-col gap-6">
+      <div>
+        <Label className="mb-2 text-sm font-semibold">{t("landing.district")}</Label>
+        <Select value={district} onValueChange={setDistrict}>
+          <SelectTrigger>
+            <SelectValue placeholder={t("landing.allDistricts")} />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">{t("landing.allDistricts")}</SelectItem>
+            {districts.map((d) => (
+              <SelectItem key={d} value={d}>{d}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div>
+        <Label className="mb-2 text-sm font-semibold">{t("search.priceRange")}</Label>
+        <Slider
+          value={maxPrice}
+          onValueChange={setMaxPrice}
+          max={500000}
+          min={50000}
+          step={10000}
+          className="mt-3"
+        />
+        <div className="mt-1 flex justify-between text-xs text-muted-foreground">
+          <span>50,000d</span>
+          <span className="font-medium text-foreground">{formatVND(maxPrice[0])}</span>
+        </div>
+      </div>
+
+      <div>
+        <Label className="mb-2 text-sm font-semibold">{t("search.capacityMin")}</Label>
+        <Select value={minCapacity.toString()} onValueChange={(v) => setMinCapacity(parseInt(v))}>
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="0">{locale === "vi" ? "Bat ky" : "Any"}</SelectItem>
+            {[2, 4, 6, 8, 10].map((n) => (
+              <SelectItem key={n} value={n.toString()}>{n}+</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div>
+        <Label className="mb-2 text-sm font-semibold">{t("search.amenities")}</Label>
+        <div className="flex flex-col gap-2">
+          {amenityOptions.map((amenity) => (
+            <label key={amenity} className="flex items-center gap-2 text-sm">
+              <Checkbox
+                checked={selectedAmenities.includes(amenity)}
+                onCheckedChange={() => toggleAmenity(amenity)}
+              />
+              {t(`amenities.${amenity}`)}
+            </label>
+          ))}
+        </div>
+      </div>
+
+      <Button variant="outline" onClick={clearFilters} className="w-full">
+        {t("search.clearFilters")}
+      </Button>
+    </div>
+  )
+
+  return (
+    <div className="mx-auto max-w-7xl px-4 py-6">
+      {/* Search Bar + Controls */}
+      <div className="mb-6 flex flex-col gap-4">
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder={t("landing.searchPlaceholder")}
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+          <Sheet>
+            <SheetTrigger asChild>
+              <Button variant="outline" className="md:hidden">
+                <SlidersHorizontal className="mr-2 h-4 w-4" />
+                {t("search.filters")}
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="left">
+              <SheetHeader>
+                <SheetTitle>{t("search.filters")}</SheetTitle>
+              </SheetHeader>
+              <div className="mt-4">
+                <FilterPanel />
+              </div>
+            </SheetContent>
+          </Sheet>
+        </div>
+
+        <div className="flex items-center justify-between">
+          <p className="text-sm text-muted-foreground">
+            <span className="font-semibold text-foreground">{results.length}</span> {t("search.resultsCount")}
+          </p>
+          <div className="flex items-center gap-2">
+            <Select value={sortBy} onValueChange={setSortBy}>
+              <SelectTrigger className="w-44">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="rating">{t("search.rating")}</SelectItem>
+                <SelectItem value="price_asc">{t("search.priceLowHigh")}</SelectItem>
+                <SelectItem value="price_desc">{t("search.priceHighLow")}</SelectItem>
+              </SelectContent>
+            </Select>
+            <div className="hidden items-center gap-1 rounded-lg border border-border p-1 md:flex">
+              <Button
+                variant={viewMode === "list" ? "secondary" : "ghost"}
+                size="sm"
+                onClick={() => setViewMode("list")}
+              >
+                <List className="h-4 w-4" />
+              </Button>
+              <Button
+                variant={viewMode === "map" ? "secondary" : "ghost"}
+                size="sm"
+                onClick={() => setViewMode("map")}
+              >
+                <Map className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        {(district || selectedAmenities.length > 0 || minCapacity > 0) && (
+          <div className="flex flex-wrap items-center gap-2">
+            {district && (
+              <Badge variant="secondary" className="gap-1">
+                {district}
+                <button onClick={() => setDistrict("")} className="ml-1 text-xs">&times;</button>
+              </Badge>
+            )}
+            {selectedAmenities.map(a => (
+              <Badge key={a} variant="secondary" className="gap-1">
+                {t(`amenities.${a}`)}
+                <button onClick={() => toggleAmenity(a)} className="ml-1 text-xs">&times;</button>
+              </Badge>
+            ))}
+            {minCapacity > 0 && (
+              <Badge variant="secondary" className="gap-1">
+                {minCapacity}+ {t("common.people")}
+                <button onClick={() => setMinCapacity(0)} className="ml-1 text-xs">&times;</button>
+              </Badge>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Content */}
+      <div className="flex gap-6">
+        {/* Desktop Filters */}
+        <aside className="hidden w-64 shrink-0 md:block">
+          <div className="sticky top-20 rounded-xl border border-border bg-card p-4">
+            <h3 className="mb-4 font-semibold text-card-foreground">{t("search.filters")}</h3>
+            <FilterPanel />
+          </div>
+        </aside>
+
+        {/* Results */}
+        <div className="flex-1">
+          {viewMode === "list" ? (
+            results.length > 0 ? (
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {results.map((room) => (
+                  <RoomCard key={room.id} room={room} />
+                ))}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center py-16 text-center">
+                <Search className="mb-4 h-12 w-12 text-muted-foreground" />
+                <p className="text-lg font-medium text-foreground">{t("common.noResults")}</p>
+                <Button variant="outline" onClick={clearFilters} className="mt-4">
+                  {t("search.clearFilters")}
+                </Button>
+              </div>
+            )
+          ) : (
+            /* Map View Placeholder */
+            <div className="relative aspect-[4/3] overflow-hidden rounded-xl border border-border bg-muted">
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="text-center">
+                  <Map className="mx-auto mb-2 h-12 w-12 text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground">
+                    {locale === "vi" ? "Ban do se hien thi o day" : "Map view would display here"}
+                  </p>
+                </div>
+              </div>
+              {/* Room pins on map placeholder */}
+              {results.map((room, i) => (
+                <div
+                  key={room.id}
+                  className="absolute flex items-center gap-1 rounded-full bg-primary px-2 py-1 text-xs font-semibold text-primary-foreground shadow-lg"
+                  style={{
+                    left: `${15 + (i * 17) % 70}%`,
+                    top: `${20 + (i * 23) % 60}%`,
+                  }}
+                >
+                  {formatVND(room.pricePerHour)}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
