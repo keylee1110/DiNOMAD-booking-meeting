@@ -15,7 +15,7 @@ import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
-import { Star, MapPin, Users, ChevronLeft, ChevronRight, ExternalLink } from "lucide-react"
+import { Star, MapPin, Users, ChevronLeft, ChevronRight, ExternalLink, Minus, Plus } from "lucide-react"
 import type { TimeSlot } from "@/lib/types"
 import { notFound } from "next/navigation"
 
@@ -32,6 +32,9 @@ export default function RoomDetailPage({ params }: { params: Promise<{ locale: s
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
   const [selectedDate, setSelectedDate] = useState(getNextDays(1)[0])
   const [selectedSlots, setSelectedSlots] = useState<TimeSlot[]>([])
+
+  // Split bill states
+  const [splitPeople, setSplitPeople] = useState(room?.capacity || 2)
 
   const slots = useMemo(() => generateTimeSlots(selectedDate, room.id), [selectedDate, room.id])
 
@@ -63,6 +66,9 @@ export default function RoomDetailPage({ params }: { params: Promise<{ locale: s
 
   const nextImage = () => setCurrentImageIndex((i) => (i + 1) % room.images.length)
   const prevImage = () => setCurrentImageIndex((i) => (i - 1 + room.images.length) % room.images.length)
+
+  // Split bill logic
+  const splitAmount = Math.ceil(totalPrice / splitPeople)
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-6">
@@ -285,15 +291,38 @@ export default function RoomDetailPage({ params }: { params: Promise<{ locale: s
                 </div>
 
                 {room.category === "team_hub" && (
-                  <div className="pt-3 border-t border-border/50">
-                    <Button
-                      variant="secondary"
-                      className="w-full text-xs font-medium bg-secondary/50 hover:bg-secondary flex items-center justify-center py-2 h-auto"
-                      onClick={() => alert("Tính năng chia tiền đang được xây dựng!")}
-                    >
-                      <Users className="mr-1.5 h-3.5 w-3.5" />
-                      Tính hộ mỗi người bao nhiêu (Split Bill)
-                    </Button>
+                  <div className="pt-3 border-t border-border/50 mt-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-1.5 text-sm font-medium text-foreground">
+                        <Users className="h-4 w-4 text-muted-foreground" />
+                        Chia tiền ({splitPeople} người)
+                      </div>
+                      <div className="flex items-center gap-1 bg-muted/50 rounded-md p-0.5 border border-border/50">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6"
+                          onClick={() => setSplitPeople(Math.max(2, splitPeople - 1))}
+                          disabled={splitPeople <= 2}
+                        >
+                          <Minus className="h-3 w-3" />
+                        </Button>
+                        <span className="text-xs font-medium w-6 text-center">{splitPeople}</span>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6"
+                          onClick={() => setSplitPeople(Math.min(50, splitPeople + 1))}
+                          disabled={splitPeople >= 50}
+                        >
+                          <Plus className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between rounded-lg bg-primary/5 px-3 py-2 border border-primary/10">
+                      <span className="text-xs font-medium text-muted-foreground">Mỗi người trả</span>
+                      <span className="font-bold text-primary">{formatVND(splitAmount)}</span>
+                    </div>
                   </div>
                 )}
               </div>
