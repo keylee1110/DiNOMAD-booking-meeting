@@ -4,6 +4,7 @@ import { useTranslation } from "@/lib/i18n/context"
 import { LayoutDashboard, DoorOpen, QrCode, Building2, Bell, CalendarCheck } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import Image from "next/image"
 
 export default function PartnerLayout({ children }: { children: React.ReactNode }) {
   const { locale } = useTranslation()
@@ -21,7 +22,10 @@ export default function PartnerLayout({ children }: { children: React.ReactNode 
     <div className="flex h-screen flex-col md:flex-row bg-background font-sans">
       {/* Mobile Header */}
       <header className="flex h-16 items-center justify-between border-b-2 border-primary bg-card px-4 md:hidden shrink-0">
-        <div className="font-black uppercase tracking-tighter text-xl">DiNOMAD <span className="text-primary">Ops</span></div>
+        <div className="flex items-center gap-2">
+          <Image src="/logo.png" alt="DiNOMAD Logo" width={32} height={32} className="object-contain" />
+          <div className="font-black uppercase tracking-tighter text-xl">DiNOMAD <span className="text-primary">Ops</span></div>
+        </div>
         <button className="relative flex h-10 w-10 items-center justify-center border-2 border-transparent hover:border-foreground transition-colors">
           <Bell className="h-5 w-5" />
           <span className="absolute top-2 right-2 h-2.5 w-2.5 rounded-full bg-red-500 border-2 border-background"></span>
@@ -31,8 +35,11 @@ export default function PartnerLayout({ children }: { children: React.ReactNode 
       {/* Sidebar (Desktop) / Bottom Nav (Mobile) */}
       <nav className="fixed bottom-0 z-50 flex w-full border-t-2 border-primary bg-card md:relative md:w-64 md:flex-col md:border-r-2 md:border-t-0 md:bg-background shrink-0 transition-transform">
         <div className="hidden h-[88px] items-center px-6 border-b-2 border-primary md:flex shrink-0">
-          <div className="font-black uppercase tracking-tighter text-2xl">
-            DiNOMAD <span className="bg-primary text-primary-foreground px-1.5 ml-1 pt-0.5 -rotate-2 inline-block">Ops</span>
+          <div className="flex items-center gap-3">
+            <Image src="/logo.png" alt="DiNOMAD Logo" width={40} height={40} className="object-contain" />
+            <div className="font-black uppercase tracking-tighter text-2xl leading-none">
+              DiNOMAD <span className="bg-primary text-primary-foreground px-1.5 ml-1 pt-0.5 -rotate-2 inline-block">Ops</span>
+            </div>
           </div>
         </div>
         

@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import Image from "next/image"
 import { usePathname } from "next/navigation"
 import {
   LayoutDashboard,
@@ -58,10 +59,8 @@ export function AdminSidebar({ locale }: { locale: string }) {
   return (
     <aside className="w-64 bg-card border-r border-border flex flex-col shrink-0">
       {/* Logo */}
-      <div className="h-16 flex items-center gap-2 px-6 border-b border-border shrink-0">
-        <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-          <span className="text-primary-foreground font-bold text-sm">D</span>
-        </div>
+      <div className="h-16 flex items-center gap-3 px-6 border-b border-border shrink-0">
+        <Image src="/logo.png" alt="DiNOMAD Logo" width={32} height={32} className="object-contain" />
         <div>
           <p className="font-bold text-foreground text-sm leading-tight">DiNOMAD</p>
           <p className="text-xs text-muted-foreground">Admin Portal</p>
