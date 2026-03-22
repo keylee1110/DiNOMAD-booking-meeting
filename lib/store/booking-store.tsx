@@ -1,6 +1,6 @@
 "use client"
 
-import { createContext, useContext, useReducer, type ReactNode } from "react"
+import { createContext, useContext, useReducer, useEffect, useState, type ReactNode } from "react"
 import type { BookingFlowState, Room, TimeSlot, PaymentMethod, Booking } from "@/lib/types"
 
 const initialState: BookingFlowState = {
@@ -60,15 +60,52 @@ function bookingReducer(state: BookingFlowState, action: BookingAction): Booking
 interface BookingContextType {
   state: BookingFlowState
   dispatch: React.Dispatch<BookingAction>
+  myBookings: Booking[]
+  addBooking: (booking: Booking) => void
+  refreshBookings: () => void
 }
 
 const BookingContext = createContext<BookingContextType | null>(null)
 
 export function BookingProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(bookingReducer, initialState)
+  const [myBookings, setMyBookings] = useState<Booking[]>([])
+
+  const refreshBookings = () => {
+    if (typeof window !== "undefined") {
+      const saved: Booking[] = JSON.parse(localStorage.getItem("dinomad_bookings") || "[]")
+      // Lọc bỏ các phần tử trùng ID
+      const uniqueBookings = saved.filter(
+        (booking, index, self) => index === self.findIndex((b) => b.id === booking.id)
+      )
+      
+      // Nếu có sự khác biệt (tức là có trùng lặp), cập nhật lại localStorage cho sạch
+      if (uniqueBookings.length !== saved.length) {
+        localStorage.setItem("dinomad_bookings", JSON.stringify(uniqueBookings))
+      }
+      
+      setMyBookings(uniqueBookings)
+    }
+  }
+
+  const addBooking = (booking: Booking) => {
+    if (typeof window !== "undefined") {
+      const existing: Booking[] = JSON.parse(localStorage.getItem("dinomad_bookings") || "[]")
+      // Kiểm tra trùng lặp ID
+      if (!existing.some(b => b.id === booking.id)) {
+        const updated = [booking, ...existing]
+        localStorage.setItem("dinomad_bookings", JSON.stringify(updated))
+        setMyBookings(updated)
+      }
+    }
+  }
+
+  useEffect(() => {
+    refreshBookings()
+  }, [])
 
   return (
-    <BookingContext.Provider value={{ state, dispatch }}>
+    <BookingContext.Provider value={{ state, dispatch, myBookings, addBooking, refreshBookings }}>
       {children}
     </BookingContext.Provider>
   )

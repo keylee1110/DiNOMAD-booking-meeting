@@ -4,13 +4,15 @@ import Link from "next/link"
 import Image from "next/image"
 import { useTranslation } from "@/lib/i18n/context"
 import { LanguageSwitcher } from "@/components/language-switcher"
-import { Menu, X } from "lucide-react"
+import { Menu, X, CalendarDays } from "lucide-react"
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
+import { useBooking } from "@/lib/store/booking-store"
 
 export function Header() {
   const { locale, t } = useTranslation()
   const [menuOpen, setMenuOpen] = useState(false)
+  const { myBookings } = useBooking()
 
   return (
     <header className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -42,6 +44,17 @@ export function Header() {
             className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
           >
             {t("common.search")}
+          </Link>
+          <Link
+            href={`/${locale}/my-bookings`}
+            className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+          >
+            {locale === "vi" ? "Đơn đặt" : "Bookings"}
+            {myBookings.length > 0 && (
+              <span className="flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
+                {myBookings.length}
+              </span>
+            )}
           </Link>
         </nav>
 
@@ -81,6 +94,18 @@ export function Header() {
               onClick={() => setMenuOpen(false)}
             >
               {t("common.search")}
+            </Link>
+            <Link
+              href={`/${locale}/my-bookings`}
+              className="flex items-center justify-between rounded-md px-3 py-2 text-sm font-medium text-foreground hover:bg-muted"
+              onClick={() => setMenuOpen(false)}
+            >
+              <span>{locale === "vi" ? "Đơn đặt của tôi" : "My Bookings"}</span>
+              {myBookings.length > 0 && (
+                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
+                  {myBookings.length}
+                </span>
+              )}
             </Link>
             <Link
               href={`/${locale}/login`}

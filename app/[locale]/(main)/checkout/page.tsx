@@ -34,7 +34,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ locale: str
   const { t } = useTranslation()
   const router = useRouter()
 
-  const { state, dispatch } = useBooking()
+  const { state, dispatch, addBooking } = useBooking()
 
   const [fullName, setFullName] = useState(state.guestName)
   const [phone, setPhone] = useState(state.guestPhone)
@@ -143,6 +143,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ locale: str
 
     await new Promise((r) => setTimeout(r, 1400))
     setIsPaying(false)
+    addBooking(newBooking)
     dispatch({ type: "SET_CONFIRMED_BOOKING", booking: newBooking })
     router.push(`/${locale}/checkout/success`)
   }
