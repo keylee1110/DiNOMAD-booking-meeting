@@ -1,9 +1,10 @@
 "use client"
 
 import Link from "next/link"
+import Image from "next/image"
 import { useTranslation } from "@/lib/i18n/context"
 import { LanguageSwitcher } from "@/components/language-switcher"
-import { Menu, X, MapPin } from "lucide-react"
+import { Menu, X } from "lucide-react"
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 
@@ -15,8 +16,14 @@ export function Header() {
     <header className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4">
         <Link href={`/${locale}`} className="flex items-center gap-2">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary">
-            <MapPin className="h-5 w-5 text-primary-foreground" />
+          <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-lg bg-transparent">
+            <Image 
+              src="/logo.png" 
+              alt="DiNOMAD Logo" 
+              width={40} 
+              height={40} 
+              className="object-contain h-full w-auto"
+            />
           </div>
           <span className="text-xl font-bold tracking-tight text-foreground">
             Di<span className="text-primary">NOMAD</span>
