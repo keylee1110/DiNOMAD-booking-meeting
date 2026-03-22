@@ -11,10 +11,9 @@ import { Button } from "@/components/ui/button"
 import { BookingSummary } from "./_components/booking-summary"
 import { GuestInfoForm } from "./_components/guest-info-form"
 import { PaymentMethodSelector } from "./_components/payment-method-selector"
-import { ConfirmationView } from "./_components/confirmation-view"
 import { EmptyCheckout } from "./_components/empty-checkout"
 
-type FieldErrors = Partial<Record<"fullName" | "phone" | "email", string>>
+type FieldErrors = Partial<Record<"fullName" | "phone" | "email" | "agreeTerms", string>>
 
 function getTimeRange(slots: TimeSlot[]) {
   if (slots.length === 0) return { startTime: "", endTime: "" }
@@ -45,7 +44,6 @@ export default function CheckoutPage({ params }: { params: Promise<{ locale: str
 
   const [softLockExpired, setSoftLockExpired] = useState(false)
   const [isPaying, setIsPaying] = useState(false)
-  const [bookingConfirmed, setBookingConfirmed] = useState<Booking | null>(null)
 
   const softLockDurationSeconds = 5 * 60
   const countdownKeyRef = useRef(0)
@@ -78,13 +76,12 @@ export default function CheckoutPage({ params }: { params: Promise<{ locale: str
     state.selectedSlots.length > 0 &&
     fullName.trim().length >= 2 &&
     phone.replace(/\D/g, "").length >= 9 &&
-    agreeTerms &&
     !softLockExpired &&
     !isPaying
 
   const handleCancel = () => {
-    dispatch({ type: "RESET" })
-    router.push(`/${locale}`)
+    // Navigate to cancel page instead of home so users can see the failure UI state if they wish
+    router.push(`/${locale}/checkout/cancel`)
   }
 
   const handleProceedPayment = async () => {
@@ -102,6 +99,10 @@ export default function CheckoutPage({ params }: { params: Promise<{ locale: str
 
     if (!validateEmail(email)) {
       nextErrors.email = locale === "vi" ? "Email không hợp lệ" : "Invalid email"
+    }
+
+    if (!agreeTerms) {
+      nextErrors.agreeTerms = locale === "vi" ? "Vui lòng đồng ý với điều khoản" : "Please agree to the terms"
     }
 
     if (Object.keys(nextErrors).length > 0) {
@@ -142,7 +143,8 @@ export default function CheckoutPage({ params }: { params: Promise<{ locale: str
 
     await new Promise((r) => setTimeout(r, 1400))
     setIsPaying(false)
-    setBookingConfirmed(newBooking)
+    dispatch({ type: "SET_CONFIRMED_BOOKING", booking: newBooking })
+    router.push(`/${locale}/checkout/success`)
   }
 
   if (!room || state.selectedSlots.length === 0) {
@@ -165,18 +167,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ locale: str
         {t("common.back")}
       </button>
 
-      {bookingConfirmed ? (
-        <ConfirmationView 
-          booking={bookingConfirmed}
-          room={room}
-          onBackHome={() => {
-            dispatch({ type: "RESET" })
-            router.push(`/${locale}`)
-          }}
-          locale={locale}
-        />
-      ) : (
-        <div className="grid gap-8 lg:grid-cols-[1fr_380px]">
+      <div className="grid gap-8 lg:grid-cols-[1fr_380px]">
           <div className="flex flex-col gap-6">
             <GuestInfoForm 
               fullName={fullName}
@@ -233,7 +224,6 @@ export default function CheckoutPage({ params }: { params: Promise<{ locale: str
             </Button>
           </div>
         </div>
-      )}
     </div>
   )
 }

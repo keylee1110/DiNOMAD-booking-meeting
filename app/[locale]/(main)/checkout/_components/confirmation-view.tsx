@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
 import { Button } from "@/components/ui/button"
 import { QrCode as DinomadQrCode } from "@/components/qr-code"
-import { Users, QrCode as QrCodeIcon } from "lucide-react"
+import { Users, QrCode as QrCodeIcon, CheckCircle2 } from "lucide-react"
 import { formatVND, formatDate } from "@/lib/format"
 import { formatTime } from "@/lib/data/time-slots"
 import type { Booking, Room } from "@/lib/types"
@@ -29,7 +29,10 @@ export function ConfirmationView({
     <div className="flex flex-col gap-6">
       <Card className="p-6">
         <CardHeader className="pb-4">
-          <CardTitle className="text-2xl">{t("confirmation.title")}</CardTitle>
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="h-8 w-8 text-emerald-500" />
+            <CardTitle className="text-2xl text-emerald-500 font-extrabold">{t("confirmation.title")}</CardTitle>
+          </div>
           <p className="mt-2 text-sm text-muted-foreground">{t("confirmation.subtitle")}</p>
         </CardHeader>
         <CardContent className="space-y-6">

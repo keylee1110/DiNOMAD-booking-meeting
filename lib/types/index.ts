@@ -138,6 +138,7 @@ export interface BookingFlowState {
   roomFee: number
   platformFee: number
   bookingId: string | null
+  confirmedBooking?: Booking | null
 }
 
 export type Dictionary = Record<string, string | Record<string, string>>
