@@ -38,8 +38,8 @@ export function Footer() {
                 </Link>
               </li>
               <li>
-                <Link href={`/${locale}/partner`} className="text-sm text-muted-foreground hover:text-foreground">
-                  {t("common.partnerPortal")}
+                <Link href={`/${locale}/login`} className="text-sm text-muted-foreground hover:text-foreground">
+                  Partner Login
                 </Link>
               </li>
             </ul>

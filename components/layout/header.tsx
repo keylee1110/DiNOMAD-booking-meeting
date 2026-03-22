@@ -36,16 +36,16 @@ export function Header() {
           >
             {t("common.search")}
           </Link>
-          <Link
-            href={`/${locale}/partner`}
-            className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
-          >
-            {t("common.partnerPortal")}
-          </Link>
         </nav>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 md:gap-4">
           <LanguageSwitcher />
+          <Link
+            href={`/${locale}/login`}
+            className="hidden md:flex text-xs font-black uppercase tracking-widest text-foreground transition-colors border-2 border-primary bg-primary/10 px-5 py-2 shadow-[2px_2px_0px_0px_var(--color-primary)] hover:bg-primary hover:text-primary-foreground active:translate-y-[2px] active:shadow-none items-center justify-center whitespace-nowrap"
+          >
+            Log In
+          </Link>
           <Button
             variant="ghost"
             size="icon"
@@ -76,11 +76,11 @@ export function Header() {
               {t("common.search")}
             </Link>
             <Link
-              href={`/${locale}/partner`}
-              className="rounded-md px-3 py-2 text-sm font-medium text-foreground hover:bg-muted"
+              href={`/${locale}/login`}
+              className="rounded-md px-3 py-2 text-sm font-black uppercase tracking-widest text-foreground hover:bg-muted"
               onClick={() => setMenuOpen(false)}
             >
-              {t("common.partnerPortal")}
+              Log In
             </Link>
           </nav>
         </div>
