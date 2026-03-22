@@ -1,4 +1,5 @@
-import type { Booking } from "@/lib/types"
+import type { Booking, Room } from "@/lib/types"
+import { rooms } from "./rooms"
 
 export const bookings: Booking[] = [
   {
@@ -141,7 +142,6 @@ export function getBookingsByDate(date: string): Booking[] {
 }
 
 export function getBookingsByVenue(venueId: string): Booking[] {
-  const { rooms } = require("./rooms")
-  const venueRoomIds = rooms.filter((r: any) => r.venueId === venueId).map((r: any) => r.id)
+  const venueRoomIds = rooms.filter((r: Room) => r.venueId === venueId).map((r: Room) => r.id)
   return bookings.filter((b) => venueRoomIds.includes(b.roomId))
 }

@@ -1,4 +1,4 @@
-import type { Room } from "@/lib/types"
+import type { Room, Review, Amenity, VibeTag } from "@/lib/types"
 
 export const rooms: Room[] = [
   {
@@ -315,10 +315,10 @@ export function searchRooms(filters: {
     result = result.filter((r) => r.pricePerHour <= filters.maxPrice!)
   }
   if (filters.amenities && filters.amenities.length > 0) {
-    result = result.filter((r) => filters.amenities!.every((a) => r.amenities.includes(a as any)))
+    result = result.filter((r) => filters.amenities!.every((a) => r.amenities.includes(a as Amenity)))
   }
   if (filters.vibeTags && filters.vibeTags.length > 0) {
-    result = result.filter((r) => filters.vibeTags!.some((v) => r.vibeTags.includes(v as any)))
+    result = result.filter((r) => filters.vibeTags!.some((v) => r.vibeTags.includes(v as VibeTag)))
   }
   if (filters.query) {
     const q = filters.query.toLowerCase()
@@ -333,5 +333,3 @@ export function searchRooms(filters: {
 
   return result
 }
-
-import type { Review } from "@/lib/types"
