@@ -1,8 +1,8 @@
 "use client"
 
 import Link from "next/link"
+import Image from "next/image"
 import { useTranslation } from "@/lib/i18n/context"
-import { MapPin } from "lucide-react"
 
 export function Footer() {
   const { locale, t } = useTranslation()
@@ -13,8 +13,14 @@ export function Footer() {
         <div className="grid gap-8 md:grid-cols-4">
           <div>
             <Link href={`/${locale}`} className="mb-4 flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
-                <MapPin className="h-4 w-4 text-primary-foreground" />
+              <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-lg bg-transparent">
+                <Image 
+                  src="/logo.png" 
+                  alt="DiNOMAD Logo" 
+                  width={40} 
+                  height={40} 
+                  className="object-contain h-full w-auto"
+                />
               </div>
               <span className="text-lg font-bold tracking-tight text-foreground">
                 Di<span className="text-primary">NOMAD</span>
