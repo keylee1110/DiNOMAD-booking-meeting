@@ -1,7 +1,7 @@
 "use client"
 
 import { createContext, useContext, useReducer, type ReactNode } from "react"
-import type { BookingFlowState, Room, TimeSlot, PaymentMethod } from "@/lib/types"
+import type { BookingFlowState, Room, TimeSlot, PaymentMethod, Booking } from "@/lib/types"
 
 const initialState: BookingFlowState = {
   selectedRoom: null,
@@ -25,6 +25,7 @@ type BookingAction =
   | { type: "SET_PAYMENT_METHOD"; method: PaymentMethod }
   | { type: "CALCULATE_PRICE" }
   | { type: "SET_BOOKING_ID"; id: string }
+  | { type: "SET_CONFIRMED_BOOKING"; booking: Booking }
   | { type: "RESET" }
 
 function bookingReducer(state: BookingFlowState, action: BookingAction): BookingFlowState {
@@ -47,6 +48,8 @@ function bookingReducer(state: BookingFlowState, action: BookingAction): Booking
     }
     case "SET_BOOKING_ID":
       return { ...state, bookingId: action.id }
+    case "SET_CONFIRMED_BOOKING":
+      return { ...state, confirmedBooking: action.booking }
     case "RESET":
       return initialState
     default:

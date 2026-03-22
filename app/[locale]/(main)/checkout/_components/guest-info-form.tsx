@@ -19,7 +19,7 @@ interface GuestInfoFormProps {
   setEmail: (v: string) => void
   agreeTerms: boolean
   setAgreeTerms: (v: boolean) => void
-  errors: Partial<Record<"fullName" | "phone" | "email", string>>
+  errors: Partial<Record<"fullName" | "phone" | "email" | "agreeTerms", string>>
   onProceed: () => void
   canProceed: boolean
   isPaying: boolean
@@ -93,14 +93,23 @@ export function GuestInfoForm({
         <Separator />
 
         <div className="flex items-start gap-3">
-          <Checkbox checked={agreeTerms} onCheckedChange={(v) => setAgreeTerms(Boolean(v))} />
+          <Checkbox 
+            checked={agreeTerms} 
+            onCheckedChange={(v) => setAgreeTerms(Boolean(v))} 
+            className={cn(errors.agreeTerms ? "border-destructive" : "")}
+          />
           <div className="space-y-1">
-            <p className="text-sm font-medium">{t("checkout.termsAgree")}</p>
+            <p className={cn("text-sm font-medium", errors.agreeTerms ? "text-destructive" : "")}>
+              {t("checkout.termsAgree")}
+            </p>
             <p className="text-xs text-muted-foreground">
               {locale === "vi"
                 ? "Bạn sẽ không được đổi lịch sau khi thanh toán thành công."
                 : "You can’t change the booking after successful payment."}
             </p>
+            {errors.agreeTerms && (
+              <p className="text-xs font-semibold text-destructive mt-1">{errors.agreeTerms}</p>
+            )}
           </div>
         </div>
       </CardContent>
