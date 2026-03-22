@@ -3,9 +3,6 @@ import { getDictionary, isValidLocale } from "@/lib/i18n"
 import type { Locale } from "@/lib/types"
 import { I18nProvider } from "@/lib/i18n/context"
 import { BookingProvider } from "@/lib/store/booking-store"
-import { Header } from "@/components/layout/header"
-import { Footer } from "@/components/layout/footer"
-import { MobileNav } from "@/components/layout/mobile-nav"
 import { notFound } from "next/navigation"
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
@@ -36,12 +33,7 @@ export default async function LocaleLayout({
   return (
     <I18nProvider locale={locale as Locale} dictionary={dictionary as any}>
       <BookingProvider>
-        <div className="flex min-h-screen flex-col">
-          <Header />
-          <main className="flex-1 pb-16 md:pb-0">{children}</main>
-          <Footer />
-          <MobileNav />
-        </div>
+        {children}
       </BookingProvider>
     </I18nProvider>
   )
