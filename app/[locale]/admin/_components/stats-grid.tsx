@@ -50,15 +50,15 @@ export function StatsGrid() {
       {stats.map((stat) => (
         <div 
           key={stat.label} 
-          className="bg-card border border-border rounded-lg p-5 flex items-start gap-4 hover:shadow-sm transition-shadow"
+          className="bg-white/60 dark:bg-card/60 backdrop-blur-xl border border-white/50 dark:border-white/10 rounded-2xl p-6 flex items-start gap-5 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)] transition-all duration-300 hover:-translate-y-0.5 group"
         >
-          <div className={`w-10 h-10 rounded-lg ${stat.bg} flex items-center justify-center shrink-0`}>
-            <stat.icon className={`w-5 h-5 ${stat.color}`} />
+          <div className={`w-12 h-12 rounded-xl ${stat.bg} flex items-center justify-center shrink-0 shadow-inner group-hover:scale-110 transition-transform duration-300`}>
+            <stat.icon className={`w-6 h-6 ${stat.color}`} />
           </div>
-          <div className="min-w-0">
-            <p className="text-2xl font-bold text-foreground">{stat.value}</p>
-            <p className="text-sm text-muted-foreground">{stat.label}</p>
-            <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-1 font-medium">{stat.change}</p>
+          <div className="min-w-0 flex-1">
+            <p className="text-3xl font-bold text-foreground tracking-tight">{stat.value}</p>
+            <p className="text-sm font-medium text-muted-foreground mt-0.5">{stat.label}</p>
+            <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-2 font-semibold bg-emerald-50 dark:bg-emerald-500/10 inline-block px-2 py-0.5 rounded-md">{stat.change}</p>
           </div>
         </div>
       ))}

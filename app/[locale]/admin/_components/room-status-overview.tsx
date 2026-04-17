@@ -2,24 +2,26 @@ import { rooms } from "@/lib/data/rooms"
 
 export function RoomStatusOverview() {
   return (
-    <div className="px-5 py-4 border-t border-border">
-      <h3 className="text-sm font-semibold text-foreground mb-3">Room Status Today</h3>
-      <div className="space-y-2">
+    <div className="flex flex-col">
+      <div className="px-6 py-5 border-y border-white/40 dark:border-white/10 bg-white/40 dark:bg-muted/10">
+        <h3 className="text-lg font-bold text-foreground tracking-tight">Room Status</h3>
+      </div>
+      <div className="p-6 space-y-4">
         {rooms.slice(0, 4).map((room) => (
-          <div key={room.id} className="flex items-center justify-between text-xs group">
-            <span className="text-muted-foreground truncate flex-1 pr-2 group-hover:text-foreground transition-colors">
+          <div key={room.id} className="flex items-center justify-between group p-3 rounded-xl hover:bg-white/50 dark:hover:bg-muted/30 transition-colors border border-transparent hover:border-white/60 dark:hover:border-white/10 cursor-default">
+            <span className="font-semibold text-sm text-foreground truncate flex-1 pr-4 transition-colors">
               {room.name}
             </span>
             <span 
-              className={`font-medium shrink-0 ${
+              className={`text-xs font-bold px-2.5 py-1 rounded-md shrink-0 border border-black/5 shadow-sm ${
                 room.slotsLeftToday > 3 
-                  ? "text-emerald-500" 
+                  ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400" 
                   : room.slotsLeftToday > 0 
-                  ? "text-amber-500" 
-                  : "text-red-500"
+                  ? "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400" 
+                  : "bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400"
               }`}
             >
-              {room.slotsLeftToday} slots left
+              {room.slotsLeftToday} slots
             </span>
           </div>
         ))}
@@ -27,3 +29,4 @@ export function RoomStatusOverview() {
     </div>
   )
 }
+

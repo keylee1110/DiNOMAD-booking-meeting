@@ -5,18 +5,20 @@ import { cva, type VariantProps } from 'class-variance-authority'
 import { cn } from '@/lib/utils'
 
 const badgeVariants = cva(
-  'inline-flex items-center justify-center rounded-none border-2 px-2 py-0.5 text-xs font-black uppercase tracking-wider w-fit whitespace-nowrap shrink-0 [&>svg]:size-3 gap-1 [&>svg]:pointer-events-none focus-visible:border-ring focus-visible:ring-ring/50 outline-none transition-[color,box-shadow,transform] overflow-hidden',
+  'inline-flex items-center justify-center rounded-full border px-3 py-1 text-[10px] font-bold uppercase tracking-wider w-fit whitespace-nowrap shrink-0 [&>svg]:size-3 gap-1.5 [&>svg]:pointer-events-none focus-visible:ring-2 focus-visible:ring-primary/50 outline-none transition-all duration-300',
   {
     variants: {
       variant: {
         default:
-          'border-foreground bg-primary text-primary-foreground shadow-[2px_2px_0px_0px_var(--color-foreground)] [a&]:hover:bg-foreground [a&]:hover:text-background [a&]:hover:shadow-[2px_2px_0px_0px_#64B5F6] [a&]:hover:-translate-y-0.5',
+          'border-transparent bg-primary text-primary-foreground shadow-sm hover:shadow-md hover:bg-primary/90',
         secondary:
-          'border-border bg-secondary text-secondary-foreground shadow-[2px_2px_0px_0px_var(--color-border)] [a&]:hover:border-primary [a&]:hover:shadow-[2px_2px_0px_0px_#64B5F6]',
+          'border-transparent bg-secondary text-secondary-foreground shadow-sm hover:bg-secondary/80',
         destructive:
-          'border-foreground bg-destructive text-destructive-foreground shadow-[2px_2px_0px_0px_var(--color-foreground)] [a&]:hover:bg-foreground [a&]:hover:text-background',
+          'border-transparent bg-destructive text-destructive-foreground hover:bg-destructive/90',
         outline:
-          'border-border text-foreground shadow-[2px_2px_0px_0px_var(--color-border)] bg-background [a&]:hover:border-primary [a&]:hover:bg-primary/5 [a&]:hover:text-foreground',
+          'border-border text-foreground bg-background hover:bg-accent hover:border-primary/30',
+        glass:
+          'bg-white/10 backdrop-blur-md border border-white/20 text-white shadow-sm hover:bg-white/20',
       },
     },
     defaultVariants: {

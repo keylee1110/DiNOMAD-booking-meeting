@@ -27,78 +27,78 @@ export default function AdminSuppliersPage() {
         </button>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        <div className="bg-card border border-border rounded-lg p-4 text-center">
-          <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{approved}</p>
-          <p className="text-xs text-muted-foreground mt-1">Approved</p>
+      <div className="grid grid-cols-2 gap-5">
+        <div className="bg-white/60 dark:bg-card/60 backdrop-blur-xl border border-white/50 dark:border-white/10 rounded-2xl p-6 text-center shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:-translate-y-0.5 transition-transform">
+          <p className="text-3xl font-bold text-emerald-600 dark:text-emerald-400 tracking-tight">{approved}</p>
+          <p className="text-xs font-semibold text-muted-foreground mt-1 uppercase tracking-wider">Approved</p>
         </div>
-        <div className="bg-card border border-border rounded-lg p-4 text-center">
-          <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">{pending}</p>
-          <p className="text-xs text-muted-foreground mt-1">Pending Review</p>
+        <div className="bg-white/60 dark:bg-card/60 backdrop-blur-xl border border-white/50 dark:border-white/10 rounded-2xl p-6 text-center shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:-translate-y-0.5 transition-transform">
+          <p className="text-3xl font-bold text-amber-600 dark:text-amber-400 tracking-tight">{pending}</p>
+          <p className="text-xs font-semibold text-muted-foreground mt-1 uppercase tracking-wider">Pending Review</p>
         </div>
       </div>
 
-      <div className="bg-card border border-border rounded-lg p-4">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+      <div className="bg-white/60 dark:bg-card/60 backdrop-blur-xl border border-white/50 dark:border-white/10 rounded-2xl p-5 flex flex-col sm:flex-row gap-4 items-start sm:items-center shadow-sm">
+        <div className="relative flex-1 w-full group">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
           <input
             type="text"
-            placeholder="Search suppliers..."
-            className="w-full pl-9 pr-4 py-2 text-sm bg-muted border border-border rounded-md outline-none focus:ring-2 focus:ring-ring text-foreground placeholder:text-muted-foreground"
+            placeholder="Search suppliers by name or email..."
+            className="w-full pl-11 pr-4 py-2.5 text-sm bg-white/50 dark:bg-muted/30 border border-white/60 dark:border-border/50 rounded-xl outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 text-foreground placeholder:text-muted-foreground transition-all shadow-sm"
           />
         </div>
       </div>
 
-      <div className="bg-card border border-border rounded-lg overflow-hidden">
+      <div className="bg-white/60 dark:bg-card/60 backdrop-blur-xl border border-white/50 dark:border-white/10 rounded-2xl overflow-hidden shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-border bg-muted/50">
-                <th className="text-left px-5 py-3 font-medium text-muted-foreground">Supplier</th>
-                <th className="text-left px-5 py-3 font-medium text-muted-foreground hidden md:table-cell">Contact</th>
-                <th className="text-left px-5 py-3 font-medium text-muted-foreground hidden lg:table-cell">District</th>
-                <th className="text-left px-5 py-3 font-medium text-muted-foreground hidden sm:table-cell">Rooms</th>
-                <th className="text-left px-5 py-3 font-medium text-muted-foreground">Status</th>
-                <th className="text-left px-5 py-3 font-medium text-muted-foreground">Actions</th>
+              <tr className="border-b border-white/40 dark:border-white/10 bg-muted/20">
+                <th className="text-left px-6 py-4 font-semibold text-muted-foreground text-xs uppercase tracking-wider">Supplier</th>
+                <th className="text-left px-6 py-4 font-semibold text-muted-foreground text-xs uppercase tracking-wider hidden md:table-cell">Contact</th>
+                <th className="text-left px-6 py-4 font-semibold text-muted-foreground text-xs uppercase tracking-wider hidden lg:table-cell">District</th>
+                <th className="text-left px-6 py-4 font-semibold text-muted-foreground text-xs uppercase tracking-wider hidden sm:table-cell">Rooms</th>
+                <th className="text-left px-6 py-4 font-semibold text-muted-foreground text-xs uppercase tracking-wider">Status</th>
+                <th className="text-left px-6 py-4 font-semibold text-muted-foreground text-xs uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-white/40 dark:divide-white/10">
               {mockSuppliers.map((supplier, i) => (
-                <tr key={supplier.id} className={i < mockSuppliers.length - 1 ? "border-b border-border hover:bg-muted/30 transition-colors" : "hover:bg-muted/30 transition-colors"}>
-                  <td className="px-5 py-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                        <Building2 className="w-4 h-4 text-primary" />
+                <tr key={supplier.id} className="hover:bg-white/40 dark:hover:bg-muted/20 transition-colors group">
+                  <td className="px-6 py-4">
+                    <div className="flex items-center gap-4">
+                      <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0 border border-primary/20 shadow-sm">
+                        <Building2 className="w-4.5 h-4.5 text-primary" />
                       </div>
                       <div>
-                        <div className="font-medium text-foreground">{supplier.name}</div>
-                        <div className="text-xs text-muted-foreground">{supplier.email}</div>
+                        <div className="font-semibold text-foreground group-hover:text-primary transition-colors">{supplier.name}</div>
+                        <div className="text-xs font-medium text-muted-foreground mt-0.5">{supplier.email}</div>
                       </div>
                     </div>
                   </td>
-                  <td className="px-5 py-4 text-muted-foreground hidden md:table-cell">
+                  <td className="px-6 py-4 font-medium text-muted-foreground hidden md:table-cell">
                     <div>{supplier.contact}</div>
                     <div className="text-xs">{supplier.phone}</div>
                   </td>
-                  <td className="px-5 py-4 text-muted-foreground hidden lg:table-cell">{supplier.district}</td>
-                  <td className="px-5 py-4 font-medium text-foreground hidden sm:table-cell">{supplier.rooms}</td>
-                  <td className="px-5 py-4">
+                  <td className="px-6 py-4 font-medium text-muted-foreground hidden lg:table-cell">{supplier.district}</td>
+                  <td className="px-6 py-4 font-semibold text-foreground hidden sm:table-cell">{supplier.rooms}</td>
+                  <td className="px-6 py-4">
                     {supplier.status === "approved" ? (
-                      <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full text-emerald-600 bg-emerald-50 dark:bg-emerald-500/10 dark:text-emerald-400">
-                        <CheckCircle2 className="w-3 h-3" /> Approved
+                      <span className="inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-md shadow-sm border border-black/5 text-emerald-700 bg-emerald-100 dark:bg-emerald-500/20 dark:text-emerald-400">
+                        <CheckCircle2 className="w-3.5 h-3.5" /> Approved
                       </span>
                     ) : (
-                      <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full text-amber-600 bg-amber-50 dark:bg-amber-500/10 dark:text-amber-400">
-                        <Clock className="w-3 h-3" /> Pending
+                      <span className="inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-md shadow-sm border border-black/5 text-amber-700 bg-amber-100 dark:bg-amber-500/20 dark:text-amber-400">
+                        <Clock className="w-3.5 h-3.5" /> Pending
                       </span>
                     )}
                   </td>
-                  <td className="px-5 py-4">
-                    <div className="flex items-center gap-2">
+                  <td className="px-6 py-4">
+                    <div className="flex items-center gap-3">
                       {supplier.status === "pending" && (
-                        <button className="text-xs font-medium text-emerald-600 dark:text-emerald-400 hover:underline">Approve</button>
+                        <button className="text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:text-emerald-500 transition-colors">Approve</button>
                       )}
-                      <button className="text-xs font-medium text-primary hover:underline">View</button>
+                      <button className="text-xs font-bold text-primary hover:text-primary/80 transition-colors">View</button>
                     </div>
                   </td>
                 </tr>

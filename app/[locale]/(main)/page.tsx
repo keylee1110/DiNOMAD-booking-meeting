@@ -42,134 +42,124 @@ export default function LandingPage() {
 
   return (
     <div className="flex flex-col">
-      {/* Hero Section */}
-      <section className="relative overflow-hidden border-b-2 border-primary bg-background pt-24 pb-16 md:pt-32 md:pb-24">
-        {/* Geometric Background Element */}
-        <div className="absolute top-0 right-0 hidden h-full w-1/2 -skew-x-12 translate-x-32 bg-primary/10 lg:block pointer-events-none" />
+      {/* Hero Section - Centered & Layered Depth */}
+      <section className="relative overflow-hidden pt-32 pb-24 md:pt-48 md:pb-32 bg-secondary/20">
+        {/* Modern Background Decorations */}
+        <div className="absolute top-[-20%] right-[-10%] w-[60%] h-[60%] bg-primary/10 rounded-full blur-[150px] pointer-events-none" />
+        <div className="absolute bottom-[-10%] left-[-10%] w-[50%] h-[50%] bg-primary/5 rounded-full blur-[150px] pointer-events-none" />
 
-        <div className="mx-auto flex max-w-7xl flex-col px-4 md:flex-row md:items-center">
-
-          {/* Left: Typography */}
-          <div className="z-10 flex-1 md:pr-12">
-            <h1 className="text-[3.5rem] font-black uppercase leading-[0.85] tracking-tighter text-foreground md:text-[5rem] lg:text-[6.5rem]">
-              {t("landing.heroTitle")}
-            </h1>
-            <p className="mt-6 border-l-4 border-primary pl-4 text-lg font-medium text-muted-foreground md:text-xl max-w-md">
-              {t("landing.heroSubtitle")}
-            </p>
-          </div>
-
-          {/* Right: Search Box Brutalist */}
-          <div className="z-10 mt-12 w-full md:mt-0 md:w-[400px] lg:w-[450px] shrink-0">
-            <div className="flex flex-col gap-4 border-2 border-primary bg-card p-6 shadow-[8px_8px_0px_0px_#64B5F6] transition-transform hover:-translate-y-1 hover:shadow-[12px_12px_0px_0px_#64B5F6]">
-
-              <div className="flex flex-col gap-1.5">
-                <label className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                  <Search className="h-3.5 w-3.5 text-primary" />
-                  {t("common.search")}
-                </label>
-                <Input
-                  placeholder={t("landing.searchPlaceholder")}
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  className="rounded-none border-2 border-border bg-background focus-visible:ring-0 focus-visible:border-primary"
-                  onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="flex flex-col gap-1.5">
-                  <label className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                    <MapPin className="h-3.5 w-3.5 text-primary" />
-                    {t("landing.district")}
-                  </label>
-                  <Select value={district} onValueChange={setDistrict}>
-                    <SelectTrigger className="rounded-none border-2 border-border bg-background focus:ring-0 focus:border-primary">
-                      <SelectValue placeholder={t("landing.allDistricts")} />
-                    </SelectTrigger>
-                    <SelectContent className="rounded-none border-2 border-primary">
-                      {districts.map((d) => (
-                        <SelectItem key={d} value={d} className="rounded-none focus:bg-primary/20">{d}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="flex flex-col gap-1.5">
-                  <label className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                    <Users className="h-3.5 w-3.5 text-primary" />
-                    {t("landing.capacity")}
-                  </label>
-                  <Select value={capacity} onValueChange={setCapacity}>
-                    <SelectTrigger className="rounded-none border-2 border-border bg-background focus:ring-0 focus:border-primary">
-                      <SelectValue placeholder="1-12+" />
-                    </SelectTrigger>
-                    <SelectContent className="rounded-none border-2 border-primary">
-                      {[2, 4, 6, 8, 10, 12].map((n) => (
-                        <SelectItem key={n} value={n.toString()} className="rounded-none focus:bg-primary/20">{n}+</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <Button
-                onClick={handleSearch}
-                className="mt-2 rounded-none border-2 border-transparent bg-primary text-primary-foreground hover:bg-foreground hover:text-background font-bold uppercase tracking-wider transition-colors"
-                size="lg"
-              >
-                <Search className="mr-2 h-4 w-4" />
-                {t("landing.searchButton")}
-              </Button>
-            </div>
-
-            {/* Quick Filters */}
-            <div className="mt-6 flex flex-wrap items-center gap-2">
-              <span className="text-xs font-bold uppercase tracking-wide text-foreground">{t("landing.quickFilters")}:</span>
-              {quickFilters.map((f) => (
-                <Badge
-                  key={f.param}
-                  variant="outline"
-                  className="rounded-none border-2 border-border cursor-pointer hover:border-primary hover:bg-primary/5 transition-colors"
-                  onClick={() => router.push(`/${locale}/search?${f.param}`)}
-                >
-                  {f.label}
-                </Badge>
-              ))}
-            </div>
-          </div>
+        <div className="relative z-10 mx-auto max-w-5xl px-4 text-center">
+          <h1 className="text-[3rem] font-bold leading-[1.1] tracking-tight text-foreground md:text-[5rem] lg:text-[6.5rem] mb-8">
+            {t("landing.heroTitle")}
+          </h1>
+          <p className="mx-auto mt-6 text-lg font-medium text-muted-foreground md:text-xl max-w-2xl leading-relaxed">
+            {t("landing.heroSubtitle")}
+          </p>
         </div>
       </section>
 
-      {/* Featured Rooms */}
-      <section className="border-b-2 border-border py-12 md:py-16">
-        <div className="mx-auto max-w-7xl px-4">
-          <div className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-4">
-            <div>
-              <h2 className="text-3xl font-black uppercase tracking-tight text-foreground">{t("landing.featured")}</h2>
-              <p className="mt-2 text-sm font-medium text-muted-foreground border-l-2 border-primary pl-3">{t("landing.featuredSubtitle")}</p>
-            </div>
+          {/* Search Control - Floating Glassmorphic Container */}
+          <div className="relative z-20 -mt-16 mx-auto w-full max-w-4xl px-4">
+            <div className="backdrop-blur-2xl bg-white/70 border border-white/50 p-5 rounded-3xl shadow-2xl flex flex-col gap-4">
 
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-              {/* Tabs for Categories */}
-              <div className="flex items-center gap-2">
+              {/* Main search row */}
+              <div className="flex flex-col md:flex-row gap-3 items-stretch">
+                {/* Search Term */}
+                <div className="flex flex-1 items-center gap-3 rounded-2xl border border-border/50 bg-background/60 px-4 h-14 focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-primary/10 transition-all">
+                  <Search className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <Input
+                    placeholder={t("landing.searchPlaceholder")}
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    className="h-full border-0 bg-transparent p-0 text-sm focus-visible:ring-0 placeholder:text-muted-foreground/60"
+                    onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+                  />
+                </div>
+
+                {/* District Select */}
+                <div className="flex items-center gap-2 rounded-2xl border border-border/50 bg-background/60 px-4 h-14 min-w-[160px] focus-within:border-primary/50 transition-all">
+                  <MapPin className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <Select value={district} onValueChange={setDistrict}>
+                    <SelectTrigger className="h-full border-0 bg-transparent p-0 text-sm focus:ring-0 [&>svg]:ml-auto">
+                      <SelectValue placeholder={t("landing.allDistricts")} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {districts.map((d) => (
+                        <SelectItem key={d} value={d}>{d}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Capacity Select */}
+                <div className="flex items-center gap-2 rounded-2xl border border-border/50 bg-background/60 px-4 h-14 min-w-[130px] focus-within:border-primary/50 transition-all">
+                  <Users className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <Select value={capacity} onValueChange={setCapacity}>
+                    <SelectTrigger className="h-full border-0 bg-transparent p-0 text-sm focus:ring-0 [&>svg]:ml-auto">
+                      <SelectValue placeholder={t("landing.capacity")} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {[2, 4, 6, 8, 10, 12].map((n) => (
+                        <SelectItem key={n} value={n.toString()}>{n}+ người</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Search Button */}
                 <Button
-                  variant={activeTab === "team_hub" ? "default" : "outline"}
-                  onClick={() => setActiveTab("team_hub")}
-                  className={`rounded-none font-bold uppercase tracking-wider border-2 ${activeTab === "team_hub" ? "border-primary bg-primary text-primary-foreground" : "border-border hover:border-primary"}`}
+                  onClick={handleSearch}
+                  className="h-14 px-7 rounded-2xl font-bold shadow-lg shadow-primary/20 hover:shadow-xl hover:shadow-primary/30 hover:-translate-y-0.5 transition-all duration-300 shrink-0 text-sm"
                 >
-                  Team Hubs
-                </Button>
-                <Button
-                  variant={activeTab === "solo_nook" ? "default" : "outline"}
-                  onClick={() => setActiveTab("solo_nook")}
-                  className={`rounded-none font-bold uppercase tracking-wider border-2 ${activeTab === "solo_nook" ? "border-primary bg-primary text-primary-foreground" : "border-border hover:border-primary"}`}
-                >
-                  Solo Nooks
+                  <Search className="h-4 w-4 mr-2" />
+                  {t("landing.searchButton")}
                 </Button>
               </div>
 
-              <Button variant="outline" onClick={() => router.push(`/${locale}/search`)} className="rounded-none border-2 border-foreground hover:bg-foreground hover:text-background hidden md:flex font-bold uppercase">
+              {/* Quick Filters */}
+              <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-border/30">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/70 mr-1">{t("landing.quickFilters")}:</span>
+                {quickFilters.map((f) => (
+                  <Badge
+                    key={f.param}
+                    variant="outline"
+                    className="rounded-full text-xs cursor-pointer border-border/50 bg-white/30 hover:bg-primary/5 hover:text-primary hover:border-primary/30 transition-all duration-200"
+                    onClick={() => router.push(`/${locale}/search?${f.param}`)}
+                  >
+                    {f.label}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          </div>
+
+      {/* Featured Rooms */}
+      <section className="py-24 md:py-32">
+        <div className="mx-auto max-w-7xl px-4">
+          <div className="mb-12 flex flex-col md:flex-row md:items-end justify-between gap-6">
+            <div className="max-w-xl">
+              <h2 className="text-4xl font-bold tracking-tight text-foreground mb-4">{t("landing.featured")}</h2>
+              <p className="text-lg text-muted-foreground">{t("landing.featuredSubtitle")}</p>
+            </div>
+
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+              {/* Modern Segmented Control for Categories */}
+              <div className="flex p-1 bg-muted rounded-xl">
+                <button
+                  onClick={() => setActiveTab("team_hub")}
+                  className={`px-6 py-2 rounded-lg font-bold text-sm transition-all duration-300 ${activeTab === "team_hub" ? "bg-background text-primary shadow-sm" : "text-muted-foreground hover:bg-background/40"}`}
+                >
+                  Team Hubs
+                </button>
+                <button
+                  onClick={() => setActiveTab("solo_nook")}
+                  className={`px-6 py-2 rounded-lg font-bold text-sm transition-all duration-300 ${activeTab === "solo_nook" ? "bg-background text-primary shadow-sm" : "text-muted-foreground hover:bg-background/40"}`}
+                >
+                  Solo Nooks
+                </button>
+              </div>
+
+              <Button variant="outline" onClick={() => router.push(`/${locale}/search`)} className="hidden md:flex">
                 {t("common.viewAll")} <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             </div>
@@ -182,20 +172,20 @@ export default function LandingPage() {
           </div>
 
           <div className="mt-8 text-center md:hidden">
-            <Button variant="outline" onClick={() => router.push(`/${locale}/search`)} className="w-full rounded-none border-2 border-foreground hover:bg-foreground hover:text-background font-bold uppercase">
+            <Button variant="outline" onClick={() => router.push(`/${locale}/search`)} className="w-full">
               {t("common.viewAll")} <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
           </div>
         </div>
       </section>
 
-      {/* How It Works */}
-      <section className="border-b-2 border-border bg-muted/20 py-16 md:py-24">
-        <div className="mx-auto max-w-7xl px-4">
-          <h2 className="mb-12 text-center text-3xl font-black uppercase text-foreground">
-            <span className="bg-primary text-primary-foreground px-4 py-1 inline-block -rotate-2">{t("landing.howItWorks")}</span>
+      {/* How It Works - Premium Steps */}
+      <section className="bg-muted/30 py-24 md:py-32 rounded-[3.5rem] mx-4 mb-24">
+        <div className="mx-auto max-w-7xl px-4 text-center">
+          <h2 className="mb-20 text-4xl font-bold tracking-tight text-foreground">
+            {t("landing.howItWorks")}
           </h2>
-          <div className="grid gap-8 md:grid-cols-3 md:gap-12 lg:gap-16">
+          <div className="grid gap-12 md:grid-cols-3">
             {[
               { icon: Search, title: t("landing.step1Title"), desc: t("landing.step1Desc"), step: "01" },
               { icon: CalendarDays, title: t("landing.step2Title"), desc: t("landing.step2Desc"), step: "02" },
@@ -203,13 +193,12 @@ export default function LandingPage() {
             ].map((item) => {
               const Icon = item.icon
               return (
-                <div key={item.step} className="relative flex flex-col border-2 border-border bg-background p-6 transition-transform hover:-translate-y-2 hover:border-primary hover:shadow-[8px_8px_0px_0px_#64B5F6]">
-                  <div className="absolute -top-5 -right-5 flex h-10 w-10 items-center justify-center border-2 border-primary bg-primary text-primary-foreground font-black text-lg shadow-[4px_4px_0px_0px_var(--color-foreground)] z-10">
-                    {item.step}
+                <div key={item.step} className="group relative flex flex-col items-center bg-background/50 backdrop-blur-sm p-10 rounded-[2.5rem] border border-border/50 transition-all duration-500 hover:-translate-y-3 hover:shadow-2xl hover:shadow-primary/5">
+                  <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10 text-primary mb-8 transition-transform duration-500 group-hover:scale-110">
+                    <Icon className="h-8 w-8" />
                   </div>
-                  <Icon className="mb-4 h-10 w-10 text-primary" />
-                  <h3 className="mb-2 text-xl font-black uppercase text-foreground">{item.title}</h3>
-                  <p className="text-sm font-medium text-muted-foreground">{item.desc}</p>
+                  <h3 className="mb-4 text-2xl font-bold text-foreground">{item.title}</h3>
+                  <p className="text-muted-foreground leading-relaxed">{item.desc}</p>
                 </div>
               )
             })}
@@ -218,20 +207,22 @@ export default function LandingPage() {
       </section>
 
       {/* Trust Section */}
-      <section className="py-16 md:py-24">
+      <section className="py-24 md:py-32">
         <div className="mx-auto max-w-7xl px-4">
-          <h2 className="mb-10 text-center text-3xl font-black uppercase text-foreground">{t("landing.trustTitle")}</h2>
-          <div className="grid gap-6 md:grid-cols-3 lg:gap-12">
+          <h2 className="mb-16 text-center text-4xl font-bold tracking-tight text-foreground">{t("landing.trustTitle")}</h2>
+          <div className="grid gap-8 md:grid-cols-3">
             {[
-              { icon: BadgeCheck, label: t("landing.verifiedListings"), color: "text-foreground" },
+              { icon: BadgeCheck, label: t("landing.verifiedListings"), color: "text-primary" },
               { icon: Building2, label: t("landing.partnersCount"), color: "text-primary" },
-              { icon: BarChart3, label: t("landing.bookingsCount"), color: "text-muted-foreground" },
+              { icon: BarChart3, label: t("landing.bookingsCount"), color: "text-primary" },
             ].map((item) => {
               const Icon = item.icon
               return (
-                <div key={item.label} className="flex flex-col flex-1 items-center border-2 border-border bg-card p-8 text-center transition-all hover:border-primary hover:shadow-[6px_6px_0px_0px_#64B5F6]">
-                  <Icon className={`mb-4 h-12 w-12 ${item.color}`} />
-                  <span className="text-xl font-black uppercase text-card-foreground">{item.label}</span>
+                <div key={item.label} className="group flex flex-col items-center p-10 rounded-3xl border border-border/50 bg-card/50 transition-all duration-500 hover:shadow-xl hover:shadow-primary/5 hover:border-primary/20">
+                  <div className="mb-6 rounded-2xl bg-primary/5 p-4 transition-transform duration-500 group-hover:scale-110">
+                    <Icon className={`h-12 w-12 ${item.color}`} />
+                  </div>
+                  <span className="text-xl font-bold text-card-foreground text-center line-clamp-2">{item.label}</span>
                 </div>
               )
             })}
@@ -241,3 +232,4 @@ export default function LandingPage() {
     </div>
   )
 }
+

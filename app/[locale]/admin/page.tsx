@@ -25,7 +25,7 @@ export default function AdminDashboardPage() {
 
         {/* Right Column: Secondary Info */}
         <div className="space-y-6">
-          <div className="bg-card border border-border rounded-lg overflow-hidden">
+          <div className="bg-white/60 dark:bg-card/60 backdrop-blur-xl border border-white/50 dark:border-white/10 rounded-2xl overflow-hidden shadow-[0_8px_30px_rgb(0,0,0,0.04)] h-full">
             <PendingSuppliers />
             <RoomStatusOverview />
           </div>
