@@ -28,7 +28,7 @@ export default async function AdminLayout({
 
   return (
     <I18nProvider locale={locale as Locale} dictionary={dictionary}>
-      <div className="flex h-screen bg-background overflow-hidden antialiased">
+      <div className="flex h-screen bg-transparent overflow-hidden antialiased">
         <AdminSidebar locale={locale} />
         <div className="flex flex-col flex-1 overflow-hidden min-w-0">
           <AdminHeader />

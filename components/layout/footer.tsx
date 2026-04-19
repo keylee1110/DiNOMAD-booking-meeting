@@ -8,59 +8,59 @@ export function Footer() {
   const { locale, t } = useTranslation()
 
   return (
-    <footer className="border-t border-border bg-muted/30">
-      <div className="mx-auto max-w-7xl px-4 py-12">
-        <div className="grid gap-8 md:grid-cols-4">
-          <div>
-            <Link href={`/${locale}`} className="mb-4 flex items-center gap-2">
-              <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-lg bg-transparent">
+    <footer className="bg-secondary/10 border-t border-border/50">
+      <div className="mx-auto max-w-7xl px-6 py-20 lg:px-8">
+        <div className="grid gap-12 md:grid-cols-4">
+          <div className="flex flex-col gap-6">
+            <Link href={`/${locale}`} className="flex items-center gap-2 group">
+              <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl bg-primary/5 transition-transform duration-300 group-hover:scale-105">
                 <Image 
                   src="/logo.png" 
                   alt="DiNOMAD Logo" 
                   width={40} 
                   height={40} 
-                  className="object-contain h-full w-auto"
+                  className="object-contain"
                 />
               </div>
-              <span className="text-lg font-bold tracking-tight text-foreground">
+              <span className="text-xl font-bold tracking-tight text-foreground">
                 Di<span className="text-primary">NOMAD</span>
               </span>
             </Link>
-            <p className="mt-2 text-sm text-muted-foreground">
+            <p className="text-sm leading-relaxed text-muted-foreground/80 font-medium">
               {locale === "vi"
-                ? "Nen tang dat phong hop cho sinh vien va freelancer tai TP.HCM"
-                : "Meeting room booking platform for students and freelancers in HCMC"}
+                ? "Nền tảng đặt phòng họp, chỗ ngồi làm việc linh hoạt dành cho sinh viên và freelancer tại TP.HCM."
+                : "The premium workspace booking platform for students and remote workers in Ho Chi Minh City."}
             </p>
           </div>
 
           <div>
-            <h4 className="mb-3 text-sm font-semibold text-foreground">
-              {locale === "vi" ? "Lien Ket" : "Links"}
+            <h4 className="mb-6 text-sm font-bold uppercase tracking-widest text-foreground">
+              {locale === "vi" ? "Liên Kết" : "Explore"}
             </h4>
-            <ul className="flex flex-col gap-2">
+            <ul className="flex flex-col gap-3">
               <li>
-                <Link href={`/${locale}/search`} className="text-sm text-muted-foreground hover:text-foreground">
+                <Link href={`/${locale}/search`} className="text-sm font-medium text-muted-foreground transition-colors hover:text-primary">
                   {t("common.search")}
                 </Link>
               </li>
               <li>
-                <Link href={`/${locale}/login`} className="text-sm text-muted-foreground hover:text-foreground">
-                  Partner Login
+                <Link href={`/${locale}/login`} className="text-sm font-medium text-muted-foreground transition-colors hover:text-primary">
+                  Partner Portal
                 </Link>
               </li>
             </ul>
           </div>
 
           <div>
-            <h4 className="mb-3 text-sm font-semibold text-foreground">
-              {locale === "vi" ? "Khu Vuc" : "Districts"}
+            <h4 className="mb-6 text-sm font-bold uppercase tracking-widest text-foreground">
+              {locale === "vi" ? "Khu Vực" : "Districts"}
             </h4>
-            <ul className="flex flex-col gap-2">
+            <ul className="flex flex-col gap-3">
               {["Thu Duc", "District 1", "District 7", "District 10", "Binh Thanh"].map((d) => (
                 <li key={d}>
                   <Link
                     href={`/${locale}/search?district=${encodeURIComponent(d)}`}
-                    className="text-sm text-muted-foreground hover:text-foreground"
+                    className="text-sm font-medium text-muted-foreground transition-colors hover:text-primary"
                   >
                     {d}
                   </Link>
@@ -70,21 +70,37 @@ export function Footer() {
           </div>
 
           <div>
-            <h4 className="mb-3 text-sm font-semibold text-foreground">
-              {locale === "vi" ? "Lien He" : "Contact"}
+            <h4 className="mb-6 text-sm font-bold uppercase tracking-widest text-foreground">
+              {locale === "vi" ? "Liên Hệ" : "Connect"}
             </h4>
-            <ul className="flex flex-col gap-2 text-sm text-muted-foreground">
-              <li>hello@dinomad.vn</li>
-              <li>028-1234-5678</li>
-              <li>Ho Chi Minh City, Vietnam</li>
+            <ul className="flex flex-col gap-4 text-sm font-medium text-muted-foreground">
+              <li className="flex items-center gap-3">
+                <span className="h-2 w-2 rounded-full bg-primary" />
+                hello@dinomad.vn
+              </li>
+              <li className="flex items-center gap-3">
+                <span className="h-2 w-2 rounded-full bg-primary" />
+                028-1234-5678
+              </li>
+              <li className="flex items-center gap-3">
+                <span className="h-2 w-2 rounded-full bg-primary" />
+                Ho Chi Minh City, VN
+              </li>
             </ul>
           </div>
         </div>
 
-        <div className="mt-8 border-t border-border pt-6 text-center text-xs text-muted-foreground">
-          &copy; {new Date().getFullYear()} DiNOMAD. {locale === "vi" ? "Moi quyen duoc bao luu." : "All rights reserved."}
+        <div className="mt-20 border-t border-border/50 pt-10 flex flex-col md:flex-row items-center justify-between gap-6">
+          <p className="text-xs font-semibold text-muted-foreground/60">
+            &copy; {new Date().getFullYear()} DiNOMAD Global. {locale === "vi" ? "Mọi quyền được bảo lưu." : "All rights reserved."}
+          </p>
+          <div className="flex gap-8 text-xs font-semibold text-muted-foreground/60 transition-colors">
+            <Link href="#" className="hover:text-primary">Privacy Policy</Link>
+            <Link href="#" className="hover:text-primary">Terms of Service</Link>
+          </div>
         </div>
       </div>
     </footer>
+
   )
 }

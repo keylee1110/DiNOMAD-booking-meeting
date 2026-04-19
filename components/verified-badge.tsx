@@ -7,8 +7,8 @@ export function VerifiedBadge({ size = "sm" }: { size?: "sm" | "md" }) {
   const { t } = useTranslation()
 
   return (
-    <span className={`inline-flex items-center gap-1 rounded-none border-2 border-border bg-background px-2 py-0.5 text-foreground font-black uppercase tracking-wider shadow-[2px_2px_0px_0px_var(--color-primary)] ${size === "md" ? "text-sm" : "text-[10px]"}`}>
-      <BadgeCheck className={`text-primary ${size === "md" ? "h-4 w-4" : "h-3.5 w-3.5"}`} />
+    <span className={`inline-flex items-center gap-1.5 rounded-full border border-primary/20 bg-primary/5 backdrop-blur-sm px-2.5 py-1 text-primary font-bold uppercase tracking-wider shadow-sm ${size === "md" ? "text-xs" : "text-[9px]"}`}>
+      <BadgeCheck className={`${size === "md" ? "h-4 w-4" : "h-3.5 w-3.5"}`} />
       {t("common.verified")}
     </span>
   )

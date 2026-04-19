@@ -57,9 +57,9 @@ export function AdminSidebar({ locale }: { locale: string }) {
   const pathname = usePathname()
 
   return (
-    <aside className="w-64 bg-card border-r border-border flex flex-col shrink-0">
+    <aside className="w-64 bg-white/60 dark:bg-card/60 backdrop-blur-2xl border-r border-white/40 dark:border-white/10 flex flex-col shrink-0 shadow-[4px_0_24px_-12px_rgba(0,0,0,0.1)] z-20">
       {/* Logo */}
-      <div className="h-16 flex items-center gap-3 px-6 border-b border-border shrink-0">
+      <div className="h-20 flex items-center gap-3 px-6 border-b border-white/40 dark:border-white/10 shrink-0">
         <Image src="/logo.png" alt="DiNOMAD Logo" width={32} height={32} className="object-contain" />
         <div>
           <p className="font-bold text-foreground text-sm leading-tight">DiNOMAD</p>
@@ -81,10 +81,10 @@ export function AdminSidebar({ locale }: { locale: string }) {
                 <Link
                   href={fullHref}
                   className={cn(
-                    "flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors",
+                    "flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold transition-all duration-300",
                     isActive
-                      ? "bg-primary/10 text-primary"
-                      : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                      ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20 scale-[1.02]"
+                      : "text-muted-foreground hover:text-primary hover:bg-white/50 hover:shadow-sm"
                   )}
                 >
                   <item.icon className="w-4 h-4 shrink-0" />
@@ -97,8 +97,8 @@ export function AdminSidebar({ locale }: { locale: string }) {
       </nav>
 
       {/* Footer */}
-      <div className="mt-auto p-3 border-t border-border bg-card shrink-0 z-10">
-        <div className="flex items-center gap-3 px-3 py-2.5 rounded-md bg-muted/30">
+      <div className="mt-auto p-4 border-t border-white/40 dark:border-white/10 shrink-0 z-10">
+        <div className="flex items-center gap-3 px-3 py-3 rounded-2xl bg-white/40 dark:bg-muted/30 border border-white/50 hover:bg-white/60 transition-colors shadow-sm">
           <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
             <span className="text-primary font-bold text-xs">A</span>
           </div>

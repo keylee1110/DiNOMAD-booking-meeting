@@ -8,7 +8,7 @@ export default function MainLayout({
   children: React.ReactNode
 }) {
   return (
-    <div className="flex min-h-screen flex-col antialiased bg-background">
+    <div className="flex min-h-screen flex-col antialiased">
       <Header />
       <main className="flex-1 pb-16 md:pb-0 scroll-smooth">{children}</main>
       <Footer />

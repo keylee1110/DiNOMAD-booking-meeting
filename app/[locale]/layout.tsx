@@ -3,6 +3,7 @@ import { getDictionary, isValidLocale } from "@/lib/i18n"
 import type { Locale } from "@/lib/types"
 import { I18nProvider } from "@/lib/i18n/context"
 import { BookingProvider } from "@/lib/store/booking-store"
+import { UserProvider } from "@/lib/store/user-store"
 import { notFound } from "next/navigation"
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
@@ -32,9 +33,11 @@ export default async function LocaleLayout({
 
   return (
     <I18nProvider locale={locale as Locale} dictionary={dictionary as any}>
-      <BookingProvider>
-        {children}
-      </BookingProvider>
+      <UserProvider>
+        <BookingProvider>
+          {children}
+        </BookingProvider>
+      </UserProvider>
     </I18nProvider>
   )
 }

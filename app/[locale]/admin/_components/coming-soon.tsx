@@ -9,9 +9,9 @@ interface ComingSoonProps {
 
 export function ComingSoon({ title, description, locale }: ComingSoonProps) {
   return (
-    <div className="flex flex-col items-center justify-center min-h-[60vh] text-center p-6 bg-card border border-dashed border-border rounded-xl">
-      <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-6">
-        <Construction className="w-8 h-8 text-primary" />
+    <div className="flex flex-col items-center justify-center min-h-[50vh] text-center p-8 bg-white/60 dark:bg-card/60 backdrop-blur-xl border border-white/50 dark:border-white/10 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
+      <div className="w-20 h-20 rounded-2xl bg-white/40 dark:bg-primary/5 flex items-center justify-center mb-6 shadow-inner border border-white/60 dark:border-white/5">
+        <Construction className="w-10 h-10 text-primary drop-shadow-sm" />
       </div>
       <h1 className="text-2xl font-bold text-foreground mb-2">{title}</h1>
       <p className="text-muted-foreground max-w-md mb-8">

@@ -7,30 +7,32 @@ const pendingSuppliers = [
 
 export function PendingSuppliers() {
   return (
-    <div className="bg-card border border-border rounded-lg overflow-hidden">
-      <div className="px-5 py-4 border-b border-border flex items-center justify-between">
-        <h2 className="font-semibold text-foreground">Pending Suppliers</h2>
-        <span className="text-xs font-medium bg-amber-500/10 text-amber-600 dark:text-amber-400 px-2 py-1 rounded-full">
+    <div className="flex flex-col">
+      <div className="px-6 py-5 border-b border-white/40 dark:border-white/10 flex items-center justify-between bg-white/40 dark:bg-muted/10">
+        <h2 className="font-bold text-foreground text-lg tracking-tight">Pending Suppliers</h2>
+        <span className="text-xs font-bold bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400 px-3 py-1.5 rounded-md shadow-sm">
           {pendingSuppliers.length} awaiting
         </span>
       </div>
-      <div className="p-4 space-y-3">
+      <div className="p-6 space-y-4">
         {pendingSuppliers.map((supplier) => (
-          <div key={supplier.name} className="p-3 bg-muted/50 rounded-lg border border-border hover:border-primary/20 transition-colors">
-            <div className="flex items-start justify-between gap-2">
+          <div key={supplier.name} className="p-4 bg-white/50 dark:bg-muted/30 rounded-xl border border-white/60 dark:border-white/10 shadow-sm hover:border-primary/30 transition-colors group">
+            <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <p className="font-medium text-sm text-foreground truncate">{supplier.name}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">
+                <p className="font-semibold text-sm text-foreground truncate group-hover:text-primary transition-colors">{supplier.name}</p>
+                <p className="text-xs font-medium text-muted-foreground mt-1">
                   {supplier.district} · {supplier.contact} · {supplier.rooms} rooms
                 </p>
               </div>
-              <Building2 className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />
+              <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                <Building2 className="w-4 h-4 text-primary" />
+              </div>
             </div>
-            <div className="flex gap-2 mt-3">
-              <button className="flex-1 text-xs font-medium py-1.5 px-3 bg-primary text-primary-foreground rounded-md hover:opacity-90 transition-opacity">
+            <div className="flex gap-3 mt-4">
+              <button className="flex-1 text-xs font-bold py-2 px-4 bg-primary text-primary-foreground rounded-lg hover:shadow-md hover:-translate-y-0.5 transition-all outline-none focus:ring-2 focus:ring-primary/20">
                 Approve
               </button>
-              <button className="flex-1 text-xs font-medium py-1.5 px-3 border border-border text-muted-foreground rounded-md hover:text-foreground hover:bg-background transition-all">
+              <button className="flex-1 text-xs font-bold py-2 px-4 bg-white dark:bg-muted text-foreground rounded-lg border border-border/60 hover:bg-muted/50 transition-all outline-none">
                 Review
               </button>
             </div>
