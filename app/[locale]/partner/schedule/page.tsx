@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { useTranslation } from "@/lib/i18n/context"
 import { CalendarCheck, Search, Filter, Users, MapPin, Check, X, LogIn, LogOut, Clock } from "lucide-react"
+import { Button } from "@/components/ui/button"
 
 export default function SchedulePage() {
   const { t } = useTranslation()
@@ -43,10 +44,10 @@ export default function SchedulePage() {
     <div className="flex flex-col gap-8 animate-in fade-in duration-500 max-w-5xl mx-auto w-full">
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div className="flex flex-col gap-2">
-          <h1 className="text-3xl md:text-5xl font-black uppercase tracking-tighter flex items-center gap-3">
+          <h1 className="text-3xl md:text-4xl font-bold tracking-tight flex items-center gap-3">
              <CalendarCheck className="h-8 w-8 text-primary hidden md:block" /> Today's Schedule
           </h1>
-          <p className="border-l-4 border-primary pl-3 text-sm md:text-base font-medium text-muted-foreground">
+          <p className="text-base text-muted-foreground">
             Manage your daily booking pipeline, prepare rooms, and process check-ins in real-time.
           </p>
         </div>
@@ -58,21 +59,21 @@ export default function SchedulePage() {
               placeholder="Search ID, Name..." 
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="border-2 border-foreground bg-background pl-9 pr-4 py-2 font-black uppercase tracking-wider text-xs md:text-sm shadow-[2px_2px_0px_0px_var(--color-foreground)] focus:outline-none focus:border-primary focus:shadow-[2px_2px_0px_0px_var(--color-primary)] transition-all w-48 md:w-64"
+              className="rounded-xl border border-border/85 bg-background pl-9 pr-4 py-2 font-semibold text-xs md:text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-ring/50 focus:border-transparent transition-all w-48 md:w-64"
             />
           </div>
-          <button className="flex items-center gap-2 bg-foreground text-background border-2 border-foreground px-4 py-2 font-black uppercase tracking-wider text-xs md:text-sm hover:bg-primary hover:text-primary-foreground hover:border-primary transition-colors shadow-[2px_2px_0px_0px_var(--color-primary)] active:translate-y-[2px] active:shadow-none h-[#40px] md:h-[42px]">
+          <button className="flex items-center gap-2 bg-secondary text-secondary-foreground border border-border hover:bg-muted/80 px-4 py-2 font-semibold text-xs md:text-sm transition-all rounded-xl shadow-sm h-[#40px] md:h-[42px]">
              <Filter className="h-4 w-4" /> Filter
           </button>
         </div>
       </div>
 
-      <div className="flex gap-2 overflow-x-auto pb-2 custom-scrollbar border-b-2 border-border">
+      <div className="flex gap-2 overflow-x-auto pb-2 custom-scrollbar border-b border-border/40">
          {tabs.map(tab => (
            <button 
              key={tab.id}
              onClick={() => setFilterMode(tab.id)}
-             className={`px-4 py-2 font-black uppercase tracking-wider text-xs md:text-sm whitespace-nowrap transition-colors border-b-4 ${filterMode === tab.id ? 'border-primary text-foreground bg-primary/10' : 'border-transparent text-muted-foreground hover:border-foreground/30 hover:text-foreground'}`}
+             className={`px-4 py-2 font-semibold text-xs md:text-sm whitespace-nowrap transition-colors border-b-2 ${filterMode === tab.id ? 'border-primary text-foreground bg-primary/10' : 'border-transparent text-muted-foreground hover:border-foreground/30 hover:text-foreground'}`}
            >
              {tab.label}
            </button>
@@ -81,19 +82,29 @@ export default function SchedulePage() {
 
       <div className="flex flex-col gap-4">
         {filteredBookings.map((b) => (
-          <div key={b.id} className={`flex flex-col md:flex-row md:items-center justify-between p-4 md:p-5 border-2 ${b.status === 'in-progress' ? 'border-primary bg-primary/5 shadow-[4px_4px_0px_0px_var(--color-primary)]' : b.status === 'completed' || b.status === 'cancelled' ? 'border-border bg-muted/30 opacity-70 shadow-none hover:opacity-100' : 'border-foreground bg-card shadow-[4px_4px_0px_0px_var(--color-foreground)]'} hover:-translate-y-1 transition-transform gap-4 md:gap-6 group`}>
+          <div key={b.id} className={`flex flex-col md:flex-row md:items-center justify-between p-4 md:p-5 rounded-2xl border ${
+            b.status === 'in-progress' 
+              ? 'border-primary/40 bg-primary/5 shadow-sm' 
+              : b.status === 'completed' || b.status === 'cancelled' 
+                ? 'border-border/40 bg-muted/20 opacity-70 shadow-none hover:opacity-100' 
+                : 'border-border/50 bg-card shadow-[0_4px_20px_-4px_rgba(41,35,30,0.04)]'
+          } hover:-translate-y-0.5 transition-all gap-4 md:gap-6 group`}>
             {/* Left Info Group */}
             <div className="flex items-start gap-4 md:gap-6">
-              <div className={`p-3 md:px-4 md:py-3 border-2 font-black uppercase text-sm md:text-base whitespace-nowrap transition-colors flex flex-col items-center justify-center ${b.status === 'in-progress' ? 'bg-primary text-primary-foreground border-primary' : b.status === 'completed' || b.status === 'cancelled' ? 'bg-muted border-border text-muted-foreground' : 'bg-primary/10 text-primary border-primary group-hover:bg-primary group-hover:text-primary-foreground'}`}>
-                 <span>{b.time.split(' - ')[0]}</span>
-                 <span className="text-[10px] opacity-80 mt-1">{b.time.split(' - ')[1]}</span>
+              <div className={`p-2.5 md:px-3 md:py-2.5 rounded-xl border font-semibold text-sm md:text-base whitespace-nowrap transition-colors flex flex-col items-center justify-center min-w-[70px] ${
+                b.status === 'in-progress' 
+                  ? 'bg-primary text-primary-foreground border-transparent' 
+                  : 'bg-muted border-border/60 text-muted-foreground'
+              }`}>
+                 <span className="font-bold">{b.time.split(' - ')[0]}</span>
+                 <span className="text-[10px] opacity-80 mt-0.5">{b.time.split(' - ')[1]}</span>
               </div>
-              <div className="flex flex-col gap-1 mt-1">
-                <span className={`font-black uppercase text-base md:text-lg tracking-wide ${b.status === 'completed' || b.status === 'cancelled' ? 'line-through text-muted-foreground' : ''}`}>{b.room}</span>
-                <span className="text-sm text-foreground flex items-center gap-1.5 font-bold mt-1">
+              <div className="flex flex-col gap-1 mt-0.5">
+                <span className={`font-semibold text-base md:text-lg tracking-tight ${b.status === 'completed' || b.status === 'cancelled' ? 'line-through text-muted-foreground' : 'text-foreground'}`}>{b.room}</span>
+                <span className="text-sm text-foreground flex items-center gap-1.5 font-semibold mt-1">
                   <Users className="h-4 w-4 text-primary" /> {b.customer} 
                 </span>
-                <span className="text-xs text-muted-foreground font-medium flex items-center gap-1.5 mt-0.5 bg-background px-2 py-1 border border-border w-max">
+                <span className="text-xs text-muted-foreground font-medium flex items-center gap-1.5 mt-1 bg-background px-2.5 py-1 rounded-lg border border-border/60 w-max shadow-sm">
                   <MapPin className="h-3 w-3" /> {b.id} • 2 Guests
                 </span>
               </div>
@@ -103,12 +114,12 @@ export default function SchedulePage() {
             <div className="flex flex-col lg:flex-row items-start lg:items-center gap-4 lg:self-center mt-2 md:mt-0 w-full lg:w-auto overflow-hidden">
                
                {/* Status Badge */}
-               <span className={`px-4 py-2 border-2 text-[10px] md:text-xs font-black uppercase tracking-widest self-start md:self-center flex items-center justify-center min-w-[110px] text-center ${
-                  b.status === 'confirmed' ? 'border-primary text-primary bg-primary/10' : 
-                  b.status === 'arriving' ? 'border-orange-500 text-orange-600 bg-orange-500/10' :
-                  b.status === 'in-progress' ? 'border-[#C1FF72] text-foreground bg-[#C1FF72]/20' :
-                  b.status === 'cancelled' ? 'border-red-500 text-red-600 bg-red-500/10' :
-                  b.status === 'completed' ? 'border-foreground/30 text-foreground/50 bg-background' :
+               <span className={`px-3.5 py-1 border rounded-full text-[10px] md:text-xs font-semibold tracking-tight uppercase self-start md:self-center flex items-center justify-center min-w-[100px] text-center ${
+                  b.status === 'confirmed' ? 'border-primary/20 text-primary bg-primary/10' : 
+                  b.status === 'arriving' ? 'border-orange-500/20 text-orange-600 bg-orange-500/5' :
+                  b.status === 'in-progress' ? 'border-emerald-500/20 text-emerald-700 bg-emerald-500/5' :
+                  b.status === 'cancelled' ? 'border-destructive/20 text-destructive bg-destructive/5' :
+                  b.status === 'completed' ? 'border-border/40 text-muted-foreground bg-muted' :
                   'border-border text-muted-foreground bg-background'
                }`}>
                  {b.status}
@@ -118,31 +129,31 @@ export default function SchedulePage() {
                <div className="flex gap-3 w-full sm:w-auto">
                  {b.status === 'pending' && (
                    <>
-                     <button onClick={() => handleStatusChange(b.id, 'confirmed')} className="flex-1 sm:flex-none w-full sm:w-[130px] border-2 border-foreground bg-primary text-primary-foreground hover:bg-foreground hover:border-foreground px-4 py-2.5 text-xs font-black uppercase tracking-wider transition-all shadow-[2px_2px_0px_0px_var(--color-foreground)] active:translate-y-[2px] active:shadow-none flex items-center justify-center gap-1.5">
+                     <Button onClick={() => handleStatusChange(b.id, 'confirmed')} className="font-semibold rounded-xl w-full sm:w-[130px] shadow-sm flex items-center justify-center gap-1.5">
                        <Check className="h-4 w-4" /> Confirm
-                     </button>
-                     <button onClick={() => handleStatusChange(b.id, 'cancelled')} className="flex-1 sm:flex-none w-full sm:w-[130px] border-2 border-foreground bg-background text-red-600 hover:bg-red-500 hover:text-white px-4 py-2.5 text-xs font-black uppercase tracking-wider transition-all shadow-[2px_2px_0px_0px_var(--color-foreground)] active:translate-y-[2px] active:shadow-none flex items-center justify-center gap-1.5">
+                     </Button>
+                     <Button onClick={() => handleStatusChange(b.id, 'cancelled')} variant="destructive" className="font-semibold rounded-xl w-full sm:w-[130px] shadow-sm flex items-center justify-center gap-1.5">
                        <X className="h-4 w-4" /> Reject
-                     </button>
+                     </Button>
                    </>
                  )}
 
                  {b.status === 'confirmed' && (
-                   <button onClick={() => handleStatusChange(b.id, 'arriving')} className="w-full sm:w-[160px] border-2 border-foreground bg-background text-foreground hover:bg-muted px-4 py-2.5 text-xs font-black uppercase tracking-wider transition-all shadow-[2px_2px_0px_0px_var(--color-foreground)] active:translate-y-[2px] active:shadow-none flex items-center justify-center gap-1.5">
+                   <Button onClick={() => handleStatusChange(b.id, 'arriving')} variant="outline" className="font-semibold rounded-xl w-full sm:w-[160px] shadow-sm bg-transparent border-border hover:bg-muted/80 flex items-center justify-center gap-1.5">
                      <Clock className="h-4 w-4" /> Arriving
-                   </button>
+                   </Button>
                  )}
 
                  {b.status === 'arriving' && (
-                   <button onClick={() => handleStatusChange(b.id, 'in-progress')} className="w-full sm:w-[160px] border-2 border-foreground bg-foreground text-background hover:bg-primary hover:text-primary-foreground px-4 py-2.5 text-xs font-black uppercase tracking-wider transition-all shadow-[2px_2px_0px_0px_var(--color-foreground)] active:translate-y-[2px] active:shadow-none flex items-center justify-center gap-1.5">
+                   <Button onClick={() => handleStatusChange(b.id, 'in-progress')} className="font-semibold rounded-xl w-full sm:w-[160px] shadow-sm flex items-center justify-center gap-1.5">
                      <LogIn className="h-4 w-4" /> Check-in
-                   </button>
+                   </Button>
                  )}
 
                  {b.status === 'in-progress' && (
-                   <button onClick={() => handleStatusChange(b.id, 'completed')} className="w-full sm:w-[160px] border-2 border-foreground bg-[#C1FF72] text-foreground hover:bg-[#a5db5c] px-4 py-2.5 text-xs font-black uppercase tracking-wider transition-all shadow-[2px_2px_0px_0px_var(--color-foreground)] active:translate-y-[2px] active:shadow-none flex items-center justify-center gap-1.5">
+                   <Button onClick={() => handleStatusChange(b.id, 'completed')} className="font-semibold rounded-xl w-full sm:w-[160px] shadow-sm bg-emerald-500 hover:bg-emerald-600 text-white flex items-center justify-center gap-1.5">
                      <LogOut className="h-4 w-4" /> Check-out
-                   </button>
+                   </Button>
                  )}
 
                </div>
@@ -151,9 +162,9 @@ export default function SchedulePage() {
         ))}
 
         {filteredBookings.length === 0 && (
-          <div className="p-12 border-4 border-dashed border-border flex flex-col items-center justify-center text-center bg-muted/10 h-48">
-            <span className="text-muted-foreground font-black uppercase text-xl md:text-2xl mb-2">No bookings found</span>
-            <span className="text-muted-foreground text-xs md:text-sm font-bold uppercase tracking-widest bg-background px-4 py-2 border-2 border-border">Try checking a different status tab</span>
+          <div className="p-12 rounded-2xl border-2 border-dashed border-border/80 flex flex-col items-center justify-center text-center bg-muted/10 h-48">
+            <span className="text-muted-foreground font-semibold text-lg md:text-xl mb-2">No bookings found</span>
+            <span className="text-muted-foreground text-xs md:text-sm font-semibold tracking-tight bg-background px-4 py-2 rounded-xl border border-border/80 shadow-sm">Try checking a different status tab</span>
           </div>
         )}
       </div>

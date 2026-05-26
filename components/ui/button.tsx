@@ -5,24 +5,24 @@ import { cva, type VariantProps } from 'class-variance-authority'
 import { cn } from '@/lib/utils'
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-none border-2 text-sm font-black uppercase tracking-wider transition-all disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:ring-0 active:translate-y-0 active:shadow-[1px_1px_0px_0px_var(--shadow-color)]",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl border text-sm font-semibold tracking-tight transition-all disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:ring-2 focus-visible:ring-ring/50 active:scale-[0.98] duration-200",
   {
     variants: {
       variant: {
-        default: 'border-transparent bg-primary text-primary-foreground hover:bg-foreground hover:text-background',
+        default: 'border-transparent bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm',
         destructive:
-          'border-transparent bg-destructive text-destructive-foreground hover:bg-foreground hover:text-background',
+          'border-transparent bg-destructive text-destructive-foreground hover:bg-destructive/90 shadow-sm',
         outline:
-          'border-border bg-background shadow-[3px_3px_0px_0px_var(--color-border)] [--shadow-color:var(--color-border)] hover:border-primary hover:shadow-[3px_3px_0px_0px_#64B5F6] hover:-translate-y-0.5',
+          'border-border bg-background hover:bg-muted hover:text-foreground hover:border-border/80 shadow-sm',
         secondary:
-          'border-border bg-secondary text-secondary-foreground shadow-[3px_3px_0px_0px_var(--color-border)] [--shadow-color:var(--color-border)] hover:border-primary hover:shadow-[3px_3px_0px_0px_#64B5F6] hover:-translate-y-0.5',
+          'border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/85 shadow-sm',
         ghost:
-          'border-transparent hover:border-border hover:bg-accent hover:text-accent-foreground',
+          'border-transparent hover:bg-muted hover:text-foreground',
         link: 'border-transparent text-primary underline-offset-4 hover:underline',
       },
       size: {
         default: 'h-10 px-5 py-2 has-[>svg]:px-4',
-        sm: 'h-8 gap-1.5 px-3 has-[>svg]:px-2.5',
+        sm: 'h-8 gap-1.5 px-3 has-[>svg]:px-2.5 text-xs',
         lg: 'h-12 px-8 has-[>svg]:px-6 text-base',
         icon: 'size-10',
         'icon-sm': 'size-8',

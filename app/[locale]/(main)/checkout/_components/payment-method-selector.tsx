@@ -77,6 +77,18 @@ export function PaymentMethodSelector({
               </p>
             </div>
           </div>
+
+          <div className="flex items-start gap-3 rounded-lg border bg-card p-3">
+            <RadioGroupItem value="card" id="pm-card" />
+            <div className="space-y-1">
+              <Label htmlFor="pm-card" className="font-semibold">
+                {locale === "vi" ? "Thẻ Quốc tế ATM / Visa / Mastercard" : "ATM / Visa / Mastercard / Credit Card"}
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                {locale === "vi" ? "Thẻ nội địa hoặc thẻ quốc tế Visa, Mastercard, JCB (demo)." : "Local ATM cards or international credit cards Visa, Mastercard, JCB (demo)."}
+              </p>
+            </div>
+          </div>
         </RadioGroup>
 
         <Separator />

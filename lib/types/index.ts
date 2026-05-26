@@ -24,7 +24,7 @@ export type VibeTag =
 
 export type BookingStatus = "confirmed" | "pending" | "completed" | "cancelled" | "checked_in"
 
-export type PaymentMethod = "vietqr" | "momo" | "zalopay"
+export type PaymentMethod = "vietqr" | "momo" | "zalopay" | "card"
 
 export interface Venue {
   id: string
@@ -67,6 +67,17 @@ export interface Room {
     acType?: string
   }
   category?: "team_hub" | "solo_nook"
+  nameVi?: string
+  descriptionVi?: string
+  addressVi?: string
+  venueNameVi?: string
+  specsVi?: {
+    tvModel?: string
+    hdmiVersion?: string
+    whiteboardType?: string
+    wifiSpeed?: string
+    acType?: string
+  }
 }
 
 export interface TimeSlot {
@@ -98,6 +109,8 @@ export interface Booking {
   checkInQr: string
   wifiPassword: string
   createdAt: string
+  paidAmount?: number
+  paymentStatus?: "deposited" | "fully_paid"
 }
 
 export interface Review {
@@ -107,6 +120,7 @@ export interface Review {
   rating: number
   comment: string
   date: string
+  commentVi?: string
 }
 
 export interface Partner {

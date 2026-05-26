@@ -62,9 +62,9 @@ export function Header() {
           <LanguageSwitcher />
           <Link
             href={`/${locale}/login`}
-            className="hidden md:flex text-xs font-black uppercase tracking-widest text-foreground transition-colors border-2 border-primary bg-primary/10 px-5 py-2 shadow-[2px_2px_0px_0px_var(--color-primary)] hover:bg-primary hover:text-primary-foreground active:translate-y-[2px] active:shadow-none items-center justify-center whitespace-nowrap"
+            className="hidden md:flex text-sm font-semibold text-primary transition-all border border-primary/20 bg-primary/5 hover:bg-primary/10 hover:border-primary/30 px-5 py-2 rounded-xl items-center justify-center whitespace-nowrap shadow-sm hover:scale-[1.02] active:scale-[0.98]"
           >
-            Log In
+            {t("common.login")}
           </Link>
           <Button
             variant="ghost"
@@ -109,10 +109,10 @@ export function Header() {
             </Link>
             <Link
               href={`/${locale}/login`}
-              className="rounded-md px-3 py-2 text-sm font-black uppercase tracking-widest text-foreground hover:bg-muted"
+              className="rounded-xl px-3 py-2 text-sm font-semibold text-primary hover:bg-primary/5 transition-all border border-transparent hover:border-primary/10"
               onClick={() => setMenuOpen(false)}
             >
-              Log In
+              {t("common.login")}
             </Link>
           </nav>
         </div>

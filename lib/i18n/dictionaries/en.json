@@ -57,7 +57,31 @@
     "trustTitle": "Trusted by HCMC Students",
     "verifiedListings": "100% Verified Listings",
     "partnersCount": "50+ Partner Venues",
-    "bookingsCount": "10,000+ Bookings"
+    "bookingsCount": "10,000+ Bookings",
+    "howItWorksSubtitle": "Book a meeting room in 3 simple steps — no calls, no waiting, no hassle",
+    "step1Tag": "Discover",
+    "step2Tag": "Confirm",
+    "step3Tag": "Work",
+    "testimonialsTitle": "Thousands trust DiNOMAD every day",
+    "testimonialsSubtitle": "Real reviews from students and freelancers across HCMC",
+    "review1Text": "Found a great room right near Bach Khoa University at an unbeatable price. Booked in under a minute!",
+    "review1Author": "Minh Khoa",
+    "review1Role": "Student @ HCMUT",
+    "review2Text": "Our startup team uses DiNOMAD for sprint meetings. Clean rooms, fast WiFi, QR check-in is super convenient.",
+    "review2Author": "Linh Nguyen",
+    "review2Role": "Co-founder @ TechSeed",
+    "review3Text": "As a freelance designer I need a quiet spot to focus. DiNOMAD always has the perfect solo nook option.",
+    "review3Author": "Tuan Tran",
+    "review3Role": "Freelance Designer",
+    "statsBookings": "Total bookings",
+    "statsVenues": "Partner venues",
+    "statsRating": "Average rating",
+    "statsDistricts": "Districts covered",
+    "ctaTitle": "Ready to book your space?",
+    "ctaSubtitle": "Join 10,000+ users who trust DiNOMAD every month",
+    "ctaButton": "Find a Room Now",
+    "ctaPartner": "Have a space to rent?",
+    "ctaPartnerLink": "Become a partner →"
   },
   "search": {
     "title": "Search Results",
@@ -196,5 +220,12 @@
     "modern": "Modern",
     "rooftop": "Rooftop",
     "garden_view": "Garden View"
+  },
+  "admin": {
+    "status": {
+      "confirmed": "Confirmed",
+      "pending": "Pending",
+      "completed": "Completed"
+    }
   }
 }

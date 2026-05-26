@@ -1,5 +1,5 @@
 export function formatVND(amount: number): string {
-  return new Intl.NumberFormat("vi-VN").format(amount) + "d"
+  return new Intl.NumberFormat("vi-VN").format(amount) + "\u00A0₫"
 }
 
 export function formatVNDFull(amount: number): string {

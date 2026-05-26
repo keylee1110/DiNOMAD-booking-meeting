@@ -74,8 +74,25 @@ export function ConfirmationView({
                   </div>
                   <div className="flex items-start justify-between gap-4">
                     <span className="text-sm text-muted-foreground">{t("checkout.total")}</span>
-                    <span className="font-black text-primary">{formatVND(booking.totalPrice)}</span>
+                    <span className="font-semibold text-foreground">{formatVND(booking.totalPrice)}</span>
                   </div>
+                  {booking.paymentStatus === "deposited" ? (
+                    <>
+                      <div className="flex items-start justify-between gap-4">
+                        <span className="text-xs text-emerald-600 font-bold uppercase tracking-wider">{locale === "vi" ? "Đã Đặt Cọc (20%)" : "Paid Deposit (20%)"}</span>
+                        <span className="font-bold text-emerald-600">{formatVND(booking.paidAmount || 0)}</span>
+                      </div>
+                      <div className="flex items-start justify-between gap-4 border-t border-dashed border-border/60 pt-2 mt-1">
+                        <span className="text-xs text-primary font-bold uppercase tracking-wider">{locale === "vi" ? "Thanh toán thêm tại quầy" : "Pay at counter"}</span>
+                        <span className="font-black text-primary text-base">{formatVND(booking.totalPrice - (booking.paidAmount || 0))}</span>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="flex items-start justify-between gap-4 border-t border-dashed border-border/60 pt-2">
+                      <span className="text-xs text-emerald-600 font-bold uppercase tracking-wider">{locale === "vi" ? "Đã thanh toán 100%" : "Paid In Full"}</span>
+                      <span className="font-black text-emerald-600">{formatVND(booking.paidAmount || booking.totalPrice)}</span>
+                    </div>
+                  )}
                 </div>
               </div>
 

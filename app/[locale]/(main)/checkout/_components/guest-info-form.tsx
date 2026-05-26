@@ -116,7 +116,7 @@ export function GuestInfoForm({
 
       <CardFooter className="pt-0">
         <Button
-          className="w-full rounded-none lg:hidden"
+          className="w-full rounded-xl lg:hidden font-bold uppercase tracking-wider shadow-md shadow-primary/10 hover:shadow-lg hover:shadow-primary/20 hover:scale-[1.01] transition-all"
           size="lg"
           onClick={onProceed}
           disabled={!canProceed}
