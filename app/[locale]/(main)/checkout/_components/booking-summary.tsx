@@ -160,7 +160,7 @@ export function BookingSummary({
 
       <CardFooter className="pt-0">
         <Button
-          className="w-full rounded-none hidden lg:inline-flex"
+          className="w-full rounded-xl hidden lg:flex items-center justify-center gap-2 px-4 text-sm font-bold uppercase tracking-wider shadow-md shadow-primary/10 hover:shadow-lg hover:shadow-primary/20 hover:scale-[1.01] transition-all"
           size="lg"
           onClick={onProceed}
           disabled={!canProceed}
@@ -173,7 +173,7 @@ export function BookingSummary({
           ) : (
             t("checkout.proceedPayment")
           )}
-          {!isPaying && <PriceDisplay amount={totalPrice} />}
+          {!isPaying && <PriceDisplay amount={totalPrice} className="font-bold text-primary-foreground" />}
         </Button>
       </CardFooter>
     </Card>

@@ -53,7 +53,7 @@ export default function SearchPage() {
       amenities: selectedAmenities.length > 0 ? selectedAmenities : undefined,
       vibeTags: initialVibes.length > 0 ? initialVibes : undefined,
       query: query || undefined,
-    })
+    }, locale)
 
     // Sort
     switch (sortBy) {
@@ -69,7 +69,7 @@ export default function SearchPage() {
     }
 
     return filtered
-  }, [query, district, maxPrice, minCapacity, selectedAmenities, sortBy, initialVibes])
+  }, [query, district, maxPrice, minCapacity, selectedAmenities, sortBy, initialVibes, locale])
 
   const clearFilters = () => {
     setQuery("")
@@ -79,7 +79,7 @@ export default function SearchPage() {
     setSelectedAmenities([])
   }
 
-  const FilterPanel = () => (
+  const renderFilterPanel = () => (
     <div className="flex flex-col gap-6">
       <div>
         <Label className="mb-2 text-sm font-semibold">{t("landing.district")}</Label>
@@ -107,7 +107,7 @@ export default function SearchPage() {
           className="mt-3"
         />
         <div className="mt-1 flex justify-between text-xs text-muted-foreground">
-          <span>50,000d</span>
+          <span>{locale === "vi" ? "50.000 ₫" : "50,000 ₫"}</span>
           <span className="font-medium text-foreground">{formatVND(maxPrice[0])}</span>
         </div>
       </div>
@@ -119,7 +119,7 @@ export default function SearchPage() {
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="0">{locale === "vi" ? "Bat ky" : "Any"}</SelectItem>
+            <SelectItem value="0">{locale === "vi" ? "Bất kỳ" : "Any"}</SelectItem>
             {[2, 4, 6, 8, 10].map((n) => (
               <SelectItem key={n} value={n.toString()}>{n}+</SelectItem>
             ))}
@@ -174,7 +174,7 @@ export default function SearchPage() {
                 <SheetTitle>{t("search.filters")}</SheetTitle>
               </SheetHeader>
               <div className="mt-4">
-                <FilterPanel />
+                {renderFilterPanel()}
               </div>
             </SheetContent>
           </Sheet>
@@ -244,7 +244,7 @@ export default function SearchPage() {
         <aside className="hidden w-64 shrink-0 md:block">
           <div className="sticky top-20 rounded-xl border border-border bg-card p-4">
             <h3 className="mb-4 font-semibold text-card-foreground">{t("search.filters")}</h3>
-            <FilterPanel />
+            {renderFilterPanel()}
           </div>
         </aside>
 
@@ -273,7 +273,7 @@ export default function SearchPage() {
                 <div className="text-center">
                   <Map className="mx-auto mb-2 h-12 w-12 text-muted-foreground" />
                   <p className="text-sm text-muted-foreground">
-                    {locale === "vi" ? "Ban do se hien thi o day" : "Map view would display here"}
+                    {locale === "vi" ? "Bản đồ sẽ hiển thị ở đây" : "Map view would display here"}
                   </p>
                 </div>
               </div>

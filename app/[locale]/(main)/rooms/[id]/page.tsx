@@ -25,10 +25,10 @@ export default function RoomDetailPage({ params }: { params: Promise<{ locale: s
   const router = useRouter()
   const { state, dispatch } = useBooking()
 
-  const room = getRoomById(id)
+  const room = getRoomById(id, locale)
   if (!room) notFound()
 
-  const reviews = getReviewsByRoomId(id)
+  const reviews = getReviewsByRoomId(id, locale)
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
   const [selectedDate, setSelectedDate] = useState(getNextDays(1)[0])
   const [selectedSlots, setSelectedSlots] = useState<TimeSlot[]>([])
@@ -136,8 +136,8 @@ export default function RoomDetailPage({ params }: { params: Promise<{ locale: s
                   {room.venueName} &middot; {room.district}
                 </p>
               </div>
-              <div className="flex items-center gap-1 rounded-lg bg-secondary/30 px-3 py-1.5">
-                <Star className="h-5 w-5 fill-secondary text-secondary" />
+              <div className="flex items-center gap-1.5 rounded-lg border border-border/60 bg-background px-3 py-1.5 shadow-sm">
+                <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
                 <span className="text-lg font-bold text-foreground">{room.rating}</span>
                 <span className="text-sm text-muted-foreground">({room.reviewCount})</span>
               </div>
@@ -146,7 +146,9 @@ export default function RoomDetailPage({ params }: { params: Promise<{ locale: s
             <div className="mt-3 flex items-center gap-4 text-sm text-muted-foreground">
               <span className="flex items-center gap-1">
                 <Users className="h-4 w-4" />
-                {room.category === "solo_nook" ? `Còn ${room.slotsLeftToday} chỗ trống` : `${room.capacity} ${t("common.people")}`}
+                {room.category === "solo_nook"
+                  ? (locale === "vi" ? `Còn ${room.slotsLeftToday} chỗ trống` : `${room.slotsLeftToday} seats left today`)
+                  : `${room.capacity} ${t("common.people")}`}
               </span>
               <span className="text-xl font-bold text-primary">
                 {formatVND(room.pricePerHour)}<span className="text-xs font-normal text-muted-foreground">{t("common.perHour")}</span>
@@ -160,7 +162,7 @@ export default function RoomDetailPage({ params }: { params: Promise<{ locale: s
                 rel="noopener noreferrer"
               >
                 <MapPin className="mr-2 h-4 w-4" />
-                Mở Google Maps
+                {locale === "vi" ? "Mở Google Maps" : "Open Google Maps"}
                 <ExternalLink className="ml-2 h-3 w-3" />
               </a>
             </Button>
@@ -176,12 +178,15 @@ export default function RoomDetailPage({ params }: { params: Promise<{ locale: s
 
           {/* Vibe Tags */}
           <div>
-            <h2 className="mb-2 text-lg font-semibold text-foreground">{t("room.vibeTags")}</h2>
+            <h2 className="mb-3 text-lg font-semibold text-foreground">{t("room.vibeTags")}</h2>
             <div className="flex flex-wrap gap-2">
               {room.vibeTags.map((tag) => (
-                <Badge key={tag} variant="secondary" className="rounded-full px-3 py-1">
+                <span
+                  key={tag}
+                  className="inline-flex items-center rounded-full border border-primary/20 bg-primary/8 px-3 py-1 text-xs font-semibold text-primary transition-colors hover:bg-primary/12"
+                >
                   {t(`vibes.${tag}`)}
-                </Badge>
+                </span>
               ))}
             </div>
           </div>
@@ -225,7 +230,7 @@ export default function RoomDetailPage({ params }: { params: Promise<{ locale: s
                     <div className="mb-2 flex items-center justify-between">
                       <span className="font-medium text-card-foreground">{review.userName}</span>
                       <div className="flex items-center gap-1">
-                        <Star className="h-3.5 w-3.5 fill-secondary text-secondary" />
+                        <Star className="h-3.5 w-3.5 fill-yellow-400 text-yellow-400" />
                         <span className="text-sm">{review.rating}</span>
                       </div>
                     </div>
@@ -246,20 +251,24 @@ export default function RoomDetailPage({ params }: { params: Promise<{ locale: s
         {/* Right: Booking Widget (sticky) */}
         <div className="lg:sticky lg:top-20 lg:self-start flex flex-col gap-4">
           {selectedSlots.length > 0 && (
-            <div className="rounded-xl bg-orange-500/10 border border-orange-500/20 p-4 flex items-center justify-between shadow-sm animate-in fade-in slide-in-from-top-4">
+            <div className="rounded-2xl bg-amber-500/5 border border-amber-500/20 p-4 flex items-center justify-between shadow-sm animate-in fade-in slide-in-from-top-4">
               <div>
-                <p className="text-xs font-medium text-orange-600 dark:text-orange-400">Đang giữ chỗ cho bạn</p>
-                <p className="text-2xl font-bold text-orange-600 dark:text-orange-400 tracking-tight">10:00</p>
+                <p className="text-xs font-medium text-amber-700 dark:text-amber-400">
+                  {locale === "vi" ? "Đang giữ chỗ cho bạn" : "Holding your spot"}
+                </p>
+                <p className="text-2xl font-bold text-amber-700 dark:text-amber-400 tracking-tight">10:00</p>
               </div>
-              <Button variant="outline" size="sm" className="text-xs h-8 border-orange-500/30 text-orange-600 hover:bg-orange-500/10 hover:text-orange-700 bg-transparent">
-                Cần thêm thời gian?
+              <Button variant="outline" size="sm" className="text-xs h-8 border-amber-500/20 text-amber-700 hover:bg-amber-500/10 hover:text-amber-800 bg-transparent rounded-xl">
+                {locale === "vi" ? "Cần thêm thời gian?" : "Need more time?"}
               </Button>
             </div>
           )}
 
-          <Card className="p-5">
-            <h3 className="mb-4 text-lg font-semibold text-card-foreground">
-              {room.category === "solo_nook" ? "Mua Seat Pass" : t("common.bookNow")}
+          <Card className="p-5 rounded-2xl border border-border/50 shadow-sm">
+            <h3 className="mb-4 text-lg font-semibold tracking-tight text-card-foreground">
+              {room.category === "solo_nook"
+                ? (locale === "vi" ? "Mua Seat Pass" : "Buy Seat Pass")
+                : t("common.bookNow")}
             </h3>
 
             <TimeSlotPicker
@@ -271,47 +280,47 @@ export default function RoomDetailPage({ params }: { params: Promise<{ locale: s
             />
 
             {selectedSlots.length > 0 && (
-              <div className="mt-4 rounded-lg bg-muted/50 p-3">
+              <div className="mt-4 rounded-xl bg-muted/30 p-3.5 border border-border/40">
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">{t("room.duration")}</span>
                   <span className="font-medium text-foreground">{duration}h</span>
                 </div>
-                <div className="mt-1 flex items-center justify-between text-sm">
+                <div className="mt-1-5 flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">{t("checkout.roomFee")}</span>
                   <span className="font-medium text-foreground">{formatVND(roomFee)}</span>
                 </div>
-                <div className="mt-1 flex items-center justify-between text-sm">
+                <div className="mt-1-5 flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">{t("checkout.platformFee")}</span>
                   <span className="font-medium text-foreground">{formatVND(platformFee)}</span>
                 </div>
-                <Separator className="my-2" />
+                <Separator className="my-3 opacity-60" />
                 <div className="flex items-center justify-between mb-3">
                   <span className="font-semibold text-foreground">{t("room.totalPrice")}</span>
                   <span className="text-lg font-bold text-primary">{formatVND(totalPrice)}</span>
                 </div>
 
                 {room.category === "team_hub" && (
-                  <div className="pt-3 border-t border-border/50 mt-3">
+                  <div className="pt-3.5 border-t border-border/40 mt-3">
                     <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-1.5 text-sm font-medium text-foreground">
-                        <Users className="h-4 w-4 text-muted-foreground" />
-                        Chia tiền ({splitPeople} người)
+                      <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground uppercase tracking-wider opacity-85">
+                        <Users className="h-3.5 w-3.5 text-primary" />
+                        {locale === "vi" ? `Chia tiền (${splitPeople} người)` : `Split bill (${splitPeople} people)`}
                       </div>
-                      <div className="flex items-center gap-1 bg-muted/50 rounded-md p-0.5 border border-border/50">
+                      <div className="flex items-center gap-1 bg-muted/60 rounded-xl p-0.5 border border-border/40">
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-6 w-6"
+                          className="h-6 w-6 rounded-lg"
                           onClick={() => setSplitPeople(Math.max(2, splitPeople - 1))}
                           disabled={splitPeople <= 2}
                         >
                           <Minus className="h-3 w-3" />
                         </Button>
-                        <span className="text-xs font-medium w-6 text-center">{splitPeople}</span>
+                        <span className="text-xs font-semibold w-6 text-center">{splitPeople}</span>
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-6 w-6"
+                          className="h-6 w-6 rounded-lg"
                           onClick={() => setSplitPeople(Math.min(50, splitPeople + 1))}
                           disabled={splitPeople >= 50}
                         >
@@ -319,8 +328,10 @@ export default function RoomDetailPage({ params }: { params: Promise<{ locale: s
                         </Button>
                       </div>
                     </div>
-                    <div className="flex items-center justify-between rounded-lg bg-primary/5 px-3 py-2 border border-primary/10">
-                      <span className="text-xs font-medium text-muted-foreground">Mỗi người trả</span>
+                    <div className="flex items-center justify-between rounded-xl bg-primary/5 px-3.5 py-2.5 border border-primary/10 shadow-sm">
+                      <span className="text-xs font-medium text-muted-foreground">
+                        {locale === "vi" ? "Mỗi người trả" : "Each person pays"}
+                      </span>
                       <span className="font-bold text-primary">{formatVND(splitAmount)}</span>
                     </div>
                   </div>

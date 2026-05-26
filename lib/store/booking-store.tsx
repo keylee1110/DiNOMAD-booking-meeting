@@ -101,7 +101,10 @@ export function BookingProvider({ children }: { children: ReactNode }) {
   }
 
   useEffect(() => {
-    refreshBookings()
+    const timer = setTimeout(() => {
+      refreshBookings()
+    }, 0)
+    return () => clearTimeout(timer)
   }, [])
 
   return (

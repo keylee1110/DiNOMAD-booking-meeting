@@ -14,15 +14,18 @@ export default function MyBookingsPage() {
   const { locale, t } = useTranslation()
 
   const getStatusBadge = (status: string) => {
+    const isVi = locale === "vi"
     switch (status) {
       case "confirmed":
-        return <Badge className="bg-green-500 hover:bg-green-600">{t("admin.status.confirmed")}</Badge>
+        return <Badge className="bg-emerald-500/15 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400 border border-emerald-500/20 font-semibold px-2.5 py-0.5 hover:bg-emerald-500/25 transition-colors">{isVi ? "Đã xác nhận" : "Confirmed"}</Badge>
       case "pending":
-        return <Badge variant="outline" className="text-yellow-600 border-yellow-600">{t("admin.status.pending")}</Badge>
+        return <Badge className="bg-amber-500/15 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400 border border-amber-500/20 font-semibold px-2.5 py-0.5 hover:bg-amber-500/25 transition-colors">{isVi ? "Chờ xử lý" : "Pending"}</Badge>
       case "completed":
-        return <Badge variant="secondary">{t("admin.status.completed")}</Badge>
+        return <Badge className="bg-slate-500/15 text-slate-700 dark:bg-slate-500/10 dark:text-slate-400 border border-slate-500/20 font-semibold px-2.5 py-0.5 hover:bg-slate-500/25 transition-colors">{isVi ? "Hoàn thành" : "Completed"}</Badge>
+      case "checked_in":
+        return <Badge className="bg-blue-500/15 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400 border border-blue-500/20 font-semibold px-2.5 py-0.5 hover:bg-blue-500/25 transition-colors">{isVi ? "Đã check-in" : "Checked In"}</Badge>
       default:
-        return <Badge variant="outline">{status}</Badge>
+        return <Badge variant="outline" className="font-semibold px-2.5 py-0.5">{status}</Badge>
     }
   }
 

@@ -1,5 +1,6 @@
 "use client"
 
+import React from "react"
 import { useTranslation } from "@/lib/i18n/context"
 import type { Amenity } from "@/lib/types"
 import { Wifi, Tv, PenLine, Snowflake, Cable, Projector, Plug, Coffee, Droplets, Car } from "lucide-react"
@@ -42,18 +43,21 @@ export function AmenityIcon({ amenity, size = "sm", showLabel = false }: Amenity
 
   if (showLabel) {
     return (
-      <div className="flex items-center gap-3">
-        <div className={cn("flex flex-shrink-0 items-center justify-center rounded-none border-2 border-primary bg-primary/10 shadow-[2px_2px_0px_0px_#64B5F6]", containerClasses[size])}>
+      <div className="flex items-center gap-3 rounded-xl border border-border/50 bg-muted/30 px-3 py-2.5 transition-colors hover:border-primary/20 hover:bg-primary/5">
+        <div className={cn("flex shrink-0 items-center justify-center rounded-lg border border-primary/20 bg-primary/10", containerClasses[size])}>
           <Icon className={cn("text-primary", sizeClasses[size])} />
         </div>
-        <span className="text-sm font-bold uppercase tracking-wider text-foreground">{t(`amenities.${amenity}`)}</span>
+        <span className="text-sm font-semibold text-foreground">{t(`amenities.${amenity}`)}</span>
       </div>
     )
   }
 
   return (
     <div
-      className={cn("flex items-center justify-center rounded-none border-[1.5px] border-border bg-card shadow-[1px_1px_0px_0px_var(--color-border)]", containerClasses[size])}
+      className={cn(
+        "flex items-center justify-center rounded-lg border border-border/50 bg-muted/30 transition-colors hover:border-primary/20 hover:bg-primary/5",
+        containerClasses[size]
+      )}
       title={t(`amenities.${amenity}`)}
     >
       <Icon className={cn("text-primary", sizeClasses[size])} />
