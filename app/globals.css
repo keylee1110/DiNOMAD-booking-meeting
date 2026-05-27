@@ -94,7 +94,7 @@
   --warning-foreground: oklch(0.20 0.04 60);
 }
 
-@theme inline {
+@theme {
   --font-sans: var(--font-outfit), sans-serif;
   --font-mono: var(--font-mono), monospace;
   --color-background: var(--background);

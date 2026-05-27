@@ -5,7 +5,7 @@ import './globals.css'
 
 const outfit = Outfit({
   variable: '--font-outfit',
-  subsets: ["latin", "latin-ext", "vietnamese"]
+  subsets: ["latin", "vietnamese"]
 });
 
 const geistMono = Geist_Mono({
@@ -36,13 +36,18 @@ export const metadata: Metadata = {
   },
 }
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
+  params,
 }: Readonly<{
   children: React.ReactNode
+  params: Promise<{ locale?: string }>
 }>) {
+  const { locale } = await params
+  const lang = locale || 'vi'
+
   return (
-    <html lang="en" className={`${outfit.variable} ${geistMono.variable}`}>
+    <html lang={lang} className={`${outfit.variable} ${geistMono.variable}`}>
       <body className="font-sans antialiased">
         {children}
         <Analytics />
