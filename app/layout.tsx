@@ -1,11 +1,12 @@
 import type { Metadata } from 'next'
-import { Outfit, Geist_Mono } from 'next/font/google'
+import { Be_Vietnam_Pro, Geist_Mono } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import './globals.css'
 
-const outfit = Outfit({
-  variable: '--font-outfit',
-  subsets: ["latin", "latin-ext", "vietnamese"]
+const beVietnamPro = Be_Vietnam_Pro({
+  variable: '--font-be-vietnam-pro',
+  subsets: ["latin", "latin-ext", "vietnamese"],
+  weight: ["100", "200", "300", "400", "500", "600", "700", "800", "900"]
 });
 
 const geistMono = Geist_Mono({
@@ -42,8 +43,8 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="vi" className={`${outfit.variable} ${geistMono.variable}`}>
-      <body className="font-sans antialiased">
+    <html lang="vi" className={`${beVietnamPro.variable} ${geistMono.variable}`} suppressHydrationWarning>
+      <body className="font-sans antialiased" suppressHydrationWarning>
         {children}
         <Analytics />
       </body>
