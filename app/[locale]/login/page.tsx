@@ -1,103 +1,210 @@
 "use client"
 
-import { useState } from "react"
+import { useState, Suspense } from "react"
 import { useTranslation } from "@/lib/i18n/context"
-import { useRouter } from "next/navigation"
-import { LogIn, ArrowRight, UserCircle, Briefcase } from "lucide-react"
+import { useRouter, useSearchParams } from "next/navigation"
+import { LogIn, ArrowRight, UserCircle, Briefcase, Lock, Mail, Loader2, Sparkles, ArrowLeft } from "lucide-react"
 import Link from "next/link"
+import Image from "next/image"
+import { createClient } from "@/utils/supabase/client"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { toast } from "sonner"
 
-export default function LoginPage() {
+function LoginForm() {
   const { t, locale } = useTranslation()
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const redirectTo = searchParams.get("redirect_to") || `/${locale}`
   
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
-  const [role, setRole] = useState<"customer" | "partner">("customer")
+  const [role, setRole] = useState<"customer" | "supplier">("customer")
+  const [isLoading, setIsLoading] = useState(false)
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
-    // Simulated authentication & routing logic
-    if (role === "partner" || email.includes("partner")) {
-      router.push(`/${locale}/partner`)
-    } else {
-      router.push(`/${locale}`)
+    setIsLoading(true)
+    
+    try {
+      const supabase = createClient()
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      })
+
+      if (error) {
+        toast.error(t("auth.loginError") || error.message)
+        setIsLoading(false)
+        return
+      }
+
+      toast.success(t("auth.loginSuccess") || "Logged in successfully!")
+      
+      // Successfully authenticated, refresh page/session and redirect
+      router.refresh()
+      
+      // Delay slightly to let toast be visible
+      setTimeout(() => {
+        router.push(redirectTo)
+      }, 800)
+      
+    } catch (err: any) {
+      toast.error(t("auth.loginError"))
+      setIsLoading(false)
     }
   }
 
   return (
-    <div className="min-h-screen bg-transparent flex flex-col items-center justify-center p-4">
-      {/* Brutalist Container */}
-      <div className="w-full max-w-md border-4 border-foreground bg-card shadow-[12px_12px_0px_0px_var(--color-primary)] p-8 md:p-12">
-        
-        <div className="flex flex-col items-center gap-4 mb-10 text-center">
-          <div className="bg-primary text-primary-foreground p-3 border-4 border-foreground transform -rotate-3 hover:rotate-3 transition-transform">
-             <LogIn className="h-8 w-8" />
-          </div>
-          <h1 className="text-3xl md:text-4xl font-black uppercase tracking-tighter">DiNOMAD</h1>
-          <p className="border-t-2 border-border pt-4 text-xs font-bold uppercase tracking-widest text-muted-foreground">Sign in to your account</p>
-        </div>
+    <div className="w-full max-w-md bg-card text-card-foreground border border-border/80 shadow-[0_8px_30px_rgb(0,0,0,0.04)] rounded-2xl p-8 md:p-10 relative overflow-hidden transition-all duration-300 hover:shadow-[0_8px_40px_rgb(0,0,0,0.06)]">
+      {/* Decorative top accent gradient */}
+      <div className="absolute top-0 left-0 right-0 h-[5px] bg-gradient-to-r from-primary/40 via-primary to-primary/40" />
 
-        {/* Role Toggle Grid */}
-        <div className="grid grid-cols-2 gap-3 mb-8">
-          <button 
-            type="button"
-            onClick={() => setRole("customer")}
-            className={`flex flex-col items-center gap-2 border-2 p-3 font-black uppercase tracking-widest text-[10px] md:text-xs transition-all ${role === 'customer' ? 'border-primary bg-primary/10 text-primary shadow-[2px_2px_0px_0px_var(--color-primary)]' : 'border-border bg-background hover:border-foreground text-muted-foreground'}`}
-          >
-            <UserCircle className="h-5 w-5" /> Customer
-          </button>
-          <button 
-            type="button"
-            onClick={() => setRole("partner")}
-            className={`flex flex-col items-center gap-2 border-2 p-3 font-black uppercase tracking-widest text-[10px] md:text-xs transition-all ${role === 'partner' ? 'border-foreground bg-foreground text-background shadow-[2px_2px_0px_0px_var(--color-foreground)] transform translate-y-[-2px]' : 'border-border bg-background hover:border-foreground text-muted-foreground'}`}
-          >
-            <Briefcase className="h-5 w-5" /> Partner
-          </button>
+      <div className="flex flex-col items-center gap-2 mb-8 text-center">
+        <div className="mb-2">
+          <Image src="/logo.png" alt="Logo" width={36} height={36} className="object-contain" />
         </div>
+        <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight text-foreground">
+          {t("common.appName")}
+        </h1>
+        <p className="text-sm text-muted-foreground">
+          {locale === "vi" ? "Đăng nhập vào tài khoản của bạn" : "Sign in to your account"}
+        </p>
+      </div>
 
-        <form onSubmit={handleLogin} className="flex flex-col gap-6">
-          <div className="flex flex-col gap-2">
-            <label className="text-[11px] font-black uppercase tracking-widest flex items-center gap-2">Email Address</label>
-            <input 
-              type="email" 
+      {/* Role Selection Toggle */}
+      <div className="grid grid-cols-2 gap-2 mb-6 bg-muted/50 p-1 rounded-xl border border-border/40">
+        <button
+          type="button"
+          onClick={() => setRole("customer")}
+          className={`flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-xs font-semibold transition-all ${
+            role === "customer"
+              ? "bg-card text-foreground shadow-sm border border-border/20 scale-[1.01]"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          <UserCircle className="h-4 w-4" />
+          <span>{t("auth.customer").split(" ")[0]}</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setRole("supplier")}
+          className={`flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-xs font-semibold transition-all ${
+            role === "supplier"
+              ? "bg-card text-foreground shadow-sm border border-border/20 scale-[1.01]"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          <Briefcase className="h-4 w-4" />
+          <span>{t("auth.partner").split(" ")[0]}</span>
+        </button>
+      </div>
+
+      <form onSubmit={handleLogin} className="flex flex-col gap-5">
+        <div className="flex flex-col gap-1.5">
+          <label className="text-xs font-bold text-muted-foreground tracking-wide uppercase">
+            {t("auth.email")}
+          </label>
+          <div className="relative">
+            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/75" />
+            <Input
+              type="email"
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder={role === 'partner' ? 'partner@dinomad.com' : 'hello@dinomad.com'}
-              className="border-4 border-foreground p-4 bg-background font-bold focus:outline-none focus:border-primary transition-colors text-sm"
+              placeholder="name@domain.com"
+              className="pl-10 h-11 rounded-xl border-border bg-background focus-visible:ring-primary/20 transition-all duration-200"
+              disabled={isLoading}
             />
           </div>
+        </div>
 
-          <div className="flex flex-col gap-2">
-            <label className="text-[11px] font-black uppercase tracking-widest flex items-center justify-between">
-               Password
-               <span className="text-muted-foreground hover:text-primary cursor-pointer border-b-2 border-transparent hover:border-primary transition-colors">Forgot?</span>
+        <div className="flex flex-col gap-1.5">
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-bold text-muted-foreground tracking-wide uppercase">
+              {t("auth.password")}
             </label>
-            <input 
-              type="password" 
+            <span className="text-xs font-medium text-primary hover:underline cursor-pointer transition-colors duration-200">
+              {t("auth.forgotPassword")}
+            </span>
+          </div>
+          <div className="relative">
+            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/75" />
+            <Input
+              type="password"
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
-              className="border-4 border-foreground p-4 bg-background font-bold focus:outline-none focus:border-primary transition-colors tracking-widest"
+              className="pl-10 h-11 rounded-xl border-border bg-background focus-visible:ring-primary/20 transition-all duration-200"
+              disabled={isLoading}
             />
           </div>
-
-          <button 
-            type="submit" 
-            className="mt-4 w-full border-4 border-foreground bg-primary text-primary-foreground py-4 font-black uppercase tracking-widest hover:bg-foreground hover:text-background transition-colors flex items-center justify-center gap-2 shadow-[4px_4px_0px_0px_var(--color-foreground)] active:translate-y-1 active:shadow-none text-sm md:text-base"
-          >
-            Authenticate <ArrowRight className="h-5 w-5" />
-          </button>
-        </form>
-
-        <div className="mt-8 text-center border-t-2 border-dashed border-border pt-6">
-           <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-             New to DiNOMAD? <Link href={`/${locale}`} className="text-foreground hover:text-primary border-b-2 border-foreground hover:border-primary transition-colors pb-0.5">Explore Spaces</Link>
-           </span>
         </div>
 
+        <Button
+          type="submit"
+          className="h-11 mt-2 rounded-xl bg-primary text-primary-foreground font-semibold hover:bg-primary/95 transition-all duration-200 shadow-md hover:shadow-lg active:scale-98 flex items-center justify-center gap-2"
+          disabled={isLoading}
+        >
+          {isLoading ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" />
+              <span>{t("auth.loggingIn")}</span>
+            </>
+          ) : (
+            <>
+              <span>{t("common.login")}</span>
+              <ArrowRight className="h-4 w-4" />
+            </>
+          )}
+        </Button>
+      </form>
+
+      <div className="mt-8 text-center border-t border-border/60 pt-6">
+        <span className="text-xs text-muted-foreground font-medium">
+          {t("auth.noAccount")}{" "}
+          <Link
+            href={`/${locale}/signup?redirect_to=${encodeURIComponent(redirectTo)}`}
+            className="text-primary font-bold hover:underline transition-all duration-200"
+          >
+            {t("auth.registerNow")}
+          </Link>
+        </span>
       </div>
+    </div>
+  )
+}
+
+export default function LoginPage() {
+  const { locale } = useTranslation()
+  return (
+    <div className="relative min-h-screen bg-background/50 flex flex-col items-center justify-center p-4">
+      {/* Floating Back to Home Button */}
+      <div className="absolute top-6 left-6 z-10">
+        <Link href={`/${locale}`}>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground bg-background/40 hover:bg-background/80 backdrop-blur-md border border-border/40 shadow-sm rounded-xl py-2 px-3 transition-all duration-200 group"
+          >
+            <ArrowLeft className="h-4 w-4 transition-transform duration-200 group-hover:-translate-x-0.5" />
+            <span>{locale === "vi" ? "Trang chủ" : "Home"}</span>
+          </Button>
+        </Link>
+      </div>
+
+      {/* Background radial gradient decoration for premium feel */}
+      <div className="absolute inset-0 -z-10 bg-[radial-gradient(45rem_50rem_at_50%_30rem,oklch(0.92_0.02_240),transparent)] pointer-events-none" />
+      
+      <Suspense fallback={
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <span className="text-sm text-muted-foreground">Loading...</span>
+        </div>
+      }>
+        <LoginForm />
+      </Suspense>
     </div>
   )
 }

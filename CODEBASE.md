@@ -50,7 +50,12 @@ Dinomad/
 │   ├── time-slot-picker.tsx # Calendar slot booking grid
 │   └── qr-code.tsx          # Ticket & QR scanner helper
 ├── hooks/                   # Custom React state & utility hooks
-└── lib/                     # Data stores, internationalization & shared mock datasets
+├── lib/                     # Data stores, internationalization & shared mock datasets
+├── utils/                   # Shared utility logic and helpers
+│   └── supabase/            # Supabase browser, server clients, and middleware helpers
+├── proxy.ts                 # Next.js root proxy for locale routing & Supabase session management
+
+
 ```
 
 ---
@@ -85,4 +90,4 @@ This table lists the history of significant architectural changes, new feature a
 | :--- | :--- | :--- | :--- |
 | **2026-05-26** | `feat/ui-refactor` | Created `ui-refactor-prompt.md` and created master `CODEBASE.md` blueprint to establish context for the UI/UX visual transition. | `/ui-refactor-prompt.md`, `/CODEBASE.md` |
 | **2026-05-26** | `feat/ui-refactor` | Resolved `pnpm run lint` circular structure and React 19/Compiler errors, bringing errors down to 0. | `/eslint.config.mjs`, `/app/[locale]/(main)/search/page.tsx`, `/app/[locale]/(main)/checkout/page.tsx`, `/app/[locale]/partner/page.tsx`, `/components/partner/inventory-toggle.tsx`, `/components/ui/sidebar.tsx`, `/lib/store/booking-store.tsx` |
-| | | | |
+| **2026-06-01** | `feat/supabase-setup` | Integrated Supabase client/server/middleware auth helpers and configured env variables. | `/.env.local`, `/utils/supabase/*`, `/proxy.ts`, `/backend/.env` |

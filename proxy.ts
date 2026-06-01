@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
+import { updateSession } from "@/utils/supabase/middleware"
 
 const locales = ["en", "vi"]
 const defaultLocale = "vi"
@@ -22,7 +23,7 @@ function getLocale(request: NextRequest): string {
   return defaultLocale
 }
 
-export function proxy(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   // Skip static files, api routes, and image paths
@@ -37,22 +38,35 @@ export function proxy(request: NextRequest) {
     return NextResponse.next()
   }
 
-  // Check if the pathname already has a locale
+  // 1. Update Supabase session
+  const response = await updateSession(request)
+
+  // 2. Check if the pathname already has a locale
   const hasLocale = locales.some(
     (locale) => pathname.startsWith(`/${locale}/`) || pathname === `/${locale}`
   )
 
   if (hasLocale) {
-    return NextResponse.next()
+    return response
   }
 
-  // Redirect to the detected locale
+  // 3. Redirect to the detected locale
   const locale = getLocale(request)
   const newUrl = new URL(`/${locale}${pathname}`, request.url)
   newUrl.search = request.nextUrl.search
-  return NextResponse.redirect(newUrl)
+
+  // Create redirect response
+  const redirectResponse = NextResponse.redirect(newUrl)
+
+  // Copy all set cookies from Supabase updateSession response to the redirect response
+  response.cookies.getAll().forEach((cookie) => {
+    redirectResponse.cookies.set(cookie.name, cookie.value)
+  })
+
+  return redirectResponse
 }
 
 export const config = {
   matcher: ["/((?!_next/static|_next/image|favicon.ico|icon|apple-icon|images|api).*)"],
 }
+
