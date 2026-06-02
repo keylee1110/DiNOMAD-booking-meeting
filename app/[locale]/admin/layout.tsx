@@ -24,7 +24,7 @@ export default async function AdminLayout({
     notFound()
   }
 
-  const dictionary = (await getDictionary(locale as Locale)) as Dictionary
+  const dictionary = (await getDictionary(locale as Locale)) as any
 
   return (
     <I18nProvider locale={locale as Locale} dictionary={dictionary}>

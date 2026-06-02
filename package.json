@@ -4,8 +4,11 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:backend": "pnpm --filter @dinomad/backend dev",
     "build": "next build",
+    "build:backend": "pnpm --filter @dinomad/backend build",
     "start": "next start",
+    "start:backend": "pnpm --filter @dinomad/backend start",
     "lint": "eslint ."
   },
   "dependencies": {
@@ -37,6 +40,8 @@
     "@radix-ui/react-toggle": "1.1.10",
     "@radix-ui/react-toggle-group": "1.1.11",
     "@radix-ui/react-tooltip": "1.2.8",
+    "@supabase/ssr": "^0.10.3",
+    "@supabase/supabase-js": "^2.106.2",
     "@vercel/analytics": "1.6.1",
     "autoprefixer": "^10.4.20",
     "canvas-confetti": "^1.9.4",
