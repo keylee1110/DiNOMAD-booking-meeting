@@ -5,23 +5,19 @@ export function generateTimeSlots(date: string, roomId: string): TimeSlot[] {
   const bookedSlotSeed = hashCode(date + roomId)
 
   for (let hour = 7; hour < 22; hour++) {
-    for (let half = 0; half < 2; half++) {
-      const startHour = hour.toString().padStart(2, "0")
-      const startMin = half === 0 ? "00" : "30"
-      const endHour = half === 1 ? (hour + 1).toString().padStart(2, "0") : startHour
-      const endMin = half === 0 ? "30" : "00"
+    const startHour = hour.toString().padStart(2, "0")
+    const endHour = (hour + 1).toString().padStart(2, "0")
 
-      const slotIndex = (hour - 7) * 2 + half
-      const isBooked = isSlotBooked(bookedSlotSeed, slotIndex)
+    const slotIndex = hour - 7
+    const isBooked = isSlotBooked(bookedSlotSeed, slotIndex)
 
-      slots.push({
-        id: `${date}-${startHour}${startMin}`,
-        startTime: `${startHour}:${startMin}`,
-        endTime: `${endHour}:${endMin}`,
-        available: !isBooked,
-        price: 0,
-      })
-    }
+    slots.push({
+      id: `${date}-${startHour}00`,
+      startTime: `${startHour}:00`,
+      endTime: `${endHour}:00`,
+      available: !isBooked,
+      price: 0,
+    })
   }
 
   return slots

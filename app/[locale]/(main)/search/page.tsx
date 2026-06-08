@@ -113,18 +113,50 @@ export default function SearchPage() {
       </div>
 
       <div>
-        <Label className="mb-2 text-sm font-semibold">{t("search.capacityMin")}</Label>
-        <Select value={minCapacity.toString()} onValueChange={(v) => setMinCapacity(parseInt(v))}>
-          <SelectTrigger>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="0">{locale === "vi" ? "Bất kỳ" : "Any"}</SelectItem>
-            {[2, 4, 6, 8, 10].map((n) => (
-              <SelectItem key={n} value={n.toString()}>{n}+</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <div className="flex items-center justify-between mb-2">
+          <Label className="text-sm font-semibold">{t("search.capacityMin")}</Label>
+          <span className="text-xs font-bold text-primary">
+            {minCapacity === 0 ? (locale === "vi" ? "Bất kỳ" : "Any") : `${minCapacity}+ ${t("common.people")}`}
+          </span>
+        </div>
+        <div className="px-1">
+          <Slider
+            value={[minCapacity === 0 ? 2 : minCapacity]}
+            onValueChange={(val) => setMinCapacity(val[0])}
+            min={2}
+            max={12}
+            step={2}
+            className="mt-2"
+          />
+          <div className="mt-2 flex justify-between px-0.5">
+            {[2, 4, 6, 8, 10, 12].map((num) => {
+              const isActive = minCapacity > 0 && num <= minCapacity;
+              const isSelected = minCapacity === num || (minCapacity === 0 && num === 2);
+              return (
+                <div
+                  key={num}
+                  className="flex flex-col items-center gap-1 cursor-pointer"
+                  onClick={() => setMinCapacity(num)}
+                >
+                  <div className={`h-2.5 w-2.5 rounded-full transition-all duration-200 border ${
+                    isSelected
+                      ? "bg-primary border-primary scale-125"
+                      : isActive
+                        ? "bg-primary/60 border-primary/40"
+                        : "bg-muted border-muted-foreground/20"
+                  }`} />
+                  <span className={`text-[10px] transition-colors duration-200 font-semibold ${
+                    isSelected
+                      ? "text-primary font-bold"
+                      : "text-muted-foreground/75"
+                  }`}>
+                    {num}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
       </div>
 
       <div>

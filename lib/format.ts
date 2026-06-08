@@ -33,7 +33,10 @@ export function getNextDays(count: number): string[] {
   for (let i = 0; i < count; i++) {
     const d = new Date(today)
     d.setDate(today.getDate() + i)
-    days.push(d.toISOString().slice(0, 10))
+    const year = d.getFullYear()
+    const month = String(d.getMonth() + 1).padStart(2, "0")
+    const dateVal = String(d.getDate()).padStart(2, "0")
+    days.push(`${year}-${month}-${dateVal}`)
   }
   return days
 }

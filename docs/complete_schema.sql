@@ -1,7 +1,13 @@
--- Dinomad initial user + supplier schema for Supabase Postgres.
--- Supabase Auth owns identity in auth.users. Application profile data lives in public tables.
+-- DiNOMAD - Complete Database Schema for Supabase Postgres
+-- This file merges all user/supplier tables, bookings, payments, reviews, wishlist, and loyalty points system tables.
+-- It serves as the single source of truth for the entire database structure.
+
+-- =========================================================================
+-- 1. EXTENSIONS & ENUMS
+-- =========================================================================
 
 create extension if not exists "pgcrypto";
+create extension if not exists "btree_gist";
 
 create type public.app_role as enum ('customer', 'supplier', 'admin');
 create type public.user_status as enum ('active', 'blocked', 'deleted');
@@ -10,6 +16,10 @@ create type public.supplier_member_role as enum ('owner', 'manager', 'staff');
 create type public.venue_status as enum ('draft', 'pending_review', 'published', 'suspended');
 create type public.room_status as enum ('draft', 'published', 'unavailable', 'archived');
 create type public.room_category as enum ('team_hub', 'solo_nook');
+create type public.booking_status as enum ('pending', 'confirmed', 'completed', 'cancelled');
+create type public.payment_method as enum ('vietqr', 'momo', 'zalopay', 'card');
+create type public.payment_status as enum ('pending', 'successful', 'failed', 'refunded');
+
 create type public.amenity as enum (
   'wifi',
   'tv',
@@ -23,6 +33,7 @@ create type public.amenity as enum (
   'parking',
   'printing'
 );
+
 create type public.vibe_tag as enum (
   'ultra_quiet',
   'discussion_friendly',
@@ -34,6 +45,25 @@ create type public.vibe_tag as enum (
   'garden_view'
 );
 
+-- =========================================================================
+-- 2. CORE TRIGGER FUNCTIONS (Must be defined before triggers are created)
+-- =========================================================================
+
+create or replace function public.set_updated_at()
+returns trigger
+language plpgsql
+as $$
+begin
+  new.updated_at = now();
+  return new;
+end;
+$$;
+
+-- =========================================================================
+-- 3. TABLES DEFINITION
+-- =========================================================================
+
+-- --- BẢNG USER PROFILES ---
 create table public.profiles (
   id uuid primary key references auth.users (id) on delete cascade,
   email text not null,
@@ -42,6 +72,7 @@ create table public.profiles (
   avatar_url text,
   role public.app_role not null default 'customer',
   status public.user_status not null default 'active',
+  points integer not null default 0, -- Loyalty reward points
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   constraint profiles_email_check check (position('@' in email) > 1)
@@ -51,6 +82,7 @@ create unique index profiles_email_unique_idx on public.profiles (lower(email));
 create index profiles_role_idx on public.profiles (role);
 create index profiles_status_idx on public.profiles (status);
 
+-- --- BẢNG SUPPLIERS (VENUE OWNERS) ---
 create table public.suppliers (
   id uuid primary key default gen_random_uuid(),
   legal_name text not null,
@@ -72,6 +104,7 @@ create unique index suppliers_tax_code_unique_idx
 create index suppliers_status_idx on public.suppliers (status);
 create index suppliers_display_name_idx on public.suppliers (display_name);
 
+-- --- BẢNG SUPPLIER MEMBERS ---
 create table public.supplier_members (
   id uuid primary key default gen_random_uuid(),
   supplier_id uuid not null references public.suppliers (id) on delete cascade,
@@ -88,6 +121,7 @@ create table public.supplier_members (
 create index supplier_members_user_id_idx on public.supplier_members (user_id);
 create index supplier_members_supplier_id_idx on public.supplier_members (supplier_id);
 
+-- --- BẢNG VENUES (ĐỊA ĐIỂM) ---
 create table public.venues (
   id uuid primary key default gen_random_uuid(),
   supplier_id uuid not null references public.suppliers (id) on delete cascade,
@@ -112,6 +146,7 @@ create index venues_supplier_id_idx on public.venues (supplier_id);
 create index venues_status_idx on public.venues (status);
 create index venues_location_idx on public.venues (city, district);
 
+-- --- BẢNG ROOMS (PHÒNG / WORKSPACES) ---
 create table public.rooms (
   id uuid primary key default gen_random_uuid(),
   venue_id uuid not null references public.venues (id) on delete cascade,
@@ -140,6 +175,7 @@ create index rooms_capacity_idx on public.rooms (capacity);
 create index rooms_price_per_hour_idx on public.rooms (price_per_hour);
 create index rooms_specs_gin_idx on public.rooms using gin (specs);
 
+-- --- BẢNG ROOM IMAGES ---
 create table public.room_images (
   id uuid primary key default gen_random_uuid(),
   room_id uuid not null references public.rooms (id) on delete cascade,
@@ -151,6 +187,7 @@ create table public.room_images (
 
 create index room_images_room_id_sort_idx on public.room_images (room_id, sort_order);
 
+-- --- BẢNG ROOM AMENITIES ---
 create table public.room_amenities (
   room_id uuid not null references public.rooms (id) on delete cascade,
   amenity public.amenity not null,
@@ -159,6 +196,7 @@ create table public.room_amenities (
 
 create index room_amenities_amenity_idx on public.room_amenities (amenity);
 
+-- --- BẢNG ROOM VIBE TAGS ---
 create table public.room_vibe_tags (
   room_id uuid not null references public.rooms (id) on delete cascade,
   vibe_tag public.vibe_tag not null,
@@ -167,19 +205,104 @@ create table public.room_vibe_tags (
 
 create index room_vibe_tags_vibe_tag_idx on public.room_vibe_tags (vibe_tag);
 
-create or replace function public.set_updated_at()
-returns trigger
-language plpgsql
-as $$
-begin
-  new.updated_at = now();
-  return new;
-end;
-$$;
+-- --- BẢNG ĐẶT PHÒNG (BOOKINGS) ---
+create table public.bookings (
+  id uuid primary key default gen_random_uuid(),
+  room_id uuid not null references public.rooms (id) on delete restrict,
+  customer_id uuid not null references public.profiles (id) on delete restrict,
+  booking_date date not null default current_date,
+  start_time timestamptz not null,
+  end_time timestamptz not null,
+  status public.booking_status not null default 'pending',
+  price_per_hour integer not null,
+  subtotal integer not null,
+  platform_fee integer not null,
+  total_amount integer not null,
+  booking_code text unique, -- User-friendly booking confirmation code (e.g. DN-A3F9X8)
+  points_redeemed integer not null default 0,
+  points_earned integer not null default 0,
+  qr_code_token text unique,
+  checked_in_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  
+  constraint bookings_start_end_time_check check (start_time < end_time),
+  constraint bookings_amount_positive check (total_amount >= 0),
+  constraint bookings_time_alignment_check check (
+    extract(minute from start_time) in (0, 30) and
+    extract(second from start_time) = 0 and
+    extract(minute from end_time) in (0, 30) and
+    extract(second from end_time) = 0
+  )
+);
 
-create trigger profiles_set_updated_at
-before update on public.profiles
-for each row execute function public.set_updated_at();
+create index bookings_room_id_idx on public.bookings (room_id);
+create index bookings_customer_id_idx on public.bookings (customer_id);
+create index bookings_status_idx on public.bookings (status);
+create index bookings_time_range_idx on public.bookings (start_time, end_time);
+
+-- Ngăn chặn trùng lịch phòng
+alter table public.bookings add constraint bookings_no_overlap exclude using gist (
+  room_id with =,
+  tstzrange(start_time, end_time) with &&
+) where (status != 'cancelled');
+
+-- --- BẢNG THANH TOÁN (PAYMENTS) ---
+create table public.payments (
+  id uuid primary key default gen_random_uuid(),
+  booking_id uuid not null references public.bookings (id) on delete restrict,
+  payment_method public.payment_method not null,
+  transaction_id text,
+  amount integer not null,
+  status public.payment_status not null default 'pending',
+  paid_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index payments_booking_id_idx on public.payments (booking_id);
+create index payments_status_idx on public.payments (status);
+
+-- --- BẢNG ĐÁNH GIÁ (REVIEWS) ---
+create table public.reviews (
+  id uuid primary key default gen_random_uuid(),
+  room_id uuid not null references public.rooms (id) on delete cascade,
+  customer_id uuid not null references public.profiles (id) on delete cascade,
+  booking_id uuid not null unique references public.bookings (id) on delete cascade,
+  rating integer not null constraint reviews_rating_check check (rating between 1 and 5),
+  comment text,
+  comment_vi text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index reviews_room_id_idx on public.reviews (room_id);
+create index reviews_rating_idx on public.reviews (rating);
+
+-- --- BẢNG WISHLISTS (PHÒNG YÊU THÍCH) ---
+create table public.wishlists (
+  user_id uuid not null references public.profiles (id) on delete cascade,
+  room_id uuid not null references public.rooms (id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (user_id, room_id)
+);
+
+-- --- BẢNG LỊCH SỬ ĐIỂM THƯỞNG (POINT TRANSACTIONS) ---
+create table public.point_transactions (
+  id uuid primary key default gen_random_uuid(),
+  profile_id uuid not null references public.profiles (id) on delete cascade,
+  booking_id uuid references public.bookings (id) on delete set null,
+  amount integer not null,
+  type text not null, -- 'earn' | 'redeem' | 'refund' | 'revert'
+  description text,
+  created_at timestamptz not null default now()
+);
+
+create index point_transactions_profile_id_idx on public.point_transactions (profile_id);
+
+-- =========================================================================
+-- 4. ADDITIONAL TRIGGER FUNCTIONS & SECURITY POLICY TOOLS
+-- =========================================================================
 
 create or replace function public.prevent_profile_privilege_escalation()
 returns trigger
@@ -210,26 +333,6 @@ begin
 end;
 $$;
 
-create trigger profiles_prevent_privilege_escalation
-before update on public.profiles
-for each row execute function public.prevent_profile_privilege_escalation();
-
-create trigger suppliers_set_updated_at
-before update on public.suppliers
-for each row execute function public.set_updated_at();
-
-create trigger supplier_members_set_updated_at
-before update on public.supplier_members
-for each row execute function public.set_updated_at();
-
-create trigger venues_set_updated_at
-before update on public.venues
-for each row execute function public.set_updated_at();
-
-create trigger rooms_set_updated_at
-before update on public.rooms
-for each row execute function public.set_updated_at();
-
 create or replace function public.handle_new_auth_user()
 returns trigger
 language plpgsql
@@ -249,10 +352,6 @@ begin
   return new;
 end;
 $$;
-
-create trigger on_auth_user_created
-after insert on auth.users
-for each row execute function public.handle_new_auth_user();
 
 create or replace function public.current_user_role()
 returns public.app_role
@@ -437,6 +536,156 @@ $$;
 revoke all on function public.submit_supplier_application_for_user(uuid, text, text, text, text, text, text) from public;
 grant execute on function public.submit_supplier_application_for_user(uuid, text, text, text, text, text, text) to service_role;
 
+-- --- GENERATE UNIQUE BOOKING CODE ---
+create or replace function public.generate_unique_booking_code()
+returns trigger as $$
+declare
+  new_code text;
+  exists_code boolean;
+  chars text := 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+begin
+  if NEW.booking_code is not null then
+    return NEW;
+  end if;
+
+  loop
+    new_code := 'DN-' || (
+      select string_agg(substr(chars, floor(random() * 36)::integer + 1, 1), '')
+      from generate_series(1, 6)
+    );
+    
+    select exists(select 1 from public.bookings where booking_code = new_code) into exists_code;
+    
+    if not exists_code then
+      NEW.booking_code := new_code;
+      exit;
+    end if;
+  end loop;
+  
+  return NEW;
+end;
+$$ language plpgsql;
+
+-- --- PROCESS LOYALTY POINTS & CANCELLATION REFUNDS ---
+create or replace function public.process_booking_loyalty_points()
+returns trigger as $$
+begin
+  -- A. Cộng/Trừ điểm khi đặt phòng thành công (CONFIRMED hoặc COMPLETED)
+  -- Đối với INSERT: kiểm tra trạng thái là confirmed hoặc completed
+  -- Đối với UPDATE: kiểm tra chuyển từ pending sang confirmed hoặc completed
+  if (TG_OP = 'INSERT' and (NEW.status = 'confirmed' or NEW.status = 'completed')) or
+     (TG_OP = 'UPDATE' and (NEW.status = 'confirmed' or NEW.status = 'completed') and (OLD.status = 'pending')) then
+    
+    -- Trừ điểm tích lũy đã tiêu dùng (Redeem)
+    if NEW.points_redeemed > 0 then
+      update public.profiles
+      set points = greatest(0, points - NEW.points_redeemed)
+      where id = NEW.customer_id;
+      
+      insert into public.point_transactions (profile_id, booking_id, amount, type, description)
+      values (NEW.customer_id, NEW.id, -NEW.points_redeemed, 'redeem', 'Redeemed points for booking ' || NEW.booking_code);
+    end if;
+    
+    -- Add Earned Points
+    if NEW.points_earned > 0 then
+      update public.profiles
+      set points = points + NEW.points_earned
+      where id = NEW.customer_id;
+      
+      insert into public.point_transactions (profile_id, booking_id, amount, type, description)
+      values (NEW.customer_id, NEW.id, NEW.points_earned, 'earn', 'Earned points for booking ' || NEW.booking_code);
+    end if;
+  end if;
+  
+  -- B. Hoàn lại và thu hồi điểm khi đơn đặt phòng bị HỦY (Chuyển sang CANCELLED)
+  -- Chỉ áp dụng khi UPDATE từ trạng thái CONFIRMED hoặc COMPLETED
+  if TG_OP = 'UPDATE' and NEW.status = 'cancelled' and (OLD.status = 'confirmed' or OLD.status = 'completed') then
+    -- Refund Redeemed Points
+    if OLD.points_redeemed > 0 then
+      update public.profiles
+      set points = points + OLD.points_redeemed
+      where id = OLD.customer_id;
+      
+      insert into public.point_transactions (profile_id, booking_id, amount, type, description)
+      values (OLD.customer_id, OLD.id, OLD.points_redeemed, 'refund', 'Refunded points for cancelled booking ' || OLD.booking_code);
+    end if;
+    
+    -- Revert Earned Points
+    if OLD.points_earned > 0 then
+      update public.profiles
+      set points = greatest(0, points - OLD.points_earned)
+      where id = OLD.customer_id;
+      
+      insert into public.point_transactions (profile_id, booking_id, amount, type, description)
+      values (OLD.customer_id, OLD.id, -OLD.points_earned, 'revert', 'Reverted earned points for cancelled booking ' || OLD.booking_code);
+    end if;
+  end if;
+  
+  return NEW;
+end;
+$$ language plpgsql;
+
+-- =========================================================================
+-- 5. TRIGGERS INITIALIZATION
+-- =========================================================================
+
+create trigger profiles_set_updated_at
+before update on public.profiles
+for each row execute function public.set_updated_at();
+
+create trigger profiles_prevent_privilege_escalation
+before update on public.profiles
+for each row execute function public.prevent_profile_privilege_escalation();
+
+create trigger suppliers_set_updated_at
+before update on public.suppliers
+for each row execute function public.set_updated_at();
+
+create trigger supplier_members_set_updated_at
+before update on public.supplier_members
+for each row execute function public.set_updated_at();
+
+create trigger venues_set_updated_at
+before update on public.venues
+for each row execute function public.set_updated_at();
+
+create trigger rooms_set_updated_at
+before update on public.rooms
+for each row execute function public.set_updated_at();
+
+create trigger bookings_set_updated_at
+before update on public.bookings
+for each row execute function public.set_updated_at();
+
+create trigger payments_set_updated_at
+before update on public.payments
+for each row execute function public.set_updated_at();
+
+create trigger reviews_set_updated_at
+before update on public.reviews
+for each row execute function public.set_updated_at();
+
+-- Auth trigger to auto-create profile
+create trigger on_auth_user_created
+after insert on auth.users
+for each row execute function public.handle_new_auth_user();
+
+-- Trigger for unique booking code
+drop trigger if exists bookings_generate_booking_code on public.bookings;
+create trigger bookings_generate_booking_code
+before insert on public.bookings
+for each row execute function public.generate_unique_booking_code();
+
+-- Trigger for points synchronization and refunds (runs on AFTER INSERT OR UPDATE)
+drop trigger if exists bookings_loyalty_points_trigger on public.bookings;
+create trigger bookings_loyalty_points_trigger
+after insert or update on public.bookings
+for each row execute function public.process_booking_loyalty_points();
+
+-- =========================================================================
+-- 6. ROW LEVEL SECURITY (RLS) POLICIES
+-- =========================================================================
+
 alter table public.profiles enable row level security;
 alter table public.suppliers enable row level security;
 alter table public.supplier_members enable row level security;
@@ -445,72 +694,67 @@ alter table public.rooms enable row level security;
 alter table public.room_images enable row level security;
 alter table public.room_amenities enable row level security;
 alter table public.room_vibe_tags enable row level security;
+alter table public.bookings enable row level security;
+alter table public.payments enable row level security;
+alter table public.reviews enable row level security;
+alter table public.wishlists enable row level security;
+alter table public.point_transactions enable row level security;
 
+-- --- PROFILES ---
 create policy "Users can read own profile"
-on public.profiles for select
-to authenticated
+on public.profiles for select to authenticated
 using (id = auth.uid() or public.is_admin());
 
 create policy "Users can update own basic profile"
-on public.profiles for update
-to authenticated
+on public.profiles for update to authenticated
 using (id = auth.uid() or public.is_admin())
-with check (
-  id = auth.uid()
-  or public.is_admin()
-);
+with check (id = auth.uid() or public.is_admin());
 
+-- --- SUPPLIERS ---
 create policy "Admins can read suppliers"
-on public.suppliers for select
-to authenticated
+on public.suppliers for select to authenticated
 using (public.is_admin());
 
 create policy "Supplier members can read own suppliers"
-on public.suppliers for select
-to authenticated
+on public.suppliers for select to authenticated
 using (public.is_supplier_member(id));
 
 create policy "Admins and managers can update suppliers"
-on public.suppliers for update
-to authenticated
+on public.suppliers for update to authenticated
 using (public.can_manage_supplier(id))
 with check (public.can_manage_supplier(id));
 
+-- --- SUPPLIER MEMBERS ---
 create policy "Admins can read supplier members"
-on public.supplier_members for select
-to authenticated
+on public.supplier_members for select to authenticated
 using (public.is_admin());
 
 create policy "Supplier members can read own membership"
-on public.supplier_members for select
-to authenticated
+on public.supplier_members for select to authenticated
 using (user_id = auth.uid() or public.is_supplier_member(supplier_id));
 
 create policy "Admins and owners can manage supplier members"
-on public.supplier_members for all
-to authenticated
+on public.supplier_members for all to authenticated
 using (public.can_manage_supplier_members(supplier_id))
 with check (public.can_manage_supplier_members(supplier_id));
 
+-- --- VENUES ---
 create policy "Published venues are public"
-on public.venues for select
-to anon, authenticated
+on public.venues for select to anon, authenticated
 using (status = 'published');
 
 create policy "Supplier members can read own venues"
-on public.venues for select
-to authenticated
+on public.venues for select to authenticated
 using (public.is_supplier_member(supplier_id) or public.is_admin());
 
 create policy "Supplier managers can manage venues"
-on public.venues for all
-to authenticated
+on public.venues for all to authenticated
 using (public.can_manage_supplier(supplier_id))
 with check (public.can_manage_supplier(supplier_id));
 
+-- --- ROOMS ---
 create policy "Published rooms are public"
-on public.rooms for select
-to anon, authenticated
+on public.rooms for select to anon, authenticated
 using (
   status = 'published'
   and exists (
@@ -522,8 +766,7 @@ using (
 );
 
 create policy "Supplier members can read own rooms"
-on public.rooms for select
-to authenticated
+on public.rooms for select to authenticated
 using (
   public.is_admin()
   or exists (
@@ -535,8 +778,7 @@ using (
 );
 
 create policy "Supplier managers can manage rooms"
-on public.rooms for all
-to authenticated
+on public.rooms for all to authenticated
 using (
   exists (
     select 1
@@ -554,9 +796,9 @@ with check (
   )
 );
 
+-- --- ROOM IMAGES ---
 create policy "Room images follow room access"
-on public.room_images for select
-to anon, authenticated
+on public.room_images for select to anon, authenticated
 using (
   exists (
     select 1
@@ -569,8 +811,7 @@ using (
 );
 
 create policy "Supplier managers can manage room images"
-on public.room_images for all
-to authenticated
+on public.room_images for all to authenticated
 using (
   exists (
     select 1
@@ -590,9 +831,9 @@ with check (
   )
 );
 
+-- --- ROOM AMENITIES ---
 create policy "Room amenities follow room access"
-on public.room_amenities for select
-to anon, authenticated
+on public.room_amenities for select to anon, authenticated
 using (
   exists (
     select 1
@@ -605,8 +846,7 @@ using (
 );
 
 create policy "Supplier managers can manage room amenities"
-on public.room_amenities for all
-to authenticated
+on public.room_amenities for all to authenticated
 using (
   exists (
     select 1
@@ -626,9 +866,9 @@ with check (
   )
 );
 
+-- --- ROOM VIBE TAGS ---
 create policy "Room vibe tags follow room access"
-on public.room_vibe_tags for select
-to anon, authenticated
+on public.room_vibe_tags for select to anon, authenticated
 using (
   exists (
     select 1
@@ -641,8 +881,7 @@ using (
 );
 
 create policy "Supplier managers can manage room vibe tags"
-on public.room_vibe_tags for all
-to authenticated
+on public.room_vibe_tags for all to authenticated
 using (
   exists (
     select 1
@@ -661,3 +900,111 @@ with check (
       and public.can_manage_supplier(v.supplier_id)
   )
 );
+
+-- --- BOOKINGS ---
+create policy "Users can read own bookings"
+on public.bookings for select to authenticated
+using (customer_id = auth.uid() or public.is_admin());
+
+create policy "Customers can create bookings"
+on public.bookings for insert to authenticated
+with check (customer_id = auth.uid());
+
+create policy "Suppliers can read bookings of their rooms"
+on public.bookings for select to authenticated
+using (
+  exists (
+    select 1
+    from public.rooms r
+    join public.venues v on v.id = r.venue_id
+    where r.id = bookings.room_id
+      and public.is_supplier_member(v.supplier_id)
+  )
+);
+
+create policy "Admins can manage all bookings"
+on public.bookings for all to authenticated
+using (public.is_admin())
+with check (public.is_admin());
+
+-- --- PAYMENTS ---
+create policy "Users can read own payments"
+on public.payments for select to authenticated
+using (
+  exists (
+    select 1
+    from public.bookings b
+    where b.id = payments.booking_id
+      and b.customer_id = auth.uid()
+  ) or public.is_admin()
+);
+
+create policy "Suppliers can read payments for their rooms"
+on public.payments for select to authenticated
+using (
+  exists (
+    select 1
+    from public.bookings b
+    join public.rooms r on r.id = b.room_id
+    join public.venues v on v.id = r.venue_id
+    where b.id = payments.booking_id
+      and public.is_supplier_member(v.supplier_id)
+  )
+);
+
+create policy "Admins can manage all payments"
+on public.payments for all to authenticated
+using (public.is_admin())
+with check (public.is_admin());
+
+-- --- REVIEWS ---
+create policy "Reviews are public for active rooms"
+on public.reviews for select to anon, authenticated
+using (
+  exists (
+    select 1
+    from public.rooms r
+    join public.venues v on v.id = r.venue_id
+    where r.id = reviews.room_id
+      and r.status = 'published'
+      and v.status = 'published'
+  )
+);
+
+create policy "Customers can create reviews for their completed bookings"
+on public.reviews for insert to authenticated
+with check (
+  customer_id = auth.uid()
+  and exists (
+    select 1
+    from public.bookings b
+    where b.id = reviews.booking_id
+      and b.customer_id = auth.uid()
+      and b.status = 'completed'
+  )
+);
+
+create policy "Customers can update their own reviews"
+on public.reviews for update to authenticated
+using (customer_id = auth.uid())
+with check (customer_id = auth.uid());
+
+create policy "Admins can manage all reviews"
+on public.reviews for all to authenticated
+using (public.is_admin())
+with check (public.is_admin());
+
+-- --- WISHLISTS ---
+create policy "Users can read own wishlist"
+  on public.wishlists for select to authenticated
+  using (user_id = auth.uid());
+
+create policy "Users can manage own wishlist"
+  on public.wishlists for all to authenticated
+  using (user_id = auth.uid())
+  with check (user_id = auth.uid());
+
+-- --- POINT TRANSACTIONS ---
+create policy "Users can view own transactions"
+  on public.point_transactions for select to authenticated
+  using (profile_id = auth.uid());

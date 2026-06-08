@@ -454,8 +454,8 @@ export default function LandingPage() {
             <div className="flex flex-col items-center sm:items-start gap-0.5">
               <span className="text-xs font-semibold text-muted-foreground">{t("landing.ctaPartner")}</span>
               <button
-                onClick={() => router.push(`/${locale}/partner`)}
-                className="text-sm font-bold text-primary hover:underline underline-offset-2 transition-all"
+                onClick={() => router.push(`/${locale}/signup?role=supplier`)}
+                className="text-sm font-bold text-primary hover:underline underline-offset-2 transition-all cursor-pointer"
               >
                 {t("landing.ctaPartnerLink")}
               </button>

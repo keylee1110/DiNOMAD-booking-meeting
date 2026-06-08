@@ -29,6 +29,8 @@ interface BookingSummaryProps {
   canProceed: boolean
   onProceed: () => void
   locale: string
+  pointsDiscount?: number
+  pointsEarned?: number
 }
 
 export function BookingSummary({
@@ -46,7 +48,9 @@ export function BookingSummary({
   isPaying,
   canProceed,
   onProceed,
-  locale
+  locale,
+  pointsDiscount = 0,
+  pointsEarned = 0
 }: BookingSummaryProps) {
   const { t } = useTranslation()
 
@@ -151,10 +155,22 @@ export function BookingSummary({
             <span className="text-muted-foreground">{t("checkout.platformFee")}</span>
             <span className="font-medium">{formatVND(platformFee)}</span>
           </div>
+          {pointsDiscount > 0 && (
+            <div className="flex items-center justify-between text-sm text-primary animate-in fade-in duration-200">
+              <span className="font-medium">{locale === "vi" ? "Khấu trừ điểm thưởng" : "Points Discount"}</span>
+              <span className="font-bold">-{formatVND(pointsDiscount)}</span>
+            </div>
+          )}
           <div className="flex items-center justify-between pt-2">
             <span className="text-sm font-semibold">{t("checkout.total")}</span>
             <span className="text-lg font-black text-primary">{formatVND(totalPrice)}</span>
           </div>
+          {pointsEarned > 0 && (
+            <div className="flex items-center justify-between border-t border-dashed border-border/40 pt-2 text-[10px] text-amber-600 font-bold uppercase tracking-wider animate-in fade-in duration-200">
+              <span>{locale === "vi" ? "Tích lũy điểm thưởng" : "Points to earn"}</span>
+              <span>+{new Intl.NumberFormat("vi-VN").format(pointsEarned)} điểm</span>
+            </div>
+          )}
         </div>
       </CardContent>
 

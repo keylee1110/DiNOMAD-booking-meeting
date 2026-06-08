@@ -100,7 +100,21 @@ export function GuestInfoForm({
           />
           <div className="space-y-1">
             <p className={cn("text-sm font-medium", errors.agreeTerms ? "text-destructive" : "")}>
-              {t("checkout.termsAgree")}
+              {locale === "vi" ? (
+                <>
+                  Tôi đồng ý với{" "}
+                  <a href="#" className="text-primary hover:underline font-bold transition-colors">Điều Khoản Dịch Vụ</a>
+                  {" "}và{" "}
+                  <a href="#" className="text-primary hover:underline font-bold transition-colors">Chính Sách Hủy Đặt Phòng</a>
+                </>
+              ) : (
+                <>
+                  I agree to the{" "}
+                  <a href="#" className="text-primary hover:underline font-bold transition-colors">Terms of Service</a>
+                  {" "}and{" "}
+                  <a href="#" className="text-primary hover:underline font-bold transition-colors">Cancellation Policy</a>
+                </>
+              )}
             </p>
             <p className="text-xs text-muted-foreground">
               {locale === "vi"

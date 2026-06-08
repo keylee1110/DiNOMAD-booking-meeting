@@ -111,6 +111,9 @@ export interface Booking {
   createdAt: string
   paidAmount?: number
   paymentStatus?: "deposited" | "fully_paid"
+  bookingCode?: string
+  pointsRedeemed?: number
+  pointsEarned?: number
 }
 
 export interface Review {

@@ -1,17 +1,121 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import { useBooking } from "@/lib/store/booking-store"
 import { useTranslation } from "@/lib/i18n/context"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Calendar, Clock, MapPin, Receipt, Wifi, QrCode as QrIcon } from "lucide-react"
+import { Calendar, Clock, MapPin, Receipt, Wifi, QrCode as QrIcon, Star, MessageSquare, Sparkles, CheckCircle2 } from "lucide-react"
 import { formatVNDFull } from "@/lib/format"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
+import { createClient } from "@/utils/supabase/client"
+import { toast } from "sonner"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter
+} from "@/components/ui/dialog"
+import { Textarea } from "@/components/ui/textarea"
+import { Label } from "@/components/ui/label"
+import type { Booking } from "@/lib/types"
+import { cn } from "@/lib/utils"
 
 export default function MyBookingsPage() {
   const { myBookings, refreshBookings } = useBooking()
   const { locale, t } = useTranslation()
+  const supabase = createClient()
+
+  const canCompleteBooking = (booking: Booking) => {
+    if (booking.status !== "confirmed") return false
+    try {
+      const endDateTime = new Date(`${booking.date}T${booking.endTime}:00`)
+      return new Date() > endDateTime
+    } catch (e) {
+      return false
+    }
+  }
+
+  const handleCompleteBooking = async (bookingId: string) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        const { error } = await supabase
+          .from("bookings")
+          .update({ status: "completed" })
+          .eq("id", bookingId)
+
+        if (error) {
+          toast.error(locale === "vi" ? `Lỗi: ${error.message}` : `Error: ${error.message}`)
+          return
+        }
+        toast.success(locale === "vi" ? "Đơn đặt đã được hoàn thành!" : "Booking completed successfully!")
+      } else {
+        // Guest: update local storage
+        const saved: Booking[] = JSON.parse(localStorage.getItem("dinomad_bookings") || "[]")
+        const updated = saved.map(b => b.id === bookingId ? { ...b, status: "completed" as const } : b)
+        localStorage.setItem("dinomad_bookings", JSON.stringify(updated))
+        toast.success(locale === "vi" ? "Đơn đặt đã được hoàn thành (Khách)!" : "Booking completed successfully (Guest)!")
+      }
+      refreshBookings()
+    } catch (e: any) {
+      console.error(e)
+      toast.error(locale === "vi" ? "Đã xảy ra lỗi hệ thống!" : "A system error occurred!")
+    }
+  }
+
+  const [isReviewOpen, setIsReviewOpen] = useState(false)
+  const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null)
+  const [rating, setRating] = useState(5)
+  const [comment, setComment] = useState("")
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
+  const handleOpenReview = (booking: Booking) => {
+    setSelectedBooking(booking)
+    setRating(5)
+    setComment("")
+    setIsReviewOpen(true)
+  }
+
+  const handleSubmitReview = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!selectedBooking) return
+    setIsSubmitting(true)
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        const { error } = await supabase
+          .from("reviews")
+          .insert({
+            room_id: selectedBooking.roomId,
+            customer_id: user.id,
+            booking_id: selectedBooking.id,
+            rating,
+            comment,
+            comment_vi: locale === "vi" ? comment : undefined
+          })
+
+        if (error) {
+          toast.error(locale === "vi" ? `Gửi đánh giá thất bại: ${error.message}` : `Failed to submit review: ${error.message}`)
+        } else {
+          toast.success(locale === "vi" ? "Đã gửi đánh giá thành công!" : "Review submitted successfully!")
+          setIsReviewOpen(false)
+        }
+      } else {
+        toast.success(locale === "vi" ? "Đã gửi đánh giá thành công (Demo)!" : "Review submitted successfully (Demo)!")
+        setIsReviewOpen(false)
+      }
+    } catch (e: any) {
+      console.error(e)
+      toast.error(locale === "vi" ? "Đã xảy ra lỗi hệ thống!" : "A system error occurred!")
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
 
   const getStatusBadge = (status: string) => {
     const isVi = locale === "vi"
@@ -21,9 +125,11 @@ export default function MyBookingsPage() {
       case "pending":
         return <Badge className="bg-amber-500/15 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400 border border-amber-500/20 font-semibold px-2.5 py-0.5 hover:bg-amber-500/25 transition-colors">{isVi ? "Chờ xử lý" : "Pending"}</Badge>
       case "completed":
-        return <Badge className="bg-slate-500/15 text-slate-700 dark:bg-slate-500/10 dark:text-slate-400 border border-slate-500/20 font-semibold px-2.5 py-0.5 hover:bg-slate-500/25 transition-colors">{isVi ? "Hoàn thành" : "Completed"}</Badge>
+        return <Badge className="bg-slate-500/15 text-slate-700 dark:bg-slate-500/10 dark:text-slate-400 border border-slate-500/20 font-semibold px-2.5 py-0.5 hover:bg-slate-500/25 transition-colors">{isVi ? "Đã hoàn thành" : "Completed"}</Badge>
       case "checked_in":
         return <Badge className="bg-blue-500/15 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400 border border-blue-500/20 font-semibold px-2.5 py-0.5 hover:bg-blue-500/25 transition-colors">{isVi ? "Đã check-in" : "Checked In"}</Badge>
+      case "cancelled":
+        return <Badge className="bg-red-500/15 text-red-700 dark:bg-red-500/10 dark:text-red-400 border border-red-500/20 font-semibold px-2.5 py-0.5 hover:bg-red-500/25 transition-colors">{isVi ? "Đã hủy" : "Cancelled"}</Badge>
       default:
         return <Badge variant="outline" className="font-semibold px-2.5 py-0.5">{status}</Badge>
     }
@@ -76,9 +182,14 @@ export default function MyBookingsPage() {
                 <div className="bg-muted/30 p-6 md:w-64 flex flex-col justify-between border-b md:border-b-0 md:border-r border-border">
                   <div>
                     <div className="mb-3">{getStatusBadge(booking.status)}</div>
-                    <div className="text-xs font-mono text-muted-foreground mb-1 uppercase tracking-wider">
-                      {booking.id}
+                    <div className="text-sm font-black text-primary mb-1 uppercase tracking-wide">
+                      {booking.bookingCode || booking.id.slice(0, 11)}
                     </div>
+                    {booking.bookingCode && (
+                      <div className="text-[10px] font-mono text-muted-foreground mb-2 uppercase tracking-wider">
+                        ID: {booking.id.slice(0, 8)}...
+                      </div>
+                    )}
                     <h3 className="font-bold text-lg leading-tight">{booking.roomName}</h3>
                     <p className="text-sm text-primary font-medium mt-1">{booking.venueName}</p>
                   </div>
@@ -126,16 +237,73 @@ export default function MyBookingsPage() {
                         <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">
                           {locale === "vi" ? "Địa chỉ" : "Address"}
                         </p>
-                        <p className="text-sm text-muted-foreground line-clamp-1">{booking.venueAddress}</p>
+                        <p className="text-sm text-muted-foreground line-clamp-1">
+                          {booking.venueAddress}{" "}
+                          <a 
+                            href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(booking.venueAddress)}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-primary hover:underline font-bold text-xs ml-1.5 inline-flex items-center gap-0.5"
+                          >
+                            ({locale === "vi" ? "Xem bản đồ" : "View Map"})
+                          </a>
+                        </p>
                       </div>
                     </div>
+
+                    {booking.pointsRedeemed && booking.pointsRedeemed > 0 ? (
+                      <div className="flex items-start gap-3 sm:col-span-2 text-xs font-semibold text-primary/95 bg-primary/5 p-2.5 rounded-xl border border-primary/10">
+                        <Sparkles className="h-4 w-4 shrink-0 text-primary animate-pulse" />
+                        <div>
+                          <span>
+                            {locale === "vi"
+                              ? `Đã dùng ${new Intl.NumberFormat("vi-VN").format(booking.pointsRedeemed)} điểm (giảm -${formatVNDFull(booking.pointsRedeemed)})`
+                              : `Redeemed ${new Intl.NumberFormat("vi-VN").format(booking.pointsRedeemed)} points (discounted -${formatVNDFull(booking.pointsRedeemed)})`}
+                          </span>
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {booking.pointsEarned && booking.pointsEarned > 0 ? (
+                      <div className="flex items-start gap-3 sm:col-span-2 text-xs font-semibold text-amber-700 bg-amber-500/5 p-2.5 rounded-xl border border-amber-500/10">
+                        <Sparkles className="h-4 w-4 shrink-0 text-amber-500" />
+                        <div>
+                          <span>
+                            {locale === "vi"
+                              ? `Tích lũy thêm +${new Intl.NumberFormat("vi-VN").format(booking.pointsEarned)} điểm thưởng từ đơn này`
+                              : `Earned +${new Intl.NumberFormat("vi-VN").format(booking.pointsEarned)} loyalty points from this booking`}
+                          </span>
+                        </div>
+                      </div>
+                    ) : null}
                   </div>
 
-                  <div className="mt-6 flex flex-wrap gap-3">
+                  <div className="mt-6 flex flex-wrap gap-3 items-center">
                     <div className="flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1 text-[11px] font-bold text-blue-700 border border-blue-100 uppercase tracking-tight">
                       <Wifi className="h-3 w-3" />
                       Pass: {booking.wifiPassword || "********"}
                     </div>
+                    {booking.status === "completed" && (
+                      <Button
+                        onClick={() => handleOpenReview(booking)}
+                        variant="outline"
+                        size="sm"
+                        className="h-8 text-xs font-bold uppercase tracking-wider gap-1.5 rounded-xl border-amber-500/20 text-amber-600 hover:bg-amber-500/8 hover:text-amber-700 bg-transparent animate-in fade-in zoom-in-95 duration-200"
+                      >
+                        <MessageSquare className="h-3.5 w-3.5" />
+                        {locale === "vi" ? "Viết đánh giá" : "Write Review"}
+                      </Button>
+                    )}
+                    {canCompleteBooking(booking) && (
+                      <Button
+                        onClick={() => handleCompleteBooking(booking.id)}
+                        size="sm"
+                        className="h-8 text-xs font-bold uppercase tracking-wider gap-1.5 rounded-xl bg-success text-white hover:bg-success/90 border border-success/35 shadow-sm transition-all duration-200 active:scale-95 animate-in fade-in zoom-in-95 duration-200"
+                      >
+                        <CheckCircle2 className="h-3.5 w-3.5" />
+                        {locale === "vi" ? "Hoàn thành" : "Complete"}
+                      </Button>
+                    )}
                     <Link href={`/${locale}/checkout/success?id=${booking.id}`} className="ml-auto">
                       <Button variant="ghost" size="sm" className="h-8 text-xs font-bold uppercase tracking-wider gap-2">
                         <QrIcon className="h-3 w-3" />
@@ -149,6 +317,93 @@ export default function MyBookingsPage() {
           ))}
         </div>
       )}
+
+      {/* Review & Rating Dialog */}
+      <Dialog open={isReviewOpen} onOpenChange={setIsReviewOpen}>
+        <DialogContent className="max-w-md rounded-2xl border border-border/60 bg-card p-6 shadow-xl">
+          <form onSubmit={handleSubmitReview} className="space-y-4">
+            <DialogHeader className="pb-2 border-b border-border/40">
+              <DialogTitle className="text-xl font-bold text-foreground">
+                {locale === "vi" ? "Đánh giá phòng họp" : "Rate Workspace"}
+              </DialogTitle>
+              <DialogDescription className="text-xs text-muted-foreground mt-1">
+                {locale === "vi"
+                  ? `Chia sẻ trải nghiệm của bạn tại ${selectedBooking?.roomName} (${selectedBooking?.venueName})`
+                  : `Share your experience at ${selectedBooking?.roomName} (${selectedBooking?.venueName})`}
+              </DialogDescription>
+            </DialogHeader>
+
+            {/* Stars Picker */}
+            <div className="flex flex-col items-center justify-center gap-2 py-4">
+              <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                {locale === "vi" ? "Số sao đánh giá" : "Rating Stars"}
+              </Label>
+              <div className="flex gap-1.5 mt-1">
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <button
+                    key={star}
+                    type="button"
+                    onClick={() => setRating(star)}
+                    className="p-1 hover:scale-110 active:scale-95 transition-transform duration-100 cursor-pointer"
+                  >
+                    <Star
+                      className={cn(
+                        "h-8 w-8 transition-colors",
+                        star <= rating
+                          ? "fill-yellow-400 text-yellow-400"
+                          : "text-muted-foreground/30 hover:text-yellow-200"
+                      )}
+                    />
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Comment area */}
+            <div className="space-y-2">
+              <Label htmlFor="comment" className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                {locale === "vi" ? "Ý kiến đóng góp" : "Your Review Comment"}
+              </Label>
+              <Textarea
+                id="comment"
+                required
+                rows={4}
+                value={comment}
+                onChange={(e) => setComment(e.target.value)}
+                placeholder={
+                  locale === "vi"
+                    ? "Không gian như thế nào? Wifi có nhanh không? Phục vụ ra sao?..."
+                    : "How was the noise level? Is the AC cold? How was the service?..."
+                }
+                className="rounded-xl border-border bg-background text-sm font-semibold focus-visible:ring-primary/20"
+              />
+            </div>
+
+            <DialogFooter className="pt-4 border-t border-border/30 gap-2 flex flex-col sm:flex-row sm:justify-end">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsReviewOpen(false)}
+                className="rounded-xl h-11 text-xs font-bold uppercase tracking-wider border-border hover:bg-muted"
+                disabled={isSubmitting}
+              >
+                {t("common.cancel")}
+              </Button>
+              <Button
+                type="submit"
+                className="rounded-xl h-11 text-xs font-bold uppercase tracking-wider shadow-md shadow-primary/10 hover:shadow-lg bg-primary text-primary-foreground"
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? (
+                  locale === "vi" ? "Đang gửi..." : "Submitting..."
+                ) : (
+                  locale === "vi" ? "Gửi đánh giá" : "Submit Review"
+                )}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

@@ -4,7 +4,7 @@ import Link from "next/link"
 import Image from "next/image"
 import { useTranslation } from "@/lib/i18n/context"
 import { LanguageSwitcher } from "@/components/language-switcher"
-import { Menu, X, CalendarDays, User as UserIcon, LogOut, ChevronDown, Sparkles } from "lucide-react"
+import { Menu, X, CalendarDays, User as UserIcon, LogOut, ChevronDown, Sparkles, Heart } from "lucide-react"
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { useBooking } from "@/lib/store/booking-store"
@@ -17,7 +17,7 @@ export function Header() {
   const { locale, t } = useTranslation()
   const router = useRouter()
   const [menuOpen, setMenuOpen] = useState(false)
-  const { myBookings } = useBooking()
+  const { myBookings, wishlist } = useBooking()
   
   const [user, setUser] = useState<User | null>(null)
   const [userRole, setUserRole] = useState<string>("customer")
@@ -97,6 +97,17 @@ export function Header() {
             {myBookings.length > 0 && (
               <span className="flex h-4.5 w-4.5 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
                 {myBookings.length}
+              </span>
+            )}
+          </Link>
+          <Link
+            href={`/${locale}/wishlist`}
+            className="flex items-center gap-1.5 text-sm font-semibold text-muted-foreground transition-colors hover:text-foreground"
+          >
+            {locale === "vi" ? "Yêu thích" : "Favorites"}
+            {wishlist.length > 0 && (
+              <span className="flex h-4.5 w-4.5 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
+                {wishlist.length}
               </span>
             )}
           </Link>
@@ -203,6 +214,18 @@ export function Header() {
               {myBookings.length > 0 && (
                 <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
                   {myBookings.length}
+                </span>
+              )}
+            </Link>
+            <Link
+              href={`/${locale}/wishlist`}
+              className="flex items-center justify-between rounded-xl px-3 py-2 text-sm font-bold text-foreground hover:bg-muted/80 transition-all duration-150"
+              onClick={() => setMenuOpen(false)}
+            >
+              <span>{locale === "vi" ? "Yêu thích" : "Wishlist"}</span>
+              {wishlist.length > 0 && (
+                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
+                  {wishlist.length}
                 </span>
               )}
             </Link>

@@ -41,8 +41,8 @@ export function ConfirmationView({
               <div className="rounded-xl border bg-muted/20 p-4">
                 <div className="flex items-start justify-between gap-4">
                   <div>
-                    <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{t("confirmation.bookingId")}</p>
-                    <p className="mt-1 font-black text-lg">{booking.id}</p>
+                    <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{locale === "vi" ? "Mã đặt phòng" : "Booking Code"}</p>
+                    <p className="mt-1 font-black text-2xl text-primary tracking-wide">{booking.bookingCode || booking.id}</p>
                   </div>
                   <div className="flex items-center gap-1 text-muted-foreground text-sm">
                     <Users className="h-4 w-4" />
@@ -76,6 +76,18 @@ export function ConfirmationView({
                     <span className="text-sm text-muted-foreground">{t("checkout.total")}</span>
                     <span className="font-semibold text-foreground">{formatVND(booking.totalPrice)}</span>
                   </div>
+                  {booking.pointsRedeemed && booking.pointsRedeemed > 0 ? (
+                    <div className="flex items-start justify-between gap-4 text-xs text-primary font-bold">
+                      <span>{locale === "vi" ? "Điểm thưởng quy đổi" : "Points Discount"}</span>
+                      <span>-{formatVND(booking.pointsRedeemed)}</span>
+                    </div>
+                  ) : null}
+                  {booking.pointsEarned && booking.pointsEarned > 0 ? (
+                    <div className="flex items-start justify-between gap-4 text-xs text-amber-600 font-bold">
+                      <span>{locale === "vi" ? "Tích lũy điểm thưởng" : "Points Earned"}</span>
+                      <span>+{new Intl.NumberFormat("vi-VN").format(booking.pointsEarned)} điểm</span>
+                    </div>
+                  ) : null}
                   {booking.paymentStatus === "deposited" ? (
                     <>
                       <div className="flex items-start justify-between gap-4">
