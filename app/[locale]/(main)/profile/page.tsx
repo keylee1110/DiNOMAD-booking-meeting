@@ -55,6 +55,7 @@ export default function ProfilePage() {
   const [email, setEmail] = useState("")
   const [avatarUrl, setAvatarUrl] = useState("")
   const [points, setPoints] = useState(0)
+  const [bookingStats, setBookingStats] = useState({ total: 0, completed: 0, totalSpent: 0 })
 
   const supabase = createClient()
 
@@ -121,6 +122,23 @@ export default function ProfilePage() {
     }
 
     checkAuth()
+
+    // Fetch booking stats for dashboard
+    async function fetchBookingStats() {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      const { data, error } = await supabase
+        .from("bookings")
+        .select("status, total_amount")
+        .eq("customer_id", user.id)
+      if (data && !error) {
+        const total = data.length
+        const completed = data.filter((b: any) => b.status === "completed").length
+        const totalSpent = data.reduce((sum: number, b: any) => sum + (b.total_amount || 0), 0)
+        setBookingStats({ total, completed, totalSpent })
+      }
+    }
+    fetchBookingStats()
 
     return () => {
       active = false
@@ -287,6 +305,36 @@ export default function ProfilePage() {
               <div className="flex items-center justify-between">
                 <span>{locale === "vi" ? "Giá trị quy đổi:" : "Points valuation:"}</span>
                 <span className="font-bold text-foreground">1 {locale === "vi" ? "điểm" : "pt"} = 1 VND</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Booking Stats Card */}
+          <div className="bg-card text-card-foreground border border-border/80 rounded-2xl p-6 shadow-sm relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-1 h-full bg-emerald-500" />
+            <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground mb-4">
+              {locale === "vi" ? "Thống kê đặt phòng" : "Booking Stats"}
+            </h3>
+            <div className="grid grid-cols-3 gap-3">
+              <div className="flex flex-col items-center justify-center rounded-xl bg-muted/40 p-3 text-center">
+                <span className="text-2xl font-black text-foreground">{bookingStats.total}</span>
+                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide mt-0.5">
+                  {locale === "vi" ? "Tổng đơn" : "Total"}
+                </span>
+              </div>
+              <div className="flex flex-col items-center justify-center rounded-xl bg-emerald-500/8 p-3 text-center border border-emerald-500/15">
+                <span className="text-2xl font-black text-emerald-600">{bookingStats.completed}</span>
+                <span className="text-[10px] font-bold text-emerald-600/70 uppercase tracking-wide mt-0.5">
+                  {locale === "vi" ? "Hoàn thành" : "Done"}
+                </span>
+              </div>
+              <div className="flex flex-col items-center justify-center rounded-xl bg-primary/5 p-3 text-center border border-primary/10">
+                <span className="text-lg font-black text-primary leading-tight">
+                  {bookingStats.totalSpent > 0
+                    ? `${(bookingStats.totalSpent / 1_000_000).toFixed(1)}M`
+                    : "0"}
+                </span>
+                <span className="text-[10px] font-bold text-primary/60 uppercase tracking-wide mt-0.5">VND</span>
               </div>
             </div>
           </div>

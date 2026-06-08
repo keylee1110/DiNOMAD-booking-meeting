@@ -78,9 +78,9 @@ Một supplier có thể có nhiều tài khoản quản trị:
 Field chính:
 
 - `supplier_id`
-- `name`, `name_vi`
-- `description`, `description_vi`
-- `address`, `address_vi`
+- `name`
+- `description`
+- `address`
 - `district`, `city`
 - `lat`, `lng`
 - `status`: `draft`, `pending_review`, `published`, `suspended`
@@ -92,15 +92,15 @@ Phòng/không gian đặt chỗ thuộc venue.
 Field chính:
 
 - `venue_id`
-- `name`, `name_vi`
-- `description`, `description_vi`
+- `name`
+- `description`
 - `capacity`
 - `price_per_hour`
 - `category`: `team_hub`, `solo_nook`
 - `status`: `draft`, `published`, `unavailable`, `archived`
 - `verified`
 - `noise_level`
-- `specs`, `specs_vi`: JSONB cho thông số linh hoạt như TV, HDMI, wifi, AC.
+- `specs`: JSONB cho thông số linh hoạt như TV, HDMI, wifi, AC.
 
 ### Room metadata tables
 

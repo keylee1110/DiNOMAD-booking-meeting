@@ -24,10 +24,13 @@ import { Label } from "@/components/ui/label"
 import type { Booking } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
+type FilterStatus = "all" | "confirmed" | "completed" | "cancelled"
+
 export default function MyBookingsPage() {
   const { myBookings, refreshBookings } = useBooking()
   const { locale, t } = useTranslation()
   const supabase = createClient()
+  const [activeFilter, setActiveFilter] = useState<FilterStatus>("all")
 
   const canCompleteBooking = (booking: Booking) => {
     if (booking.status !== "confirmed") return false
@@ -72,6 +75,49 @@ export default function MyBookingsPage() {
   const [rating, setRating] = useState(5)
   const [comment, setComment] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [reviewedIds, setReviewedIds] = useState<string[]>(() => {
+    if (typeof window === "undefined") return []
+    try {
+      return JSON.parse(localStorage.getItem("dinomad_reviewed_bookings") || "[]")
+    } catch {
+      return []
+    }
+  })
+
+  // Sync reviewed booking IDs from Supabase (handles multi-device)
+  useEffect(() => {
+    async function syncReviewedFromDb() {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      const { data, error } = await supabase
+        .from("reviews")
+        .select("booking_id")
+        .eq("customer_id", user.id)
+      if (data && !error) {
+        const dbIds = data.map((r: any) => r.booking_id).filter(Boolean)
+        setReviewedIds((prev) => {
+          const merged = Array.from(new Set([...prev, ...dbIds]))
+          localStorage.setItem("dinomad_reviewed_bookings", JSON.stringify(merged))
+          return merged
+        })
+      }
+    }
+    syncReviewedFromDb()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const [activeFilter, setActiveFilter] = useState<FilterStatus>("all")
+
+  const filteredBookings = activeFilter === "all"
+    ? myBookings
+    : myBookings.filter((b) => b.status === activeFilter)
+
+  const filterCounts = {
+    all: myBookings.length,
+    confirmed: myBookings.filter((b) => b.status === "confirmed").length,
+    completed: myBookings.filter((b) => b.status === "completed").length,
+    cancelled: myBookings.filter((b) => b.status === "cancelled").length,
+  }
 
   const handleOpenReview = (booking: Booking) => {
     setSelectedBooking(booking)
@@ -95,18 +141,19 @@ export default function MyBookingsPage() {
             customer_id: user.id,
             booking_id: selectedBooking.id,
             rating,
-            comment,
-            comment_vi: locale === "vi" ? comment : undefined
+            comment
           })
 
         if (error) {
           toast.error(locale === "vi" ? `Gửi đánh giá thất bại: ${error.message}` : `Failed to submit review: ${error.message}`)
         } else {
           toast.success(locale === "vi" ? "Đã gửi đánh giá thành công!" : "Review submitted successfully!")
+          markAsReviewed(selectedBooking.id)
           setIsReviewOpen(false)
         }
       } else {
         toast.success(locale === "vi" ? "Đã gửi đánh giá thành công (Demo)!" : "Review submitted successfully (Demo)!")
+        markAsReviewed(selectedBooking.id)
         setIsReviewOpen(false)
       }
     } catch (e: any) {
@@ -115,6 +162,14 @@ export default function MyBookingsPage() {
     } finally {
       setIsSubmitting(false)
     }
+  }
+
+  const markAsReviewed = (bookingId: string) => {
+    setReviewedIds((prev) => {
+      const updated = [...prev, bookingId]
+      localStorage.setItem("dinomad_reviewed_bookings", JSON.stringify(updated))
+      return updated
+    })
   }
 
   const getStatusBadge = (status: string) => {
@@ -174,8 +229,46 @@ export default function MyBookingsPage() {
           </Link>
         </Card>
       ) : (
-        <div className="grid gap-6">
-          {myBookings.map((booking) => (
+        <div className="flex flex-col gap-6">
+          {/* Filter Tabs */}
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+            {([
+              { key: "all", labelVi: "Tất cả", labelEn: "All" },
+              { key: "confirmed", labelVi: "Đã xác nhận", labelEn: "Confirmed" },
+              { key: "completed", labelVi: "Đã hoàn thành", labelEn: "Completed" },
+              { key: "cancelled", labelVi: "Đã hủy", labelEn: "Cancelled" },
+            ] as const).map(({ key, labelVi, labelEn }) => (
+              <button
+                key={key}
+                onClick={() => setActiveFilter(key)}
+                className={cn(
+                  "flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all shrink-0 border",
+                  activeFilter === key
+                    ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                    : "bg-card border-border/60 text-muted-foreground hover:border-primary/40 hover:text-foreground"
+                )}
+              >
+                {locale === "vi" ? labelVi : labelEn}
+                <span className={cn(
+                  "inline-flex items-center justify-center h-4 min-w-4 px-1 rounded-full text-[10px] font-black",
+                  activeFilter === key ? "bg-primary-foreground/20 text-primary-foreground" : "bg-muted text-muted-foreground"
+                )}>
+                  {filterCounts[key]}
+                </span>
+              </button>
+            ))}
+          </div>
+
+          {/* Booking Cards */}
+          {filteredBookings.length === 0 ? (
+            <Card className="flex flex-col items-center justify-center p-10 text-center border-dashed border-border/60">
+              <p className="text-muted-foreground text-sm">
+                {locale === "vi" ? "Không có đơn nào trong mục này." : "No bookings in this category."}
+              </p>
+            </Card>
+          ) : (
+          <div className="grid gap-6">
+          {filteredBookings.map((booking) => (
             <Card key={booking.id} className="overflow-hidden border-2 transition-all hover:shadow-md">
               <div className="flex flex-col md:flex-row">
                 {/* Status and Summary Side */}
@@ -283,7 +376,7 @@ export default function MyBookingsPage() {
                       <Wifi className="h-3 w-3" />
                       Pass: {booking.wifiPassword || "********"}
                     </div>
-                    {booking.status === "completed" && (
+                    {booking.status === "completed" && !reviewedIds.includes(booking.id) && (
                       <Button
                         onClick={() => handleOpenReview(booking)}
                         variant="outline"
@@ -293,6 +386,12 @@ export default function MyBookingsPage() {
                         <MessageSquare className="h-3.5 w-3.5" />
                         {locale === "vi" ? "Viết đánh giá" : "Write Review"}
                       </Button>
+                    )}
+                    {booking.status === "completed" && reviewedIds.includes(booking.id) && (
+                      <span className="flex items-center gap-1.5 text-[11px] font-bold text-emerald-600 uppercase tracking-tight">
+                        <CheckCircle2 className="h-3.5 w-3.5" />
+                        {locale === "vi" ? "Đã đánh giá" : "Reviewed"}
+                      </span>
                     )}
                     {canCompleteBooking(booking) && (
                       <Button
@@ -315,6 +414,8 @@ export default function MyBookingsPage() {
               </div>
             </Card>
           ))}
+        </div>
+          )}
         </div>
       )}
 

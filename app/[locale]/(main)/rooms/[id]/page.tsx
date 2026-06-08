@@ -11,6 +11,7 @@ import { formatVND, getNextDays, formatDate } from "@/lib/format"
 import { TimeSlotPicker } from "@/components/time-slot-picker"
 import { AmenityIcon } from "@/components/amenity-icon"
 import { VerifiedBadge } from "@/components/verified-badge"
+import { CountdownTimer } from "@/components/countdown-timer"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -34,6 +35,8 @@ export default function RoomDetailPage({ params }: { params: Promise<{ locale: s
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
   const [selectedDate, setSelectedDate] = useState(getNextDays(1)[0])
   const [selectedSlots, setSelectedSlots] = useState<TimeSlot[]>([])
+  const [holdExpired, setHoldExpired] = useState(false)
+  const [holdTimerKey, setHoldTimerKey] = useState(0)
 
   // Split bill states
   const [splitPeople, setSplitPeople] = useState(room?.capacity || 2)
@@ -66,6 +69,9 @@ export default function RoomDetailPage({ params }: { params: Promise<{ locale: s
 
       return [...prev, slot].sort((a, b) => a.startTime.localeCompare(b.startTime))
     })
+    // Reset hold timer each time user picks a new slot
+    setHoldExpired(false)
+    setHoldTimerKey((k) => k + 1)
   }
 
   const handleDateChange = (date: string) => {
@@ -281,16 +287,36 @@ export default function RoomDetailPage({ params }: { params: Promise<{ locale: s
 
         {/* Right: Booking Widget (sticky) */}
         <div className="lg:sticky lg:top-20 lg:self-start flex flex-col gap-4">
-          {selectedSlots.length > 0 && (
+          {selectedSlots.length > 0 && !holdExpired && (
             <div className="rounded-2xl bg-amber-500/5 border border-amber-500/20 p-4 flex items-center justify-between shadow-sm animate-in fade-in slide-in-from-top-4">
               <div>
                 <p className="text-xs font-medium text-amber-700 dark:text-amber-400">
                   {locale === "vi" ? "Đang giữ chỗ cho bạn" : "Holding your spot"}
                 </p>
-                <p className="text-2xl font-bold text-amber-700 dark:text-amber-400 tracking-tight">10:00</p>
+                <CountdownTimer
+                  key={holdTimerKey}
+                  durationSeconds={600}
+                  onExpire={() => setHoldExpired(true)}
+                  className="mt-1 border-amber-500/20 bg-transparent text-amber-700 dark:text-amber-400 text-base px-0 py-0 gap-1.5"
+                />
               </div>
               <Button variant="outline" size="sm" className="text-xs h-8 border-amber-500/20 text-amber-700 hover:bg-amber-500/10 hover:text-amber-800 bg-transparent rounded-xl">
                 {locale === "vi" ? "Cần thêm thời gian?" : "Need more time?"}
+              </Button>
+            </div>
+          )}
+          {selectedSlots.length > 0 && holdExpired && (
+            <div className="rounded-2xl bg-destructive/5 border border-destructive/20 p-4 flex items-center gap-3 shadow-sm animate-in fade-in">
+              <p className="text-xs font-semibold text-destructive flex-1">
+                {locale === "vi" ? "Đã hết thời gian giữ chỗ. Vui lòng chọn lại." : "Hold time expired. Please reselect your slots."}
+              </p>
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-xs h-8 border-destructive/20 text-destructive hover:bg-destructive/10 bg-transparent rounded-xl shrink-0"
+                onClick={() => { setSelectedSlots([]); setHoldExpired(false); setHoldTimerKey(k => k + 1) }}
+              >
+                {locale === "vi" ? "Chọn lại" : "Reset"}
               </Button>
             </div>
           )}
@@ -316,11 +342,11 @@ export default function RoomDetailPage({ params }: { params: Promise<{ locale: s
                   <span className="text-muted-foreground">{t("room.duration")}</span>
                   <span className="font-medium text-foreground">{duration}h</span>
                 </div>
-                <div className="mt-1-5 flex items-center justify-between text-sm">
+                <div className="mt-1.5 flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">{t("checkout.roomFee")}</span>
                   <span className="font-medium text-foreground">{formatVND(roomFee)}</span>
                 </div>
-                <div className="mt-1-5 flex items-center justify-between text-sm">
+                <div className="mt-1.5 flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">{t("checkout.platformFee")}</span>
                   <span className="font-medium text-foreground">{formatVND(platformFee)}</span>
                 </div>

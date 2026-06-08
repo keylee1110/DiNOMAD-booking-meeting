@@ -264,6 +264,29 @@ export default function CheckoutPage({ params }: { params: Promise<{ locale: str
           
         if (data && !error) {
           dbBookingCode = data.booking_code || newBookingCode
+          
+          // Update user points balance: add earned, subtract redeemed
+          const netPoints = pointsEarned - pointsDiscount
+          if (netPoints !== 0) {
+            await supabase.rpc("increment_user_points", {
+              user_id: user.id,
+              delta: netPoints
+            }).catch((err: any) => {
+              console.warn("Could not update points via RPC, trying manual update:", err)
+              // Fallback: manual fetch + update
+              supabase
+                .from("profiles")
+                .select("points")
+                .eq("id", user.id)
+                .single()
+                .then(({ data: profile }) => {
+                  if (profile) {
+                    const newPoints = Math.max(0, (profile.points || 0) + netPoints)
+                    supabase.from("profiles").update({ points: newPoints }).eq("id", user.id)
+                  }
+                })
+            })
+          }
         } else if (error) {
           console.warn("Supabase insert error, falling back to local storage:", error.message)
         }
@@ -487,10 +510,12 @@ export default function CheckoutPage({ params }: { params: Promise<{ locale: str
               pointsEarned={pointsEarned}
             />
 
-            <Button variant="outline" className="w-full rounded-xl lg:hidden font-semibold border-border hover:bg-muted" onClick={handleCancel} disabled={isPaying}>
-              {t("payment.cancelBooking")}
-            </Button>
-            <Button variant="outline" className="w-full rounded-xl hidden lg:flex items-center justify-center font-semibold border-border hover:bg-muted" onClick={handleCancel} disabled={isPaying}>
+            <Button
+              variant="outline"
+              className="w-full rounded-xl font-semibold border-border hover:bg-muted"
+              onClick={handleCancel}
+              disabled={isPaying}
+            >
               {t("payment.cancelBooking")}
             </Button>
           </div>
