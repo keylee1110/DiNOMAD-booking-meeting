@@ -106,8 +106,6 @@ export default function MyBookingsPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const [activeFilter, setActiveFilter] = useState<FilterStatus>("all")
-
   const filteredBookings = activeFilter === "all"
     ? myBookings
     : myBookings.filter((b) => b.status === activeFilter)
