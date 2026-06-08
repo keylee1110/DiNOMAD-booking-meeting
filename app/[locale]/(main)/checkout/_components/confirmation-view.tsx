@@ -134,7 +134,7 @@ export function ConfirmationView({
               </div>
 
               <Button
-                className="w-full rounded-none"
+                className="w-full rounded-xl"
                 size="lg"
                 onClick={onBackHome}
               >

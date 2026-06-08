@@ -201,9 +201,64 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Xóa trigger cũ trước khi khởi tạo mới (đáp ứng cú pháp Postgres)
 DROP TRIGGER IF EXISTS bookings_loyalty_points_trigger ON public.bookings;
 CREATE TRIGGER bookings_loyalty_points_trigger
 AFTER INSERT OR UPDATE ON public.bookings
 FOR EACH ROW
 EXECUTE FUNCTION public.process_booking_loyalty_points();
+
+-- =========================================================================
+-- 6. RPC: increment_user_points (Atomic points update — frontend fallback)
+-- =========================================================================
+-- Được gọi từ frontend sau khi thanh toán thành công.
+-- Trigger (process_booking_loyalty_points) xử lý chính, đây là phương án dự phòng.
+CREATE OR REPLACE FUNCTION public.increment_user_points(
+  user_id  uuid,
+  delta    integer
+)
+RETURNS integer
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  new_balance integer;
+BEGIN
+  -- Chỉ cho phép user tự thay đổi điểm của chính mình
+  IF user_id != auth.uid() THEN
+    RAISE EXCEPTION 'Access denied: cannot modify another user''s points.';
+  END IF;
+
+  UPDATE public.profiles
+  SET points = GREATEST(0, points + delta)
+  WHERE id = user_id
+  RETURNING points INTO new_balance;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Profile not found for user_id: %', user_id;
+  END IF;
+
+  RETURN new_balance;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.increment_user_points(uuid, integer) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.increment_user_points(uuid, integer) TO authenticated;
+
+-- =========================================================================
+-- 7. VIEW: user_booking_summary (Thống kê đặt phòng cho trang Profile)
+-- =========================================================================
+CREATE OR REPLACE VIEW public.user_booking_summary AS
+SELECT
+  b.customer_id                                          AS user_id,
+  COUNT(*)                                               AS total_bookings,
+  COUNT(*) FILTER (WHERE b.status = 'completed')        AS completed_bookings,
+  COUNT(*) FILTER (WHERE b.status = 'cancelled')        AS cancelled_bookings,
+  COALESCE(SUM(b.total_amount), 0)                      AS total_spent,
+  COALESCE(SUM(b.points_earned), 0)                     AS total_points_earned,
+  COALESCE(SUM(b.points_redeemed), 0)                   AS total_points_redeemed
+FROM public.bookings b
+GROUP BY b.customer_id;
+
+ALTER VIEW public.user_booking_summary SET (security_invoker = true);
+GRANT SELECT ON public.user_booking_summary TO authenticated;
