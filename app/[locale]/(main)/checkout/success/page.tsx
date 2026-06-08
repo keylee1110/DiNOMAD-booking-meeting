@@ -7,20 +7,31 @@ import confetti from "canvas-confetti"
 import { useBooking } from "@/lib/store/booking-store"
 import { ConfirmationView } from "../_components/confirmation-view"
 
-export default function CheckoutSuccessPage({ params }: { params: Promise<{ locale: string }> }) {
+import { rooms } from "@/lib/data/rooms"
+
+export default function CheckoutSuccessPage({
+  params,
+  searchParams
+}: {
+  params: Promise<{ locale: string }>
+  searchParams: Promise<{ id?: string }>
+}) {
   const { locale } = use(params)
+  const { id } = use(searchParams)
   const { t } = useTranslation()
   const router = useRouter()
-  const { state, dispatch } = useBooking()
+  const { state, dispatch, myBookings } = useBooking()
 
-  const { confirmedBooking, selectedRoom } = state
+  // Load from state or query parameter
+  const confirmedBooking = id ? myBookings.find(b => b.id === id) : state.confirmedBooking
+  const selectedRoom = confirmedBooking ? rooms.find(r => r.id === confirmedBooking.roomId) : state.selectedRoom
 
   useEffect(() => {
     // If no booking data is found in store, redirect to home.
     if (!confirmedBooking || !selectedRoom) {
       router.push(`/${locale}`)
-    } else {
-      // Trigger a confetti explosion
+    } else if (!id) {
+      // Trigger a confetti explosion only for new checkout bookings (where id param is not present)
       const duration = 2.5 * 1000;
       const animationEnd = Date.now() + duration;
       const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 0 };

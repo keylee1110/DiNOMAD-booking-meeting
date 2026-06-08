@@ -12,7 +12,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { QrCode as DinomadQrCode } from "@/components/qr-code"
-import { CreditCard, Smartphone, Check, Loader2, ShieldCheck, Clock } from "lucide-react"
+import { CreditCard, Smartphone, Check, Loader2, ShieldCheck, Clock, Sparkles } from "lucide-react"
+import { createClient } from "@/utils/supabase/client"
 
 import { BookingSummary } from "./_components/booking-summary"
 import { GuestInfoForm } from "./_components/guest-info-form"
@@ -39,6 +40,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ locale: str
   const { locale } = use(params)
   const { t } = useTranslation()
   const router = useRouter()
+  const supabase = createClient()
 
   const { state, dispatch, addBooking } = useBooking()
 
@@ -50,6 +52,26 @@ export default function CheckoutPage({ params }: { params: Promise<{ locale: str
 
   const [softLockExpired, setSoftLockExpired] = useState(false)
   const [isPaying, setIsPaying] = useState(false)
+  
+  const [userPoints, setUserPoints] = useState(0)
+  const [redeemPoints, setRedeemPoints] = useState(false)
+
+  useEffect(() => {
+    async function getPoints() {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        const { data, error } = await supabase
+          .from("profiles")
+          .select("points")
+          .eq("id", user.id)
+          .single()
+        if (data && !error) {
+          setUserPoints(data.points || 0)
+        }
+      }
+    }
+    getPoints()
+  }, [])
 
   // Booking Flow & Payment Options (Agoda/Booking style)
   const [paymentMode, setPaymentMode] = useState<"deposit" | "full">("deposit")
@@ -77,7 +99,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ locale: str
 
   const room = state.selectedRoom
   const timeRange = useMemo(() => getTimeRange(state.selectedSlots), [state.selectedSlots])
-  const durationHours = useMemo(() => state.selectedSlots.length * 0.5, [state.selectedSlots.length])
+  const durationHours = useMemo(() => state.selectedSlots.length, [state.selectedSlots.length])
 
   const fees = useMemo(() => {
     const roomFee = room ? room.pricePerHour * durationHours : 0
@@ -86,14 +108,26 @@ export default function CheckoutPage({ params }: { params: Promise<{ locale: str
   }, [room, durationHours])
 
   const checkoutTotal = state.totalPrice > 0 ? state.totalPrice : fees.totalPrice
+
+  const pointsDiscount = useMemo(() => {
+    return redeemPoints ? Math.min(checkoutTotal, userPoints) : 0
+  }, [redeemPoints, checkoutTotal, userPoints])
+
+  const finalPayableTotal = useMemo(() => {
+    return checkoutTotal - pointsDiscount
+  }, [checkoutTotal, pointsDiscount])
+
+  const pointsEarned = useMemo(() => {
+    return Math.round(finalPayableTotal * 0.01)
+  }, [finalPayableTotal])
   
   // Calculate specific amount to pay right now (Agoda style)
   const amountToPayNow = useMemo(() => {
     if (paymentMode === "deposit") {
-      return Math.round(fees.roomFee * 0.2 + fees.platformFee) // 20% room fee + 10% platform fee
+      return Math.max(0, Math.round(fees.roomFee * 0.2 + fees.platformFee) - pointsDiscount) // 20% room fee + 10% platform fee minus points discount
     }
-    return checkoutTotal
-  }, [paymentMode, fees, checkoutTotal])
+    return finalPayableTotal
+  }, [paymentMode, fees, finalPayableTotal, pointsDiscount])
 
   // Payment countdown effect
   useEffect(() => {
@@ -187,6 +221,57 @@ export default function CheckoutPage({ params }: { params: Promise<{ locale: str
     const newBookingId = generateBookingId()
     dispatch({ type: "SET_BOOKING_ID", id: newBookingId })
 
+    // Generate unique code in frontend as backup and local storage sync
+    const generateFrontCode = () => {
+      const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+      let code = "DN-"
+      for (let i = 0; i < 6; i++) {
+        code += chars.charAt(Math.floor(Math.random() * chars.length))
+      }
+      return code
+    }
+    const newBookingCode = generateFrontCode()
+    let dbBookingCode = newBookingCode
+
+    // Sync to database if authenticated
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        const startTimeStr = `${state.selectedDate}T${timeRange.startTime}:00`
+        const endTimeStr = `${state.selectedDate}T${timeRange.endTime}:00`
+        
+        const { data, error } = await supabase
+          .from("bookings")
+          .insert({
+            id: newBookingId,
+            room_id: room.id,
+            customer_id: user.id,
+            booking_date: state.selectedDate,
+            start_time: new Date(startTimeStr).toISOString(),
+            end_time: new Date(endTimeStr).toISOString(),
+            status: "confirmed",
+            price_per_hour: room.pricePerHour,
+            subtotal: fees.roomFee,
+            platform_fee: fees.platformFee,
+            total_amount: finalPayableTotal,
+            points_redeemed: pointsDiscount,
+            points_earned: pointsEarned,
+            booking_code: newBookingCode,
+            payment_status: paymentMode === "deposit" ? "deposited" : "fully_paid"
+          })
+          .select()
+          .single()
+          
+        if (data && !error) {
+          dbBookingCode = data.booking_code || newBookingCode
+        } else if (error) {
+          console.warn("Supabase insert error, falling back to local storage:", error.message)
+        }
+      }
+    } catch (e) {
+      console.warn("Supabase insert exception, falling back to local storage:", e)
+    }
+
     const newBooking: Booking = {
       id: newBookingId,
       roomId: room.id,
@@ -200,7 +285,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ locale: str
       guestName: fullName.trim(),
       guestPhone: phone.trim(),
       guestEmail: email.trim() || undefined,
-      totalPrice: checkoutTotal,
+      totalPrice: finalPayableTotal,
       roomFee: fees.roomFee,
       platformFee: fees.platformFee,
       status: "confirmed",
@@ -212,6 +297,11 @@ export default function CheckoutPage({ params }: { params: Promise<{ locale: str
       // Dynamic payment metadata (deposited amount vs full payment)
       paidAmount: amountToPayNow,
       paymentStatus: paymentMode === "deposit" ? "deposited" : "fully_paid",
+      
+      // Points metadata
+      bookingCode: dbBookingCode,
+      pointsRedeemed: pointsDiscount,
+      pointsEarned: pointsEarned
     }
 
     // Defer API / Webhook loading spinner simulation
@@ -320,6 +410,48 @@ export default function CheckoutPage({ params }: { params: Promise<{ locale: str
               locale={locale}
             />
 
+            {/* Loyalty Points Section */}
+            {userPoints > 0 && (
+              <Card className="overflow-hidden border border-border/50 shadow-sm rounded-2xl p-5 flex flex-col gap-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <div className="h-9 w-9 rounded-xl bg-amber-500/10 text-amber-500 flex items-center justify-center border border-amber-500/20 shrink-0">
+                      <Sparkles className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-sm text-foreground">
+                        {locale === "vi" ? "Điểm thưởng DiNOMAD" : "DiNOMAD Loyalty Points"}
+                      </h3>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {locale === "vi" 
+                          ? `Bạn đang có ${new Intl.NumberFormat("vi-VN").format(userPoints)} điểm (tương đương ${formatVND(userPoints)})`
+                          : `You currently have ${new Intl.NumberFormat("vi-VN").format(userPoints)} points (equals ${formatVND(userPoints)})`}
+                      </p>
+                    </div>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer select-none">
+                    <input 
+                      type="checkbox" 
+                      checked={redeemPoints}
+                      onChange={(e) => setRedeemPoints(e.target.checked)}
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-muted peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-border after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                  </label>
+                </div>
+                {redeemPoints && (
+                  <div className="rounded-xl bg-primary/5 p-3.5 border border-primary/10 flex items-center justify-between text-xs transition-all animate-in fade-in slide-in-from-top-1.5 duration-200">
+                    <span className="font-semibold text-primary">
+                      {locale === "vi" ? "Khấu trừ điểm thưởng:" : "Points Discount Applied:"}
+                    </span>
+                    <span className="font-bold text-primary">
+                      -{formatVND(pointsDiscount)}
+                    </span>
+                  </div>
+                )}
+              </Card>
+            )}
+
             {/* 3. Multi-option Payment Selector */}
             <PaymentMethodSelector 
               paymentMethod={state.paymentMethod}
@@ -351,6 +483,8 @@ export default function CheckoutPage({ params }: { params: Promise<{ locale: str
               canProceed={canProceed}
               onProceed={handleProceedPayment}
               locale={locale}
+              pointsDiscount={pointsDiscount}
+              pointsEarned={pointsEarned}
             />
 
             <Button variant="outline" className="w-full rounded-xl lg:hidden font-semibold border-border hover:bg-muted" onClick={handleCancel} disabled={isPaying}>

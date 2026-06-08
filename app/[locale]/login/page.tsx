@@ -55,6 +55,26 @@ function LoginForm() {
     }
   }
 
+  const handleOAuthLogin = async (provider: "google" | "facebook") => {
+    setIsLoading(true)
+    try {
+      const supabase = createClient()
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider,
+        options: {
+          redirectTo: `${window.location.origin}/api/auth/callback?redirect_to=${encodeURIComponent(redirectTo)}`,
+        }
+      })
+      if (error) {
+        toast.error(error.message)
+        setIsLoading(false)
+      }
+    } catch (err: any) {
+      toast.error(locale === "vi" ? "Đăng nhập thất bại!" : "OAuth login failed!")
+      setIsLoading(false)
+    }
+  }
+
   return (
     <div className="w-full max-w-md bg-card text-card-foreground border border-border/80 shadow-[0_8px_30px_rgb(0,0,0,0.04)] rounded-2xl p-8 md:p-10 relative overflow-hidden transition-all duration-300 hover:shadow-[0_8px_40px_rgb(0,0,0,0.06)]">
       {/* Decorative top accent gradient */}
@@ -161,7 +181,59 @@ function LoginForm() {
         </Button>
       </form>
 
-      <div className="mt-8 text-center border-t border-border/60 pt-6">
+      {/* OR Divider */}
+      <div className="relative flex py-4 items-center">
+        <div className="flex-grow border-t border-border/60"></div>
+        <span className="flex-shrink mx-4 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+          {locale === "vi" ? "Hoặc đăng nhập bằng" : "Or log in with"}
+        </span>
+        <div className="flex-grow border-t border-border/60"></div>
+      </div>
+
+      {/* Social Logins */}
+      <div className="grid grid-cols-2 gap-3 mt-1">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => handleOAuthLogin("google")}
+          disabled={isLoading}
+          className="h-10 rounded-xl hover:bg-muted font-bold text-xs flex items-center justify-center gap-2 border-border/80 cursor-pointer transition-all duration-200"
+        >
+          <svg className="h-4.5 w-4.5 shrink-0" viewBox="0 0 24 24">
+            <path
+              fill="#EA4335"
+              d="M12 5.04c1.62 0 3.06.56 4.21 1.66l3.15-3.15C17.45 1.76 14.94 1 12 1 7.37 1 3.42 3.66 1.5 7.55l3.87 3a7.2 7.2 0 016.63-5.51z"
+            />
+            <path
+              fill="#4285F4"
+              d="M23.49 12.27c0-.81-.07-1.59-.2-2.34H12v4.44h6.43a5.5 5.5 0 01-2.39 3.62l3.72 2.89c2.18-2 3.73-4.96 3.73-8.61z"
+            />
+            <path
+              fill="#FBBC05"
+              d="M5.37 14.55a7.18 7.18 0 010-5.1V6.45L1.5 3.45a11.95 11.95 0 000 17.1l3.87-3v-3z"
+            />
+            <path
+              fill="#34A853"
+              d="M12 23c3.24 0 5.97-1.08 7.96-2.92l-3.72-2.89a7.22 7.22 0 01-10.87-3.83l-3.87 3C3.42 20.34 7.37 23 12 23z"
+            />
+          </svg>
+          <span>Google</span>
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => handleOAuthLogin("facebook")}
+          disabled={isLoading}
+          className="h-10 rounded-xl hover:bg-muted font-bold text-xs flex items-center justify-center gap-2 border-border/80 cursor-pointer transition-all duration-200"
+        >
+          <svg className="h-4.5 w-4.5 shrink-0 fill-[#1877F2]" viewBox="0 0 24 24">
+            <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
+          </svg>
+          <span>Facebook</span>
+        </Button>
+      </div>
+
+      <div className="mt-6 text-center border-t border-border/60 pt-5">
         <span className="text-xs text-muted-foreground font-medium">
           {t("auth.noAccount")}{" "}
           <Link

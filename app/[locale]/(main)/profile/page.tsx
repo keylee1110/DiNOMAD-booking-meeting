@@ -19,7 +19,8 @@ import {
   Building,
   Save,
   CheckCircle,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Sparkles
 } from "lucide-react"
 import { toast } from "sonner"
 import type { User } from "@supabase/supabase-js"
@@ -34,6 +35,7 @@ interface UserProfile {
   status: "active" | "blocked" | "deleted"
   created_at: string
   updated_at: string
+  points?: number
 }
 
 export default function ProfilePage() {
@@ -52,6 +54,7 @@ export default function ProfilePage() {
   const [createdAt, setCreatedAt] = useState("")
   const [email, setEmail] = useState("")
   const [avatarUrl, setAvatarUrl] = useState("")
+  const [points, setPoints] = useState(0)
 
   const supabase = createClient()
 
@@ -96,6 +99,7 @@ export default function ProfilePage() {
           setRole((authUser.user_metadata?.role as any) || "customer")
           setStatus("active")
           setCreatedAt(authUser.created_at || "")
+          setPoints(0)
         } else if (active && data) {
           const p = data as UserProfile
           setEmail(p.email)
@@ -105,6 +109,7 @@ export default function ProfilePage() {
           setStatus(p.status)
           setCreatedAt(p.created_at)
           setAvatarUrl(p.avatar_url || "")
+          setPoints(p.points || 0)
         }
       } catch (err) {
         console.error(err)
@@ -252,6 +257,40 @@ export default function ProfilePage() {
         
         {/* Left Side: General Info Badges (DB Schema Metadata) */}
         <div className="lg:col-span-1 flex flex-col gap-6">
+          {/* Loyalty Points Card */}
+          <div className="bg-card text-card-foreground border border-border/80 rounded-3xl p-6 shadow-sm relative overflow-hidden bg-gradient-to-br from-card via-card to-amber-500/3">
+            <div className="absolute top-0 left-0 w-1 h-full bg-amber-500" />
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
+                {locale === "vi" ? "Điểm thưởng DiNOMAD" : "Loyalty Points"}
+              </h3>
+              <Sparkles className="h-5 w-5 text-amber-500 animate-pulse shrink-0" />
+            </div>
+            
+            <div className="flex flex-col gap-1.5 py-2">
+              <span className="text-3.5xl font-black tracking-tight text-foreground">
+                {new Intl.NumberFormat("vi-VN").format(points)}
+                <span className="text-xs font-semibold text-muted-foreground ml-1.5 uppercase">{locale === "vi" ? "Điểm" : "Pts"}</span>
+              </span>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                {locale === "vi"
+                  ? `Tương đương: ${new Intl.NumberFormat("vi-VN").format(points)} VNĐ. Được khấu trừ trực tiếp khi thanh toán đơn phòng.`
+                  : `Valued at ${new Intl.NumberFormat("vi-VN").format(points)} VND. Can be redeemed at checkout to discount bookings.`}
+              </p>
+            </div>
+
+            <div className="border-t border-border/50 mt-4 pt-4 flex flex-col gap-2.5 text-xs text-muted-foreground">
+              <div className="flex items-center justify-between">
+                <span>{locale === "vi" ? "Tỷ lệ tích lũy:" : "Earning rate:"}</span>
+                <span className="font-bold text-foreground">1% {locale === "vi" ? "giá trị thanh toán mặt" : "on cash spent"}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span>{locale === "vi" ? "Giá trị quy đổi:" : "Points valuation:"}</span>
+                <span className="font-bold text-foreground">1 {locale === "vi" ? "điểm" : "pt"} = 1 VND</span>
+              </div>
+            </div>
+          </div>
+
           <div className="bg-card text-card-foreground border border-border/80 rounded-2xl p-6 shadow-sm relative overflow-hidden">
             <div className="absolute top-0 left-0 w-1 h-full bg-primary" />
             <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground mb-5">

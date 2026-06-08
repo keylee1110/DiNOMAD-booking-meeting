@@ -9,6 +9,7 @@ import Image from "next/image"
 import { createClient } from "@/utils/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Checkbox } from "@/components/ui/checkbox"
 import { toast } from "sonner"
 
 function SignupForm() {
@@ -22,7 +23,10 @@ function SignupForm() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
-  const [role, setRole] = useState<"customer" | "supplier">("customer")
+  const [role, setRole] = useState<"customer" | "supplier">(
+    searchParams.get("role") === "supplier" ? "supplier" : "customer"
+  )
+  const [agreeTerms, setAgreeTerms] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [isRegisteredSuccess, setIsRegisteredSuccess] = useState(false)
 
@@ -36,6 +40,16 @@ function SignupForm() {
         locale === "vi" 
           ? "Mật khẩu xác nhận không trùng khớp!" 
           : "Confirm password does not match!"
+      )
+      setIsLoading(false)
+      return
+    }
+
+    if (!agreeTerms) {
+      toast.error(
+        locale === "vi" 
+          ? "Bạn phải đồng ý với Điều khoản và Điều kiện sử dụng!" 
+          : "You must agree to the Terms and Conditions!"
       )
       setIsLoading(false)
       return
@@ -108,6 +122,26 @@ function SignupForm() {
 
     } catch (err: any) {
       toast.error(t("auth.signupError"))
+      setIsLoading(false)
+    }
+  }
+
+  const handleOAuthLogin = async (provider: "google" | "facebook") => {
+    setIsLoading(true)
+    try {
+      const supabase = createClient()
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider,
+        options: {
+          redirectTo: `${window.location.origin}/api/auth/callback?redirect_to=${encodeURIComponent(redirectTo)}`,
+        }
+      })
+      if (error) {
+        toast.error(error.message)
+        setIsLoading(false)
+      }
+    } catch (err: any) {
+      toast.error(locale === "vi" ? "Đăng ký thất bại!" : "OAuth registration failed!")
       setIsLoading(false)
     }
   }
@@ -308,6 +342,40 @@ function SignupForm() {
           </div>
         </div>
 
+        {/* Agree to Terms Checkbox */}
+        <div className="flex items-start gap-2.5 my-1">
+          <Checkbox 
+            id="agreeTerms"
+            checked={agreeTerms} 
+            onCheckedChange={(v) => setAgreeTerms(Boolean(v))} 
+            disabled={isLoading}
+          />
+          <label 
+            htmlFor="agreeTerms" 
+            className="text-xs text-muted-foreground leading-normal cursor-pointer select-none"
+          >
+            {locale === "vi" ? (
+              <>
+                Tôi đồng ý với{" "}
+                <a href="#" className="text-primary hover:underline font-bold transition-colors">Điều Khoản Dịch Vụ</a>
+                {" "}và{" "}
+                <a href="#" className="text-primary hover:underline font-bold transition-colors">
+                  {role === "supplier" ? "Chính Sách Đối Tác" : "Chính Sách Hủy Đặt Phòng"}
+                </a>
+              </>
+            ) : (
+              <>
+                I agree to the{" "}
+                <a href="#" className="text-primary hover:underline font-bold transition-colors">Terms of Service</a>
+                {" "}and{" "}
+                <a href="#" className="text-primary hover:underline font-bold transition-colors">
+                  {role === "supplier" ? "Partner Policy" : "Cancellation Policy"}
+                </a>
+              </>
+            )}
+          </label>
+        </div>
+
         <Button
           type="submit"
           className="h-11 mt-3 rounded-xl bg-primary text-primary-foreground font-semibold hover:bg-primary/95 transition-all duration-200 shadow-md hover:shadow-lg active:scale-98 flex items-center justify-center gap-2"
@@ -326,6 +394,58 @@ function SignupForm() {
           )}
         </Button>
       </form>
+
+      {/* OR Divider */}
+      <div className="relative flex py-4 items-center">
+        <div className="flex-grow border-t border-border/60"></div>
+        <span className="flex-shrink mx-4 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+          {locale === "vi" ? "Hoặc đăng ký bằng" : "Or sign up with"}
+        </span>
+        <div className="flex-grow border-t border-border/60"></div>
+      </div>
+
+      {/* Social Logins */}
+      <div className="grid grid-cols-2 gap-3 mt-1">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => handleOAuthLogin("google")}
+          disabled={isLoading}
+          className="h-10 rounded-xl hover:bg-muted font-bold text-xs flex items-center justify-center gap-2 border-border/80 cursor-pointer transition-all duration-200"
+        >
+          <svg className="h-4.5 w-4.5 shrink-0" viewBox="0 0 24 24">
+            <path
+              fill="#EA4335"
+              d="M12 5.04c1.62 0 3.06.56 4.21 1.66l3.15-3.15C17.45 1.76 14.94 1 12 1 7.37 1 3.42 3.66 1.5 7.55l3.87 3a7.2 7.2 0 016.63-5.51z"
+            />
+            <path
+              fill="#4285F4"
+              d="M23.49 12.27c0-.81-.07-1.59-.2-2.34H12v4.44h6.43a5.5 5.5 0 01-2.39 3.62l3.72 2.89c2.18-2 3.73-4.96 3.73-8.61z"
+            />
+            <path
+              fill="#FBBC05"
+              d="M5.37 14.55a7.18 7.18 0 010-5.1V6.45L1.5 3.45a11.95 11.95 0 000 17.1l3.87-3v-3z"
+            />
+            <path
+              fill="#34A853"
+              d="M12 23c3.24 0 5.97-1.08 7.96-2.92l-3.72-2.89a7.22 7.22 0 01-10.87-3.83l-3.87 3C3.42 20.34 7.37 23 12 23z"
+            />
+          </svg>
+          <span>Google</span>
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => handleOAuthLogin("facebook")}
+          disabled={isLoading}
+          className="h-10 rounded-xl hover:bg-muted font-bold text-xs flex items-center justify-center gap-2 border-border/80 cursor-pointer transition-all duration-200"
+        >
+          <svg className="h-4.5 w-4.5 shrink-0 fill-[#1877F2]" viewBox="0 0 24 24">
+            <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
+          </svg>
+          <span>Facebook</span>
+        </Button>
+      </div>
 
       <div className="mt-6 text-center border-t border-border/60 pt-5">
         <span className="text-xs text-muted-foreground font-medium">

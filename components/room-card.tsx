@@ -7,9 +7,11 @@ import type { Room } from "@/lib/types"
 import { formatVND } from "@/lib/format"
 import { VerifiedBadge } from "@/components/verified-badge"
 import { AmenityIcon } from "@/components/amenity-icon"
-import { Star, Users, MessageSquare, AudioLines } from "lucide-react"
+import { Star, Users, MessageSquare, AudioLines, Heart } from "lucide-react"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { useBooking } from "@/lib/store/booking-store"
+import { cn } from "@/lib/utils"
 
 interface RoomCardProps {
   room: Room
@@ -18,6 +20,14 @@ interface RoomCardProps {
 
 export function RoomCard({ room, compact = false }: RoomCardProps) {
   const { locale, t } = useTranslation()
+  const { wishlist, toggleWishlist } = useBooking()
+  const isFavorited = wishlist.includes(room.id)
+
+  const handleHeartClick = (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    toggleWishlist(room.id)
+  }
 
   return (
     <Link href={`/${locale}/rooms/${room.id}`}>
@@ -30,6 +40,13 @@ export function RoomCard({ room, compact = false }: RoomCardProps) {
             className="object-cover transition-transform duration-500 group-hover:scale-105"
             sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
           />
+          <button
+            onClick={handleHeartClick}
+            className="absolute right-3 top-3 z-10 flex h-8 w-8 items-center justify-center rounded-lg border border-border/60 bg-background/90 text-muted-foreground transition-all duration-200 shadow-sm backdrop-blur-sm hover:scale-110 hover:bg-background hover:text-red-500 active:scale-95"
+            aria-label="Toggle wishlist"
+          >
+            <Heart className={cn("h-4.5 w-4.5 transition-colors", isFavorited ? "fill-red-500 text-red-500" : "text-muted-foreground")} />
+          </button>
           <div className="absolute left-3 top-3 flex flex-col items-start gap-2">
             {room.noiseLevel && (
               <span className="inline-flex items-center gap-1.5 rounded-full border border-border/60 bg-background/90 px-3 py-1 text-xs font-semibold tracking-tight text-foreground backdrop-blur-sm shadow-sm">

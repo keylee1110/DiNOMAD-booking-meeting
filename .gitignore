@@ -12,3 +12,7 @@ backend/dist/
 backend/.env
 .DS_Store
 .vercel
+
+# Agent & Build info
+.agent/
+*.tsbuildinfo

@@ -15,15 +15,17 @@ import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
-import { Star, MapPin, Users, ChevronLeft, ChevronRight, ExternalLink, Minus, Plus } from "lucide-react"
+import { Star, MapPin, Users, ChevronLeft, ChevronRight, ExternalLink, Minus, Plus, Heart } from "lucide-react"
 import type { TimeSlot } from "@/lib/types"
 import { notFound } from "next/navigation"
+import { cn } from "@/lib/utils"
 
 export default function RoomDetailPage({ params }: { params: Promise<{ locale: string; id: string }> }) {
   const { locale, id } = use(params)
   const { t } = useTranslation()
   const router = useRouter()
-  const { state, dispatch } = useBooking()
+  const { state, dispatch, wishlist, toggleWishlist } = useBooking()
+  const isFavorited = wishlist ? wishlist.includes(id) : false
 
   const room = getRoomById(id, locale)
   if (!room) notFound()
@@ -41,7 +43,27 @@ export default function RoomDetailPage({ params }: { params: Promise<{ locale: s
   const handleToggleSlot = (slot: TimeSlot) => {
     setSelectedSlots((prev) => {
       const exists = prev.find((s) => s.id === slot.id)
-      if (exists) return prev.filter((s) => s.id !== slot.id)
+      if (exists) {
+        return prev.filter((s) => s.id !== slot.id)
+      }
+
+      if (prev.length > 0) {
+        const earliest = prev[0]
+        const latest = slot
+        const startIndex = slots.findIndex((s) => s.id === earliest.id)
+        const endIndex = slots.findIndex((s) => s.id === latest.id)
+
+        if (startIndex !== -1 && endIndex !== -1) {
+          const start = Math.min(startIndex, endIndex)
+          const end = Math.max(startIndex, endIndex)
+          const range = slots.slice(start, end + 1)
+          const allAvailable = range.every((s) => s.available)
+          if (allAvailable) {
+            return range
+          }
+        }
+      }
+
       return [...prev, slot].sort((a, b) => a.startTime.localeCompare(b.startTime))
     })
   }
@@ -51,7 +73,7 @@ export default function RoomDetailPage({ params }: { params: Promise<{ locale: s
     setSelectedSlots([])
   }
 
-  const duration = selectedSlots.length * 0.5
+  const duration = selectedSlots.length
   const roomFee = room.pricePerHour * duration
   const platformFee = Math.round(roomFee * 0.1)
   const totalPrice = roomFee + platformFee
@@ -136,10 +158,19 @@ export default function RoomDetailPage({ params }: { params: Promise<{ locale: s
                   {room.venueName} &middot; {room.district}
                 </p>
               </div>
-              <div className="flex items-center gap-1.5 rounded-lg border border-border/60 bg-background px-3 py-1.5 shadow-sm">
-                <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                <span className="text-lg font-bold text-foreground">{room.rating}</span>
-                <span className="text-sm text-muted-foreground">({room.reviewCount})</span>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => toggleWishlist(room.id)}
+                  className="flex h-10 w-10 items-center justify-center rounded-xl border border-border/60 bg-background hover:bg-muted/40 transition-colors shadow-sm cursor-pointer active:scale-95 duration-200"
+                  aria-label="Toggle wishlist"
+                >
+                  <Heart className={cn("h-5 w-5 transition-colors", isFavorited ? "fill-red-500 text-red-500" : "text-muted-foreground")} />
+                </button>
+                <div className="flex items-center gap-1.5 rounded-xl border border-border/60 bg-background px-3 py-1.5 shadow-sm">
+                  <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                  <span className="text-lg font-bold text-foreground">{room.rating}</span>
+                  <span className="text-sm text-muted-foreground">({room.reviewCount})</span>
+                </div>
               </div>
             </div>
 
