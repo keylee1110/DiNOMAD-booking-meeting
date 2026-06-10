@@ -158,4 +158,15 @@ export interface BookingFlowState {
   confirmedBooking?: Booking | null
 }
 
+
+export type Review = {
+  id: string
+  room_id: string
+  customer_id: string
+  booking_id: string
+  rating: number
+  comment: string | null
+  created_at: string
+  updated_at: string
+}
 export type Dictionary = Record<string, string | Record<string, string>>

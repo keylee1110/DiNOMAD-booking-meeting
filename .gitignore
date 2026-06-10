@@ -16,3 +16,4 @@ backend/.env
 # Agent & Build info
 .agent/
 *.tsbuildinfo
+.env
