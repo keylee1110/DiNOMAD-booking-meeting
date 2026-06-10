@@ -9,7 +9,7 @@ import { HealthModule } from "./modules/health/health.module"
 import { SuppliersModule } from "./modules/suppliers/suppliers.module"
 import { UsersModule } from "./modules/users/users.module"
 import { ReviewsModule } from "./modules/reviews/reviews.module"
-
+import { WishlistModule } from "./modules/wishlist/wishlist.module"
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -23,6 +23,7 @@ import { ReviewsModule } from "./modules/reviews/reviews.module"
     UsersModule,
     SuppliersModule,
     ReviewsModule,
+    WishlistModule,
   ],
 })
 export class AppModule {}
