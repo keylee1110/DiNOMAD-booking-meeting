@@ -1,7 +1,7 @@
 "use client"
 
 import { useTranslation } from "@/lib/i18n/context"
-import { LayoutDashboard, DoorOpen, QrCode, Building2, Bell, CalendarCheck } from "lucide-react"
+import { LayoutDashboard, DoorOpen, QrCode, Bell, CalendarCheck, TrendingUp, Building2 } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import Image from "next/image"
@@ -12,9 +12,9 @@ export default function PartnerLayout({ children }: { children: React.ReactNode 
 
   const navItems = [
     { href: `/${locale}/partner`, icon: LayoutDashboard, label: "Dashboard" },
-    { href: `/${locale}/partner/schedule`, icon: CalendarCheck, label: "Schedule" },
-    { href: `/${locale}/partner/inventory`, icon: DoorOpen, label: "Inventory" },
     { href: `/${locale}/partner/venues`, icon: Building2, label: "Venues" },
+    { href: `/${locale}/partner/inventory`, icon: DoorOpen, label: "Inventory" },
+    { href: `/${locale}/partner/earnings`, icon: TrendingUp, label: "Earnings" },
     { href: `/${locale}/partner/scanner`, icon: QrCode, label: "Scan QR" },
   ]
 
