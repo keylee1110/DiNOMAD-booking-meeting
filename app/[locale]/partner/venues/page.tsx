@@ -1028,6 +1028,20 @@ export default function VenuesPage() {
                           {publishing === room.id ? "Publishing..." : "Publish Room"}
                         </Button>
                       )}
+                      {venueMap[room.venueId ?? ""]?.status !== "published" && (
+                        <Button
+                          onClick={() => handlePublishVenue(room.venueId!)}
+                          disabled={publishing === room.venueId}
+                          variant="outline"
+                          className="w-full rounded-xl font-semibold text-emerald-700 border-emerald-500/30 hover:bg-emerald-500/10 bg-transparent"
+                        >
+                          {publishing === room.venueId
+                            ? <Loader2 className="h-4 w-4 animate-spin" />
+                            : <Globe className="h-4 w-4" />
+                          }
+                          {publishing === room.venueId ? "Publishing..." : "Publish Venue"}
+                        </Button>
+                      )}
                       <div className="flex gap-2">
                         <Button
                           onClick={() => handleEdit(room)}

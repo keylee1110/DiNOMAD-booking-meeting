@@ -136,8 +136,33 @@ export class RoomsService {
       (blocks ?? []).map(b => [(b.start_time as string).slice(0, 5), b.id as string])
     )
 
+    // Overlay confirmed/pending bookings so partners see booked slots as occupied
+    // bookings.start_time is timestamptz; use a UTC-day range that covers venue hours (UTC+7)
+    const nextDayUtc = new Date(new Date(date + "T00:00:00Z").getTime() + 86400000).toISOString()
+    const { data: activeBookings } = await this.supabase.admin
+      .from("bookings")
+      .select("start_time, end_time")
+      .eq("room_id", roomId)
+      .gte("start_time", `${date}T00:00:00.000Z`)
+      .lt("start_time", nextDayUtc)
+      .neq("status", "cancelled")
+
+    // Expand each booking into 30-min slot keys (convert UTC → Vietnam UTC+7)
+    const bookedSlots = new Set<string>()
+    for (const bk of (activeBookings ?? [])) {
+      let cur = new Date(bk.start_time as string).getTime() + 7 * 3600000
+      const end = new Date(bk.end_time as string).getTime() + 7 * 3600000
+      while (cur < end) {
+        const d = new Date(cur)
+        bookedSlots.add(
+          `${String(d.getUTCHours()).padStart(2, "0")}:${String(d.getUTCMinutes()).padStart(2, "0")}`
+        )
+        cur += 1800000
+      }
+    }
+
     // Generate slots on-demand from venue hours — zero DB rows needed for available slots
-    return this.buildSlotList(room.venues.open_time, room.venues.close_time, blockMap)
+    return this.buildSlotList(room.venues.open_time, room.venues.close_time, blockMap, bookedSlots)
   }
 
   async updateSlots(roomId: string, userId: string, dto: UpdateSlotsDto) {
@@ -184,6 +209,7 @@ export class RoomsService {
     openTime: string,
     closeTime: string,
     blockMap: Map<string, string>,
+    bookedSlots: Set<string> = new Set(),
   ) {
     const slots: {
       id: string; startTime: string; endTime: string
@@ -194,15 +220,16 @@ export class RoomsService {
     const close  = this.timeToMinutes(closeTime)
 
     while (current < close) {
-      const start   = this.minutesToTime(current)
-      const end     = this.minutesToTime(current + 30)
-      const blockId = blockMap.get(start)
+      const start    = this.minutesToTime(current)
+      const end      = this.minutesToTime(current + 30)
+      const blockId  = blockMap.get(start)
+      const isBooked = bookedSlots.has(start)
       slots.push({
-        id:        blockId ?? `virtual-${start}`,
+        id:        blockId ? blockId : isBooked ? `booked-${start}` : `virtual-${start}`,
         startTime: start,
         endTime:   end,
-        status:    blockId ? "blocked" : "available",
-        available: !blockId,
+        status:    blockId ? "blocked" : isBooked ? "booked" : "available",
+        available: !blockId && !isBooked,
         heldUntil: null,
       })
       current += 30

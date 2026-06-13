@@ -11,18 +11,24 @@ DO $$ BEGIN
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 
--- Authenticated partners can upload
-DO $$ BEGIN
-  CREATE POLICY "room_images_auth_upload"
-    ON storage.objects FOR INSERT TO authenticated
-    WITH CHECK (bucket_id = 'room-images');
-EXCEPTION WHEN duplicate_object THEN NULL;
-END $$;
+-- Drop old permissive write policies before recreating with path scoping
+DROP POLICY IF EXISTS "room_images_auth_upload" ON storage.objects;
+DROP POLICY IF EXISTS "room_images_auth_delete" ON storage.objects;
 
--- Authenticated users can delete (ownership enforced at DB row level, not storage)
-DO $$ BEGIN
-  CREATE POLICY "room_images_auth_delete"
-    ON storage.objects FOR DELETE TO authenticated
-    USING (bucket_id = 'room-images');
-EXCEPTION WHEN duplicate_object THEN NULL;
-END $$;
+-- Upload path must be: rooms/{userId}/{roomId}/{filename}
+-- (storage.foldername returns everything except the filename, 1-indexed array)
+-- [1] = 'rooms', [2] = userId, [3] = roomId
+-- Enforcing [2] = auth.uid() means a user can only write under their own prefix.
+CREATE POLICY "room_images_auth_upload"
+  ON storage.objects FOR INSERT TO authenticated
+  WITH CHECK (
+    bucket_id = 'room-images'
+    AND (storage.foldername(name))[2] = auth.uid()::text
+  );
+
+CREATE POLICY "room_images_auth_delete"
+  ON storage.objects FOR DELETE TO authenticated
+  USING (
+    bucket_id = 'room-images'
+    AND (storage.foldername(name))[2] = auth.uid()::text
+  );

@@ -3,8 +3,12 @@ import type { Amenity, VibeTag } from "@/lib/types"
 
 export async function uploadRoomImage(file: File, roomId: string): Promise<string> {
   const supabase = createClient()
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session) throw new Error("Not authenticated — please sign in before uploading images")
+  const userId = session.user.id
   const ext = file.name.split(".").pop()?.toLowerCase() ?? "jpg"
-  const path = `rooms/${roomId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`
+  // Path: rooms/{userId}/{roomId}/{filename}  — matches Storage RLS ownership check
+  const path = `rooms/${userId}/${roomId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`
 
   const { data, error } = await supabase.storage
     .from("room-images")

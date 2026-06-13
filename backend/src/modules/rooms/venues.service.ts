@@ -305,7 +305,7 @@ export class VenuesService {
       closeTime: venue.close_time,
       createdAt: venue.created_at,
       updatedAt: venue.updated_at,
-      rooms: (venue.rooms ?? []).map(r => this.toRoomResponse(r)),
+      rooms: (venue.rooms ?? []).filter(r => r.status !== "archived").map(r => this.toRoomResponse(r)),
     }
   }
 

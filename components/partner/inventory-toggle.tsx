@@ -122,6 +122,7 @@ export function InventoryToggle({
 
   const toggleSelection = (slotId: string) => {
     if (roomStatus === "busy") return
+    if (slotId.startsWith("booked-")) return  // customer bookings are read-only
     setSelectedIds(prev => {
       const next = new Set(prev)
       if (next.has(slotId)) next.delete(slotId)
@@ -372,19 +373,22 @@ export function InventoryToggle({
                       <button
                         key={slot.id}
                         onClick={() => toggleSelection(slot.id)}
+                        disabled={slot.id.startsWith("booked-")}
                         className={`p-2 rounded-xl border transition-all flex flex-col items-center justify-center gap-1 shadow-sm active:scale-95 duration-200 ${
-                          isSelected
-                            ? "bg-primary text-primary-foreground border-transparent scale-[1.03]"
-                            : slot.available
-                              ? "bg-emerald-500/5 border-emerald-500/20 hover:border-emerald-500/50 text-foreground"
-                              : "bg-destructive/5 text-destructive/80 border-destructive/20 hover:border-destructive/50"
+                          slot.id.startsWith("booked-")
+                            ? "bg-amber-500/10 text-amber-700 border-amber-400/30 cursor-not-allowed opacity-75"
+                            : isSelected
+                              ? "bg-primary text-primary-foreground border-transparent scale-[1.03]"
+                              : slot.available
+                                ? "bg-emerald-500/5 border-emerald-500/20 hover:border-emerald-500/50 text-foreground"
+                                : "bg-destructive/5 text-destructive/80 border-destructive/20 hover:border-destructive/50"
                         }`}
                       >
                         <span className="text-[10px] md:text-[11px] font-semibold block">{slot.startTime}</span>
                         {isSelected
                           ? <span className="text-[8px] font-semibold uppercase tracking-wider block">Sel</span>
                           : <span className="text-[8px] font-medium uppercase tracking-wider opacity-60 block">
-                              {slot.available ? "Free" : "Busy"}
+                              {slot.id.startsWith("booked-") ? "Booked" : slot.available ? "Free" : "Busy"}
                             </span>
                         }
                       </button>
