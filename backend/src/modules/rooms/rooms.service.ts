@@ -2,15 +2,14 @@ import { ForbiddenException, Injectable, NotFoundException } from "@nestjs/commo
 import { SupabaseService } from "../../database/supabase.service"
 import { UpdateRoomDto } from "./dto/update-room.dto"
 import { UpdateRoomStatusDto } from "./dto/update-room-status.dto"
+import { UpdateSlotsDto } from "./dto/update-slots.dto"
 import { VenuesService } from "./venues.service"
 
 type RoomRow = {
   id: string
   venue_id: string
   name: string
-  name_vi: string | null
   description: string
-  description_vi: string | null
   capacity: number
   price_per_hour: number
   category: string | null
@@ -18,7 +17,6 @@ type RoomRow = {
   verified: boolean
   noise_level: number | null
   specs: Record<string, string>
-  specs_vi: Record<string, string>
   created_at: string
   updated_at: string
   room_amenities?: { amenity: string }[]
@@ -53,14 +51,11 @@ export class RoomsService {
 
     const updates: Record<string, unknown> = {}
     if (dto.name !== undefined) updates.name = dto.name
-    if (dto.nameVi !== undefined) updates.name_vi = dto.nameVi
     if (dto.description !== undefined) updates.description = dto.description
-    if (dto.descriptionVi !== undefined) updates.description_vi = dto.descriptionVi
     if (dto.capacity !== undefined) updates.capacity = dto.capacity
     if (dto.pricePerHour !== undefined) updates.price_per_hour = dto.pricePerHour
     if (dto.category !== undefined) updates.category = dto.category
     if (dto.specs !== undefined) updates.specs = dto.specs
-    if (dto.specsVi !== undefined) updates.specs_vi = dto.specsVi
     if (dto.noiseLevel !== undefined) updates.noise_level = dto.noiseLevel
 
     const { data: updatedRoom, error } = await this.supabase.admin
@@ -115,6 +110,156 @@ export class RoomsService {
     if (error || !data) throw new NotFoundException("Room not found")
 
     return this.venuesService.toRoomResponse(data)
+  }
+
+  async getSlots(roomId: string, userId: string, date: string) {
+    // Fetch room + venue hours in one query
+    const { data: room, error: roomErr } = await this.supabase.admin
+      .from("rooms")
+      .select("venue_id, venues(open_time, close_time)")
+      .eq("id", roomId)
+      .single<{ venue_id: string; venues: { open_time: string; close_time: string } }>()
+
+    if (roomErr || !room) throw new NotFoundException("Room not found")
+    await this.venuesService.verifyVenueOwnership(room.venue_id, userId)
+
+    // Fetch only the exception rows (blocked slots) — O(blocks) not O(all slots)
+    const { data: blocks, error: blocksErr } = await this.supabase.admin
+      .from("room_blocks")
+      .select("id, start_time")
+      .eq("room_id", roomId)
+      .eq("date", date)
+
+    if (blocksErr) throw new Error(blocksErr.message)
+
+    const blockMap = new Map(
+      (blocks ?? []).map(b => [(b.start_time as string).slice(0, 5), b.id as string])
+    )
+
+    // Generate slots on-demand from venue hours — zero DB rows needed for available slots
+    return this.buildSlotList(room.venues.open_time, room.venues.close_time, blockMap)
+  }
+
+  async updateSlots(roomId: string, userId: string, dto: UpdateSlotsDto) {
+    const { data: room, error: roomErr } = await this.supabase.admin
+      .from("rooms")
+      .select("venue_id")
+      .eq("id", roomId)
+      .single<{ venue_id: string }>()
+
+    if (roomErr || !room) throw new NotFoundException("Room not found")
+    await this.venuesService.verifyVenueOwnership(room.venue_id, userId)
+
+    if (dto.status === "blocked") {
+      // Upsert block rows — safe to call multiple times
+      const rows = dto.startTimes.map(start => ({
+        room_id: roomId,
+        date: dto.date,
+        start_time: start,
+        end_time: this.addMinutes(start, 30),
+        blocked_by: userId,
+        reason: "manual",
+      }))
+      const { error } = await this.supabase.admin
+        .from("room_blocks")
+        .upsert(rows, { onConflict: "room_id,date,start_time" })
+      if (error) throw new Error(error.message)
+    } else {
+      // Remove block rows — slot reverts to "available" (computed)
+      const { error } = await this.supabase.admin
+        .from("room_blocks")
+        .delete()
+        .eq("room_id", roomId)
+        .eq("date", dto.date)
+        .in("start_time", dto.startTimes)
+      if (error) throw new Error(error.message)
+    }
+
+    return { updated: dto.startTimes.length }
+  }
+
+  // ─── Private helpers ──────────────────────────────────────────────────────
+
+  private buildSlotList(
+    openTime: string,
+    closeTime: string,
+    blockMap: Map<string, string>,
+  ) {
+    const slots: {
+      id: string; startTime: string; endTime: string
+      status: string; available: boolean; heldUntil: null
+    }[] = []
+
+    let current = this.timeToMinutes(openTime)
+    const close  = this.timeToMinutes(closeTime)
+
+    while (current < close) {
+      const start   = this.minutesToTime(current)
+      const end     = this.minutesToTime(current + 30)
+      const blockId = blockMap.get(start)
+      slots.push({
+        id:        blockId ?? `virtual-${start}`,
+        startTime: start,
+        endTime:   end,
+        status:    blockId ? "blocked" : "available",
+        available: !blockId,
+        heldUntil: null,
+      })
+      current += 30
+    }
+
+    return slots
+  }
+
+  private addMinutes(time: string, minutes: number): string {
+    return this.minutesToTime(this.timeToMinutes(time) + minutes)
+  }
+
+  private timeToMinutes(time: string): number {
+    const [h, m] = time.slice(0, 5).split(":").map(Number)
+    return h * 60 + m
+  }
+
+  private minutesToTime(minutes: number): string {
+    return `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`
+  }
+
+  async saveImages(roomId: string, userId: string, urls: string[]) {
+    await this.verifyRoomOwnership(roomId, userId)
+
+    const { data: existing } = await this.supabase.admin
+      .from("room_images")
+      .select("sort_order")
+      .eq("room_id", roomId)
+      .order("sort_order", { ascending: false })
+      .limit(1)
+
+    const nextOrder = ((existing?.[0] as { sort_order: number } | undefined)?.sort_order ?? -1) + 1
+
+    const rows = urls.map((url, i) => ({
+      room_id: roomId,
+      image_url: url,
+      sort_order: nextOrder + i,
+    }))
+
+    const { error } = await this.supabase.admin.from("room_images").insert(rows)
+    if (error) throw new Error(error.message)
+
+    return { saved: urls.length }
+  }
+
+  async deleteImage(imageId: string, roomId: string, userId: string) {
+    await this.verifyRoomOwnership(roomId, userId)
+
+    const { error } = await this.supabase.admin
+      .from("room_images")
+      .delete()
+      .eq("id", imageId)
+      .eq("room_id", roomId)
+
+    if (error) throw new Error(error.message)
+
+    return { deleted: true }
   }
 
   async archive(roomId: string, userId: string) {

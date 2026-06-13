@@ -28,16 +28,7 @@ export class UpdateRoomDto {
 
   @IsOptional()
   @IsString()
-  @MaxLength(120)
-  nameVi?: string
-
-  @IsOptional()
-  @IsString()
   description?: string
-
-  @IsOptional()
-  @IsString()
-  descriptionVi?: string
 
   @IsOptional()
   @IsInt()
@@ -66,10 +57,6 @@ export class UpdateRoomDto {
   @IsOptional()
   @IsObject()
   specs?: Record<string, string>
-
-  @IsOptional()
-  @IsObject()
-  specsVi?: Record<string, string>
 
   @IsOptional()
   @IsNumber()

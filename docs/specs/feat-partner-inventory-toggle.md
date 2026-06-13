@@ -4,7 +4,7 @@
 **PRD ref:** §10.2  
 **Branch:** `feat/ViNTD`  
 **Author:** Claude (AI)  
-**Date:** 2026-06-09
+**Date:** 2026-06-13
 
 ---
 
@@ -18,21 +18,39 @@ This adds a room-level "Busy" toggle to each room card in the Inventory page, wi
 ## Acceptance Criteria
 
 - [x] Partner can toggle any of their rooms to "Available" or "Busy"
-- [x] When toggled to "Busy": room hidden from search results immediately *(frontend-only: visual state; backend `PATCH /partner/rooms/:id/status` wires this to real DB)*
-- [x] When toggled to "Available": room appears in search results immediately
-- [x] Toggle state persisted — survives page refresh
+- [x] When toggled to "Busy": calls `PATCH /partner/rooms/:id/status` with `status: "unavailable"` — persisted to DB
+- [x] When toggled to "Available": calls `PATCH /partner/rooms/:id/status` with `status: "published"` — persisted to DB
+- [x] Toggle state persisted — survives page refresh (DB is source of truth; localStorage mirrors for fast hydration)
 - [x] Reason field (optional): "Walk-in customer", "Maintenance", "Private event"
+- [x] Inventory page loads real rooms from `GET /partner/venues` instead of hardcoded list
+- [x] Archived rooms excluded from inventory list
+- [x] Loading spinner shown during API toggle call; buttons disabled while in-flight
+- [x] Toast on success and error
+- [x] Optimistic UI — status updates immediately on click; reverts on API error
+- [x] `hydrated` initialises to `true` when `initialDbStatus` prop is provided (no button flash on mount)
+- [x] Date navigation — prev/next arrows + "Pick" calendar input in expanded slot grid
+- [x] Slots reload when selected date changes (range: 7 days back → 30 days forward)
+- [x] Slot grid shows loading spinner while fetching, "No slots" message when empty
 
 **Out of scope for this spec:**
-- Wiring the toggle to `PATCH /partner/rooms/:id/status` (backend not built at time of writing)
-- Affecting the search results page in real-time (requires backend)
+- Affecting the guest search results page in real-time (requires backend pub/sub or polling)
 
 ---
 
 ## Backend
 
-> **Not yet built.** Uses localStorage only.  
-> When ready: replace `handleConfirmBlock` / `handleSetAvailable` with `updateRoomStatus(roomId, status)` from `lib/api/partner.ts`.
+Uses existing endpoint from `feat-partner-room-venue-crud`:
+
+| Method | Path | Auth | Payload | Description |
+|---|---|---|---|---|
+| `PATCH` | `/partner/rooms/:roomId/status` | `supplier` | `{ status: "published" \| "unavailable" \| "archived" }` | Toggle room availability |
+
+Status mapping:
+
+| UI state | DB status |
+|---|---|
+| Available | `published` |
+| Busy | `unavailable` |
 
 ---
 
@@ -42,19 +60,35 @@ This adds a room-level "Busy" toggle to each room card in the Inventory page, wi
 
 | File | Change |
 |---|---|
-| `components/partner/inventory-toggle.tsx` | Added room-level toggle, reason panel, busy state overrides |
-| `lib/types/index.ts` | Added `RoomStatusReason`, `RoomStatusEntry` interfaces |
-| `lib/i18n/dictionaries/en.json` | Added toggle/reason keys under `"partner"` |
+| `app/[locale]/partner/inventory/page.tsx` | Loads real rooms from `getPartnerVenues()`, passes `id`, `name`, `status` to each toggle |
+| `components/partner/inventory-toggle.tsx` | Wired to `updateRoomStatus()` API; added `initialDbStatus` prop, `toggling` state, loading spinner |
+| `lib/types/index.ts` | `RoomStatusReason`, `RoomStatusEntry` interfaces |
+| `lib/i18n/dictionaries/en.json` | Toggle/reason keys under `"partner"` |
 | `lib/i18n/dictionaries/vi.json` | Same in Vietnamese |
+
+### `InventoryToggle` props
+
+```typescript
+interface InventoryToggleProps {
+  roomId?: string
+  roomName?: string
+  initialDbStatus?: string  // "published" | "unavailable" | "draft" — from API
+  className?: string
+}
+```
+
+`initialDbStatus` maps to UI: `"unavailable"` → `"busy"`, anything else → `"available"`.
 
 ### New state in `InventoryToggle`
 
 ```typescript
-const [roomStatus, setRoomStatus] = useState<"available" | "busy">("available")
+const [roomStatus, setRoomStatus] = useState<"available" | "busy">(dbStatusToUi(initialDbStatus))
 const [showReasonPanel, setShowReasonPanel] = useState(false)
 const [pendingReason, setPendingReason] = useState<RoomStatusReason | "">("")
-const [hydrated, setHydrated] = useState(false)
-// hydrated via useEffect to avoid SSR mismatch
+const [hydrated, setHydrated] = useState(initialDbStatus !== undefined)  // skip flash when prop provided
+const [toggling, setToggling] = useState(false)  // true while API call in-flight
+const [selectedDate, setSelectedDate] = useState(isoToday())   // drives slot grid date
+const [slotsLoading, setSlotsLoading] = useState(false)
 ```
 
 ### localStorage key
@@ -98,12 +132,14 @@ All toggle buttons call `e.stopPropagation()` to prevent accidental expand/colla
 
 ## Test Plan
 
-- [x] Navigate to `/partner/inventory` — all rooms show "Available" state on first load
+- [x] Navigate to `/partner/inventory` — real rooms loaded from API, correct initial status from DB
 - [x] Click "Busy" on a room — reason dropdown appears
-- [x] Select "Maintenance", click "Block Room" — header shows red "Busy" badge; slots grayed out
-- [x] Reload page — "Busy" state persists (from localStorage)
-- [x] Click "Mark as Available" — header reverts to green slot count; slots interactive again
-- [x] `localStorage.getItem("dinomad_room_status")` — entry present after blocking
+- [x] Select "Maintenance", click "Block Room" — spinner shows, API called, header shows red "Busy" badge; slots grayed out
+- [x] Reload page — "Busy" state persists (room.status = "unavailable" in DB)
+- [x] Click "Unblock Room" — spinner shows, API called, header reverts to green slot count; slots interactive
+- [x] `localStorage.getItem("dinomad_room_status")` — entry mirrors DB status after toggle
+- [x] No rooms → empty state with link to Venues page
+- [x] Archived rooms not shown in inventory list
 
 ---
 
@@ -111,5 +147,6 @@ All toggle buttons call `e.stopPropagation()` to prevent accidental expand/colla
 
 - `e.stopPropagation()` is critical on all toggle/reason buttons — the legacy single-button header pattern would fire expand/collapse on any click within the row
 - `pendingReason` is required before `confirmBlock` is enabled — UX forces partner to pick a reason
-- `hydrated` gates the toggle buttons to prevent hydration mismatch (server renders "available" by default; localStorage may say "busy")
-- To wire to real backend: in `handleConfirmBlock`, after localStorage write, also call `updateRoomStatus(roomId, "unavailable")`; in `handleSetAvailable`, call `updateRoomStatus(roomId, "published")`
+- `hydrated` gates the toggle buttons to prevent hydration mismatch (server renders "available" by default; DB/localStorage may say "busy")
+- DB status is the source of truth: when `initialDbStatus` prop is provided, localStorage is only a mirror for fast hydration. When prop is absent (legacy static usage), localStorage is the fallback.
+- `toggling` disables both the toggle button and the "Block Room" confirm button while the API call is in-flight to prevent double-submit
