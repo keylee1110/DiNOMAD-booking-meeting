@@ -10,6 +10,7 @@ type ProfileRow = {
   avatar_url: string | null
   role: "customer" | "supplier" | "admin"
   status: "active" | "blocked" | "deleted"
+  points: number | null
   created_at: string
   updated_at: string
 }
@@ -79,6 +80,7 @@ export class UsersService {
       avatarUrl: profile.avatar_url,
       role: profile.role,
       status: profile.status,
+      points: profile.points,
       createdAt: profile.created_at,
       updatedAt: profile.updated_at,
     }

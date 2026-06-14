@@ -11,6 +11,7 @@ import { SuppliersModule } from "./modules/suppliers/suppliers.module"
 import { UsersModule } from "./modules/users/users.module"
 import { ReviewsModule } from "./modules/reviews/reviews.module"
 import { WishlistModule } from "./modules/wishlist/wishlist.module"
+import { PointTransactionsModule } from "./modules/point-transactions/point-transactions.module"
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -26,6 +27,7 @@ import { WishlistModule } from "./modules/wishlist/wishlist.module"
     RoomsModule,
     ReviewsModule,
     WishlistModule,
+    PointTransactionsModule,
   ],
 })
 export class AppModule {}
