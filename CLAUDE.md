@@ -402,4 +402,31 @@ ui: update room card to show access code on confirmation
 
 ---
 
+## Spec-Driven Development — Auto-Implementation Rules
+
+All features in this repo follow spec-driven development. Specs live in `docs/specs/`.
+
+### When the user asks you to build a feature
+
+1. **Always write the spec first** — copy `docs/specs/TEMPLATE.md`, fill every section, save as `docs/specs/feat-{scope}-{feature}.md` with `**Status:** \`approved\``
+2. **Immediately implement after writing** — do not wait for a follow-up prompt. As soon as the spec file is saved with status `approved`, begin implementation automatically.
+3. **Follow the spec exactly** — implement endpoints, DTOs, file paths, and state shapes as written. If reality forces a deviation, update the spec file first, then continue.
+4. **Tick off ACs as you go** — update the `- [ ]` checkboxes to `- [x]` in the spec file as each acceptance criterion is completed.
+5. **Set status to `done`** when all ACs are checked off.
+
+### Order of implementation
+
+Always implement in this order:
+1. DB migration (if spec has DB changes)
+2. Backend — DTOs → Service → Controller → Module registration
+3. Frontend — API client functions → Page/components
+4. Tick all ACs, set spec status to `done`
+
+### When the user says "write a spec for X" or "build X"
+
+- Treat both as the same instruction: write the spec AND implement it in one turn.
+- Do not stop after writing the spec and ask "shall I implement now?" — just implement.
+
+---
+
 *Keep this file updated when new patterns are established.*

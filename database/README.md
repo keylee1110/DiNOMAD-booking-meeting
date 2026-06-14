@@ -21,7 +21,9 @@
 | `20260531000000_initial_user_supplier_schema.sql` | 2026-05-31 | Enums, `profiles`, `suppliers`, `supplier_members`, `venues`, `rooms`, `room_images`, `room_amenities`, `room_vibe_tags`, RLS policies, helper functions |
 | `20260605000000_bookings_payments_reviews.sql` | 2026-06-05 | `bookings`, `payments`, `reviews`, no-overlap GiST constraint |
 | `20260605010000_profile_points_booking_code_wishlists.sql` | 2026-06-05 | `profiles.points`, `bookings.booking_code/points_*`, `wishlists`, `point_transactions`, loyalty triggers |
-| `20260609000000_missing_core_features.sql` | 2026-06-09 | `bookings.guest_token`, `availability_slots`, `notifications` |
+| `20260613000000_availability_slots.sql` | 2026-06-13 | `venues.open_time`/`close_time` columns, `availability_slots` table (superseded by next migration) |
+| `20260614000000_room_blocks.sql` | 2026-06-14 | Drops `availability_slots` + pre-generation functions; adds `room_blocks` (sparse exception table) |
+| `20260614010000_room_images_bucket.sql` | 2026-06-14 | Creates `room-images` Supabase Storage bucket (public, 5 MB limit) with RLS policies |
 
 ## How to Apply Migrations
 
@@ -45,7 +47,7 @@ psql -U postgres -d dinomad -f supabase/migrations/20260609000000_missing_core_f
 - **All prices are INTEGER (VND)** — Vietnamese Dong has no sub-unit; never use DECIMAL for money.
 - **Supabase Auth is the identity layer** — `auth.users` is the source of identity; `profiles` is the application extension. The `handle_new_auth_user()` trigger auto-creates a profile row on sign-up.
 - **`bookings` has a no-overlap GiST constraint** — the database enforces non-overlapping bookings for the same room at the DB level (cancelled bookings excluded).
-- **`availability_slots` pre-generated** — 30-min slots are generated ahead of time per room per day. The backend generates them when a room is created/published. Slot status: `available → held → booked → occupied`.
+- **`room_blocks` sparse model** — available slots are computed on-demand from `venues.open_time`/`close_time`; only exceptions (partner-blocked slots) are stored. This avoids ~900 rows/room/month of "always available" noise. Blocked slots have real UUIDs; available slots get virtual IDs (`virtual-HH:MM`) in API responses.
 - **`booking_code` auto-generated** — the `generate_unique_booking_code()` trigger creates `DN-XXXXXX` codes on insert.
 - **Loyalty points** — `profiles.points` is the live balance; `point_transactions` is the immutable audit trail. The `process_booking_loyalty_points()` trigger keeps them in sync automatically.
 - **RLS** — enabled on all tables. The backend uses `SERVICE_ROLE` key (bypasses RLS). The frontend uses `ANON`/`AUTHENTICATED` keys (RLS enforced).
@@ -66,7 +68,7 @@ payments            — payment records per booking
 reviews             — post-stay guest ratings
 wishlists           — user's saved favorite rooms
 point_transactions  — loyalty point change audit log
-availability_slots  — pre-generated 30-min time slots per room
+room_blocks         — partner-blocked 30-min slots (sparse; available slots are computed)
 notifications       — log of SMS/Zalo/email messages sent
 ```
 

@@ -1,4 +1,4 @@
-import { IsNumber, IsOptional, IsString, MaxLength } from "class-validator"
+import { IsNumber, IsOptional, IsString, Matches, MaxLength } from "class-validator"
 
 export class UpdateVenueDto {
   @IsOptional()
@@ -8,24 +8,11 @@ export class UpdateVenueDto {
 
   @IsOptional()
   @IsString()
-  @MaxLength(120)
-  nameVi?: string
-
-  @IsOptional()
-  @IsString()
   description?: string
 
   @IsOptional()
   @IsString()
-  descriptionVi?: string
-
-  @IsOptional()
-  @IsString()
   address?: string
-
-  @IsOptional()
-  @IsString()
-  addressVi?: string
 
   @IsOptional()
   @IsString()
@@ -48,4 +35,14 @@ export class UpdateVenueDto {
   @IsOptional()
   @IsNumber()
   lng?: number
+
+  @IsOptional()
+  @IsString()
+  @Matches(/^\d{2}:\d{2}$/, { message: "openTime must be HH:MM" })
+  openTime?: string
+
+  @IsOptional()
+  @IsString()
+  @Matches(/^\d{2}:\d{2}$/, { message: "closeTime must be HH:MM" })
+  closeTime?: string
 }

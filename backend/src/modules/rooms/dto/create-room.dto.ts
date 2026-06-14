@@ -27,15 +27,7 @@ export class CreateRoomDto {
 
   @IsOptional()
   @IsString()
-  @MaxLength(120)
-  nameVi?: string
-
-  @IsString()
-  description!: string
-
-  @IsOptional()
-  @IsString()
-  descriptionVi?: string
+  description?: string
 
   @IsInt()
   @Min(1)
@@ -61,10 +53,6 @@ export class CreateRoomDto {
   @IsOptional()
   @IsObject()
   specs?: Record<string, string>
-
-  @IsOptional()
-  @IsObject()
-  specsVi?: Record<string, string>
 
   @IsOptional()
   @IsNumber()

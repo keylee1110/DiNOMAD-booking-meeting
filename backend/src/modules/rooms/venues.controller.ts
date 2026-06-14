@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, UseGuards } from "@nestjs/common"
+import { Body, Controller, Get, Param, Patch, Post, Req, UseGuards } from "@nestjs/common"
 import { CurrentUser } from "../../common/decorators/current-user.decorator"
 import { Roles } from "../../common/decorators/roles.decorator"
 import type { AuthUser } from "../../common/types/auth-user"
@@ -7,6 +7,7 @@ import { RolesGuard } from "../auth/guards/roles.guard"
 import { CreateRoomDto } from "./dto/create-room.dto"
 import { CreateVenueDto } from "./dto/create-venue.dto"
 import { UpdateVenueDto } from "./dto/update-venue.dto"
+import { UpdateVenueStatusDto } from "./dto/update-venue-status.dto"
 import { VenuesService } from "./venues.service"
 
 @Controller("partner/venues")
@@ -21,8 +22,29 @@ export class VenuesController {
   }
 
   @Post()
-  create(@CurrentUser() user: AuthUser, @Body() dto: CreateVenueDto) {
-    return this.venuesService.create(user.id, dto)
+  async create(@CurrentUser() user: AuthUser, @Body() dto: CreateVenueDto) {
+    console.log('📍 POST /partner/venues');
+    console.log('User:', user);
+    console.log('DTO:', dto);
+
+    try {
+      const result = await this.venuesService.create(user.id, dto);
+      console.log('✅ Venue created:', result);
+      return result;
+    } catch (error) {
+      console.error('❌ CREATE VENUE ERROR:', error);
+      throw error;
+    }
+  }
+
+
+  @Patch(":venueId/status")
+  updateStatus(
+    @Param("venueId") venueId: string,
+    @CurrentUser() user: AuthUser,
+    @Body() dto: UpdateVenueStatusDto,
+  ) {
+    return this.venuesService.updateStatus(venueId, user.id, dto.status)
   }
 
   @Patch(":venueId")
