@@ -291,10 +291,18 @@ export default function VenuesPage() {
     formData.images.filter(img => !toDeleteIds.includes(img.id)).length + pendingFiles.length
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const MAX_SIZE = 5 * 1024 * 1024 // 5 MB — matches Supabase bucket limit
     const files = Array.from(e.target.files ?? [])
+
+    const oversized = files.filter(f => f.size > MAX_SIZE)
+    if (oversized.length > 0) {
+      toast.error(`${oversized.map(f => f.name).join(", ")} ${oversized.length === 1 ? "exceeds" : "exceed"} the 5 MB limit.`)
+    }
+    const sizedOk = files.filter(f => f.size <= MAX_SIZE)
+
     const remaining = 5 - currentImageCount
-    const toAdd = files.slice(0, remaining)
-    if (files.length > remaining) {
+    const toAdd = sizedOk.slice(0, remaining)
+    if (sizedOk.length > remaining) {
       toast.error(`Maximum 5 photos per room — only ${remaining} slot${remaining === 1 ? "" : "s"} left.`)
     }
     const newPreviews = toAdd.map(f => URL.createObjectURL(f))
