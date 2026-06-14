@@ -294,6 +294,42 @@
       "confirmed": "Đã xác nhận",
       "pending": "Chờ xử lý",
       "completed": "Đã hoàn thành"
+    },
+    "suppliers": {
+      "title": "Nhà cung cấp",
+      "total": "nhà cung cấp",
+      "approved": "Đã duyệt",
+      "pending": "Chờ duyệt",
+      "rejected": "Từ chối",
+      "search": "Tìm kiếm nhà cung cấp...",
+      "columns": {
+        "supplier": "Nhà cung cấp",
+        "contact": "Liên hệ",
+        "district": "Quận",
+        "rooms": "Phòng",
+        "status": "Trạng thái",
+        "actions": "Thao tác"
+      },
+      "statusLabels": {
+        "approved": "Đã duyệt",
+        "pending": "Chờ duyệt",
+        "rejected": "Từ chối",
+        "suspended": "Tạm khóa"
+      },
+      "actions": {
+        "approve": "Duyệt",
+        "reject": "Từ chối",
+        "view": "Xem",
+        "approveConfirmDesc": "Đối tác này sẽ được cấp quyền truy cập đầy đủ vào cổng đối tác.",
+        "rejectConfirmDesc": "Đơn đăng ký đối tác này sẽ bị từ chối.",
+        "error": "Cập nhật trạng thái thất bại. Vui lòng thử lại."
+      },
+      "widget": {
+        "title": "Nhà cung cấp chờ duyệt",
+        "count": "đang chờ"
+      },
+      "empty": "Không có nhà cung cấp nào.",
+      "noPending": "Không có đơn đăng ký chờ xử lý."
     }
   }
 }

@@ -26,7 +26,7 @@ interface ReviewFormProps {
   onSuccess?: () => void
 }
 
-export function ReviewForm({ roomId, bookingId, accessToken, onSuccess }: ReviewFormProps) {
+export function ReviewForm({ roomId, bookingId, onSuccess }: ReviewFormProps) {
   const { toast } = useToast()
   const [isLoading, setIsLoading] = useState(false)
 
@@ -43,7 +43,7 @@ export function ReviewForm({ roomId, bookingId, accessToken, onSuccess }: Review
         bookingId,
         rating: values.rating,
         comment: values.comment,
-      }, accessToken)
+      })
 
       toast({
         title: "Thành công!",

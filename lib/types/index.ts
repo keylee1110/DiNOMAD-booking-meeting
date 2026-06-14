@@ -176,14 +176,21 @@ export interface BookingFlowState {
 }
 
 
-export type Review = {
-  id: string
-  room_id: string
-  customer_id: string
-  booking_id: string
-  rating: number
-  comment: string | null
-  created_at: string
-  updated_at: string
-}
 export type Dictionary = Record<string, string | Record<string, string>>
+
+export type SupplierStatus = "pending" | "approved" | "rejected" | "suspended"
+
+export interface Supplier {
+  id: string
+  legalName: string
+  displayName: string
+  taxCode: string | null
+  businessEmail: string | null
+  businessPhone: string | null
+  status: SupplierStatus
+  onboardingNote: string | null
+  approvedAt: string | null
+  approvedBy: string | null
+  createdAt: string
+  updatedAt: string
+}

@@ -25,15 +25,12 @@ export function I18nProvider({
 }) {
   const t = (key: string): string => {
     const parts = key.split(".")
-    if (parts.length === 2) {
-      const section = dictionary[parts[0]]
-      if (typeof section === "object" && section !== null) {
-        return (section as Record<string, string>)[parts[1]] ?? key
-      }
+    let current: any = dictionary
+    for (const part of parts) {
+      if (typeof current !== "object" || current === null) return key
+      current = current[part]
     }
-    const val = dictionary[key]
-    if (typeof val === "string") return val
-    return key
+    return typeof current === "string" ? current : key
   }
 
   return (

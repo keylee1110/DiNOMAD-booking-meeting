@@ -44,29 +44,13 @@ async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
   return (json.data ?? json) as T
 }
 
-export interface ApiReview {
-  id: string
-  roomId: string
-  customerId: string
-  bookingId: string
-  rating: number
-  comment: string | null
-  createdAt: string
-  updatedAt: string
-}
-
-export function getRoomReviews(roomId: string): Promise<ApiReview[]> {
-  return apiFetch<ApiReview[]>(`/reviews/room/${roomId}`)
-}
-
-export function submitReview(data: {
-  roomId: string
-  bookingId: string
-  rating: number
-  comment?: string
-}): Promise<ApiReview> {
-  return apiFetch<ApiReview>("/reviews", {
+export function toggleWishlist(roomId: string): Promise<{ favorited: boolean }> {
+  return apiFetch<{ favorited: boolean }>("/wishlists/toggle", {
     method: "POST",
-    body: JSON.stringify(data),
+    body: JSON.stringify({ roomId }),
   })
+}
+
+export function getWishlist(): Promise<{ room_id: string }[]> {
+  return apiFetch<{ room_id: string }[]>("/wishlists")
 }

@@ -4,7 +4,7 @@ import { ToggleWishlistDto } from "./dto/toggle-wishlist.dto"
 
 type WishlistRow = {
   id: string
-  customer_id: string
+  user_id: string
   room_id: string
   created_at: string
 }
@@ -18,7 +18,7 @@ export class WishlistService {
     const { data: existing } = await this.supabase.admin
       .from("wishlists")
       .select("*")
-      .eq("customer_id", userId)
+      .eq("user_id", userId)
       .eq("room_id", dto.roomId)
       .maybeSingle<WishlistRow>()
 
@@ -36,7 +36,7 @@ export class WishlistService {
       const { error } = await this.supabase.admin
         .from("wishlists")
         .insert({
-          customer_id: userId,
+          user_id: userId,
           room_id: dto.roomId,
         })
 
@@ -61,7 +61,7 @@ export class WishlistService {
           status
         )
       `)
-      .eq("customer_id", userId)
+      .eq("user_id", userId)
       .order("created_at", { ascending: false })
 
     if (error) throw new Error(error.message)
