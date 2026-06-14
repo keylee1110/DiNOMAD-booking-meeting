@@ -114,6 +114,23 @@ export interface Booking {
   bookingCode?: string
   pointsRedeemed?: number
   pointsEarned?: number
+  accessCode?: string
+  checkedInAt?: string
+}
+
+export interface CheckInRecord {
+  bookingId: string
+  guestName: string
+  roomName: string
+  checkedInAt: string
+}
+
+export type RoomStatusReason = "walk_in" | "maintenance" | "private_event"
+
+export interface RoomStatusEntry {
+  status: "available" | "busy"
+  reason?: RoomStatusReason
+  timestamp: string
 }
 
 export interface Review {

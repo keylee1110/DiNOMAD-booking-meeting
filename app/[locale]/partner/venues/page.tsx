@@ -1,385 +1,874 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { useTranslation } from "@/lib/i18n/context"
-import { Building2, Plus, Image as ImageIcon, Check, MapPin, Users, Edit2, ArrowLeft, Tags, AlignLeft, DollarSign, LayoutList, Navigation2, Info } from "lucide-react"
+import {
+  Building2, Plus, Image as ImageIcon, Check, MapPin, Users, Edit2,
+  ArrowLeft, Tags, AlignLeft, DollarSign, LayoutList, Navigation2,
+  Info, Trash2, Loader2, Globe, Upload, X,
+} from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { toast } from "sonner"
+import { cn } from "@/lib/utils"
+import { formatVND } from "@/lib/format"
+import {
+  getPartnerVenues, createVenue, updateVenue, updateVenueStatus,
+  createRoom, updateRoom, deleteRoom, updateRoomStatus,
+  uploadRoomImage, saveRoomImages, deleteRoomImage,
+  type ApiVenue,
+} from "@/lib/api/partner"
+import type { Amenity, VibeTag } from "@/lib/types"
+
+// ─── Local form shape ─────────────────────────────────────────────────────────
+
+interface RoomImage {
+  id: string
+  url: string
+  sortOrder: number
+}
+
+interface RoomFormData {
+  id: string | null
+  venueId: string | null
+  name: string
+  venueName: string
+  address: string
+  district: string
+  description: string
+  capacity: number
+  pricePerHour: number
+  category: "team_hub" | "solo_nook"
+  specs: { size: string; floor: string; view: string }
+  amenities: Amenity[]
+  vibeTags: VibeTag[]
+  status?: string
+  images: RoomImage[]
+}
+
+interface FormErrors {
+  name?: string
+  venueName?: string
+  address?: string
+  capacity?: string
+  pricePerHour?: string
+  description?: string
+}
+
+const AMENITY_OPTIONS: { value: Amenity; label: string }[] = [
+  { value: "wifi", label: "WiFi" },
+  { value: "tv", label: "Smart TV" },
+  { value: "whiteboard", label: "Whiteboard" },
+  { value: "ac", label: "Air Con" },
+  { value: "hdmi", label: "HDMI" },
+  { value: "projector", label: "Projector" },
+  { value: "power_outlets", label: "Power Outlets" },
+  { value: "coffee", label: "Coffee" },
+  { value: "water", label: "Water" },
+  { value: "parking", label: "Parking" },
+]
+
+const VIBE_TAG_OPTIONS: { value: VibeTag; label: string }[] = [
+  { value: "ultra_quiet", label: "ultra_quiet" },
+  { value: "discussion_friendly", label: "discussion_friendly" },
+  { value: "cold_ac", label: "cold_ac" },
+  { value: "natural_light", label: "natural_light" },
+  { value: "cozy", label: "cozy" },
+  { value: "modern", label: "modern" },
+  { value: "rooftop", label: "rooftop" },
+  { value: "garden_view", label: "garden_view" },
+]
+
+const DISTRICTS = ["District 1", "District 2", "District 3", "District 4", "District 5",
+  "District 6", "District 7", "District 8", "District 9", "District 10",
+  "District 11", "District 12", "Binh Thanh", "Go Vap", "Phu Nhuan",
+  "Tan Binh", "Tan Phu", "Thu Duc", "Binh Chanh", "Hoc Mon"]
+
+function flattenVenues(venues: ApiVenue[]): RoomFormData[] {
+  return venues.flatMap((v): RoomFormData[] => {
+    if (v.rooms.length === 0) {
+      return [{
+        id: null,
+        venueId: v.id,
+        name: "",
+        venueName: v.name,
+        address: v.address,
+        district: v.district,
+        description: "",
+        capacity: 4,
+        pricePerHour: 120000,
+        category: "team_hub" as const,
+        specs: { size: "", floor: "", view: "" },
+        amenities: [],
+        vibeTags: [],
+        status: "empty",
+        images: [],
+      }]
+    }
+    return v.rooms.map(r => ({
+      id: r.id,
+      venueId: v.id,
+      name: r.name,
+      venueName: v.name,
+      address: v.address,
+      district: v.district,
+      description: r.description,
+      capacity: r.capacity,
+      pricePerHour: r.pricePerHour,
+      category: r.category,
+      specs: {
+        size: (r.specs?.size as string) ?? "",
+        floor: (r.specs?.floor as string) ?? "",
+        view: (r.specs?.view as string) ?? "",
+      },
+      amenities: r.amenities,
+      vibeTags: r.vibeTags,
+      status: r.status,
+      images: (r.images ?? []).map(img => ({ id: img.id, url: img.imageUrl, sortOrder: img.sortOrder })),
+    }))
+  })
+}
+
+const EMPTY_FORM: RoomFormData = {
+  id: null,
+  venueId: null,
+  name: "",
+  venueName: "",
+  address: "",
+  district: "District 1",
+  description: "",
+  capacity: 4,
+  pricePerHour: 120000,
+  category: "team_hub",
+  specs: { size: "", floor: "", view: "" },
+  amenities: [],
+  vibeTags: [],
+  images: [],
+}
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function VenuesPage() {
   const { t } = useTranslation()
 
-  const [rooms, setRooms] = useState([
-    {
-      id: "r1",
-      name: "Solo Nook A",
-      venueName: "DiNOMAD HQ",
-      address: "123 Nguyen Hue, Ben Nghe Ward",
-      district: "District 1",
-      googleMapsLink: "https://maps.google.com/?q=10.7769,106.7009",
-      description: "A private pod perfect for deep focus work.",
-      capacity: 2,
-      pricePerHour: 120000,
-      category: "solo_nook",
-      specs: { size: "15sqm", floor: "3rd Floor", view: "City View" },
-      amenities: ["Whiteboard", "Fast WiFi"],
-      vibeTags: ["ultra_quiet", "focus"],
-    },
-    {
-      id: "r2",
-      name: "Team Hub B",
-      venueName: "DiNOMAD D7",
-      address: "456 Nguyen Van Linh, Tan Phong Ward",
-      district: "District 7",
-      googleMapsLink: "https://maps.google.com/?q=10.7294,106.7029",
-      description: "Collaborative space with natural lighting.",
-      capacity: 8,
-      pricePerHour: 350000,
-      category: "team_hub",
-      specs: { size: "40sqm", floor: "Ground Floor", view: "Garden" },
-      amenities: ["Smart TV", "Whiteboard", "Coffee Machine", "Fast WiFi"],
-      vibeTags: ["creative", "bright"],
-    }
-  ])
-
+  const [rooms, setRooms] = useState<RoomFormData[]>([])
+  const [venueMap, setVenueMap] = useState<Record<string, ApiVenue>>({})
+  const [loading, setLoading] = useState(true)
   const [editingId, setEditingId] = useState<string | null>(null)
-  
-  // Create a copy of the room being edited in local state to avoid changing original array before save
-  const [formData, setFormData] = useState<any>(null)
+  const [formData, setFormData] = useState<RoomFormData>(EMPTY_FORM)
+  const [saving, setSaving] = useState(false)
+  const [deleting, setDeleting] = useState<string | null>(null)
+  const [publishing, setPublishing] = useState<string | null>(null)
+  const [errors, setErrors] = useState<FormErrors>({})
 
-  const handleEdit = (room: any) => {
-    setEditingId(room.id)
+  // Image upload state (not in formData — files can't be serialised)
+  const [pendingFiles, setPendingFiles] = useState<File[]>([])
+  const [pendingPreviews, setPendingPreviews] = useState<string[]>([])
+  const [toDeleteIds, setToDeleteIds] = useState<string[]>([])
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // ── Derived: whether to show new-venue creation fields ────────────────────
+  // True when creating a new room AND no existing venue is selected
+  const isCreatingNewVenue = formData.id === null && formData.venueId === null
+  const hasExistingVenues = Object.keys(venueMap).length > 0
+
+  const validateForm = (): boolean => {
+    const newErrors: FormErrors = {}
+
+    if (!formData.name.trim()) {
+      newErrors.name = "Room name is required"
+    } else if (formData.name.trim().length < 3) {
+      newErrors.name = "Room name must be at least 3 characters"
+    } else if (formData.name.trim().length > 50) {
+      newErrors.name = "Room name must not exceed 50 characters"
+    }
+
+    // Validate venue fields only when creating a new venue OR editing an existing room
+    const needsVenueValidation = formData.id !== null || isCreatingNewVenue
+    if (needsVenueValidation) {
+      if (!formData.venueName.trim()) {
+        newErrors.venueName = "Venue name is required"
+      } else if (formData.venueName.trim().length < 3) {
+        newErrors.venueName = "Venue name must be at least 3 characters"
+      } else if (formData.venueName.trim().length > 100) {
+        newErrors.venueName = "Venue name must not exceed 100 characters"
+      }
+
+      if (!formData.address.trim()) {
+        newErrors.address = "Address is required"
+      } else if (formData.address.trim().length < 5) {
+        newErrors.address = "Address must be at least 5 characters"
+      }
+    }
+
+    if (formData.capacity < 1) {
+      newErrors.capacity = "Capacity must be at least 1"
+    } else if (formData.capacity > 100) {
+      newErrors.capacity = "Capacity must not exceed 100"
+    } else if (!Number.isInteger(formData.capacity)) {
+      newErrors.capacity = "Capacity must be a whole number"
+    }
+
+    if (formData.pricePerHour < 10000) {
+      newErrors.pricePerHour = "Minimum price is 10,000 VND per hour"
+    } else if (formData.pricePerHour > 50000000) {
+      newErrors.pricePerHour = "Maximum price is 50,000,000 VND per hour"
+    }
+
+    if (formData.description.trim().length > 500) {
+      newErrors.description = "Description must not exceed 500 characters"
+    }
+
+    setErrors(newErrors)
+    return Object.keys(newErrors).length === 0
+  }
+
+  const loadVenues = useCallback(async () => {
+    setLoading(true)
+    try {
+      const venues = await getPartnerVenues()
+      const map: Record<string, ApiVenue> = {}
+      venues.forEach(v => { map[v.id] = v })
+      setVenueMap(map)
+      setRooms(flattenVenues(venues))
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Failed to load rooms"
+      toast.error(msg)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { loadVenues() }, [loadVenues])
+
+  const resetImageState = () => {
+    pendingPreviews.forEach(url => URL.revokeObjectURL(url))
+    setPendingFiles([])
+    setPendingPreviews([])
+    setToDeleteIds([])
+  }
+
+  const handleEdit = (room: RoomFormData) => {
+    setEditingId(room.id ?? "new")
     setFormData({ ...room })
+    resetImageState()
+    setErrors({})
   }
 
   const handleAddNew = () => {
-    const newRoom = {
-      id: `r${Date.now()}`,
-      name: "New Room",
-      venueName: "DiNOMAD Location",
-      address: "",
-      district: "District 1",
-      googleMapsLink: "",
-      description: "",
-      capacity: 4,
-      pricePerHour: 200000,
-      category: "team_hub",
-      specs: { size: "", floor: "", view: "" },
-      amenities: [],
-      vibeTags: [],
+    setEditingId("new")
+    // Pre-select the first existing venue so the user doesn't re-type venue info
+    const firstVenueId = Object.keys(venueMap)[0]
+    if (firstVenueId) {
+      const v = venueMap[firstVenueId]
+      setFormData({ ...EMPTY_FORM, venueId: v.id, venueName: v.name, address: v.address, district: v.district })
+    } else {
+      setFormData({ ...EMPTY_FORM })
     }
-    setEditingId(newRoom.id)
-    setFormData(newRoom)
+    resetImageState()
+    setErrors({})
   }
 
-  const handleSave = () => {
-    setRooms(prev => {
-      const exists = prev.find(r => r.id === formData.id)
-      if (exists) return prev.map(r => r.id === formData.id ? formData : r)
-      return [...prev, formData] // Add new
-    })
+  const handleCancel = () => {
     setEditingId(null)
+    setFormData(EMPTY_FORM)
+    resetImageState()
+    setErrors({})
   }
 
-  const toggleArrayItem = (field: string, item: string) => {
-    setFormData((prev: any) => {
-      const arr = prev[field] as string[]
+  const handleVenueSelect = (value: string) => {
+    if (value === "new") {
+      setFormData(prev => ({ ...prev, venueId: null, venueName: "", address: "", district: "District 1" }))
+    } else {
+      const v = venueMap[value]
+      setFormData(prev => ({ ...prev, venueId: v.id, venueName: v.name, address: v.address, district: v.district }))
+    }
+    setErrors(prev => ({ ...prev, venueName: undefined, address: undefined }))
+  }
+
+  // ── Image handlers ────────────────────────────────────────────────────────
+
+  const currentImageCount =
+    formData.images.filter(img => !toDeleteIds.includes(img.id)).length + pendingFiles.length
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const MAX_SIZE = 5 * 1024 * 1024 // 5 MB — matches Supabase bucket limit
+    const files = Array.from(e.target.files ?? [])
+
+    const oversized = files.filter(f => f.size > MAX_SIZE)
+    if (oversized.length > 0) {
+      toast.error(`${oversized.map(f => f.name).join(", ")} ${oversized.length === 1 ? "exceeds" : "exceed"} the 5 MB limit.`)
+    }
+    const sizedOk = files.filter(f => f.size <= MAX_SIZE)
+
+    const remaining = 5 - currentImageCount
+    const toAdd = sizedOk.slice(0, remaining)
+    if (sizedOk.length > remaining) {
+      toast.error(`Maximum 5 photos per room — only ${remaining} slot${remaining === 1 ? "" : "s"} left.`)
+    }
+    const newPreviews = toAdd.map(f => URL.createObjectURL(f))
+    setPendingFiles(prev => [...prev, ...toAdd])
+    setPendingPreviews(prev => [...prev, ...newPreviews])
+    e.target.value = ""
+  }
+
+  const removePendingFile = (index: number) => {
+    URL.revokeObjectURL(pendingPreviews[index])
+    setPendingFiles(prev => prev.filter((_, i) => i !== index))
+    setPendingPreviews(prev => prev.filter((_, i) => i !== index))
+  }
+
+  const markImageForDeletion = (imageId: string) => {
+    setToDeleteIds(prev => [...prev, imageId])
+  }
+
+  // ── Save ──────────────────────────────────────────────────────────────────
+
+  const handleSave = async () => {
+    if (!validateForm()) {
+      toast.error("Please fix the errors above")
+      return
+    }
+    setSaving(true)
+    try {
+      const specs = {
+        ...(formData.specs.size ? { size: formData.specs.size } : {}),
+        ...(formData.specs.floor ? { floor: formData.specs.floor } : {}),
+        ...(formData.specs.view ? { view: formData.specs.view } : {}),
+      }
+
+      if (formData.id === null) {
+        // ── Create room ────────────────────────────────────────────────────
+        let targetVenueId: string
+
+        if (formData.venueId) {
+          // Add to existing venue — no venue API call needed
+          targetVenueId = formData.venueId
+        } else {
+          // Brand new venue + room
+          const venue = await createVenue({
+            name: formData.venueName,
+            address: formData.address,
+            district: formData.district,
+          })
+          targetVenueId = venue.id
+          setVenueMap(prev => ({ ...prev, [venue.id]: { ...venue, rooms: [] } }))
+        }
+
+        const room = await createRoom(targetVenueId, {
+          name: formData.name,
+          description: formData.description,
+          capacity: formData.capacity,
+          pricePerHour: formData.pricePerHour,
+          category: formData.category,
+          amenities: formData.amenities,
+          vibeTags: formData.vibeTags,
+          specs,
+        })
+
+        // Upload and save images
+        if (pendingFiles.length > 0) {
+          const uploadedUrls: string[] = []
+          for (const file of pendingFiles) {
+            const url = await uploadRoomImage(file, room.id)
+            uploadedUrls.push(url)
+          }
+          await saveRoomImages(room.id, uploadedUrls)
+        }
+
+        resetImageState()
+        await loadVenues()
+        toast.success("Room created successfully.")
+      } else {
+        // ── Update room ────────────────────────────────────────────────────
+        if (formData.venueId) {
+          await updateVenue(formData.venueId, {
+            name: formData.venueName,
+            address: formData.address,
+            district: formData.district,
+          })
+        }
+        await updateRoom(formData.id, {
+          name: formData.name,
+          description: formData.description,
+          capacity: formData.capacity,
+          pricePerHour: formData.pricePerHour,
+          category: formData.category,
+          amenities: formData.amenities,
+          vibeTags: formData.vibeTags,
+          specs,
+        })
+
+        // Delete removed images
+        for (const imageId of toDeleteIds) {
+          await deleteRoomImage(formData.id, imageId)
+        }
+
+        // Upload and save new images
+        if (pendingFiles.length > 0) {
+          const uploadedUrls: string[] = []
+          for (const file of pendingFiles) {
+            const url = await uploadRoomImage(file, formData.id)
+            uploadedUrls.push(url)
+          }
+          await saveRoomImages(formData.id, uploadedUrls)
+        }
+
+        resetImageState()
+        await loadVenues()
+        toast.success("Room updated successfully.")
+      }
+
+      setEditingId(null)
+      setErrors({})
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Failed to save room"
+      toast.error(msg)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handlePublishRoom = async (room: RoomFormData) => {
+    if (!room.id) return
+    setPublishing(room.id)
+    try {
+      await updateRoomStatus(room.id, "published")
+      setRooms(prev => prev.map(r => r.id === room.id ? { ...r, status: "published" } : r))
+      toast.success(`"${room.name}" is now live.`)
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Failed to publish room"
+      toast.error(msg)
+    } finally {
+      setPublishing(null)
+    }
+  }
+
+  const handlePublishVenue = async (venueId: string) => {
+    setPublishing(venueId)
+    try {
+      const updated = await updateVenueStatus(venueId, "published")
+      setVenueMap(prev => ({ ...prev, [venueId]: { ...prev[venueId], status: updated.status } }))
+      toast.success("Venue published.")
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Failed to publish venue"
+      toast.error(msg)
+    } finally {
+      setPublishing(null)
+    }
+  }
+
+  const handleDelete = async (room: RoomFormData) => {
+    if (!room.id) return
+    if (!confirm(`Archive "${room.name}"? It will be hidden from listings.`)) return
+    setDeleting(room.id)
+    try {
+      await deleteRoom(room.id)
+      setRooms(prev => prev.filter(r => r.id !== room.id))
+      toast.success("Room archived.")
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Failed to archive room"
+      toast.error(msg)
+    } finally {
+      setDeleting(null)
+    }
+  }
+
+  const toggleArrayItem = <T extends string>(field: keyof RoomFormData, item: T) => {
+    setFormData(prev => {
+      const arr = (prev[field] as T[])
       return {
         ...prev,
-        [field]: arr.includes(item) ? arr.filter(i => i !== item) : [...arr, item]
+        [field]: arr.includes(item) ? arr.filter(i => i !== item) : [...arr, item],
       }
     })
   }
 
-  const formatVND = (amount: number) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount)
+  // ── Edit form ──────────────────────────────────────────────────────────────
 
-  if (editingId && formData) {
+  if (editingId !== null) {
+    const isNewRoom = formData.id === null
+    const visibleImages = formData.images.filter(img => !toDeleteIds.includes(img.id))
+
     return (
       <div className="flex flex-col gap-6 animate-in fade-in duration-300 max-w-6xl mx-auto w-full">
-        {/* Header Section */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border/50 pb-5">
-          <button 
-            onClick={() => setEditingId(null)} 
+          <button
+            onClick={handleCancel}
             className="flex items-center gap-2 font-semibold text-sm text-muted-foreground hover:text-foreground transition-all duration-200 hover:-translate-x-0.5"
           >
             <ArrowLeft className="h-4 w-4" /> Back to Venues
           </button>
           <div className="flex gap-2.5">
-            <Button 
-              variant="outline" 
-              onClick={() => setEditingId(null)} 
-              className="rounded-xl px-5 font-semibold text-sm"
-            >
+            <Button variant="outline" onClick={handleCancel} className="rounded-xl px-5 font-semibold text-sm">
               Cancel
             </Button>
-            <Button 
-              onClick={handleSave} 
+            <Button
+              onClick={handleSave}
+              disabled={saving}
               className="rounded-xl px-6 font-semibold text-sm flex items-center gap-2 shadow-sm"
             >
-              <Check className="h-4 w-4" /> Save Changes
+              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+              {saving ? "Saving..." : "Save Changes"}
             </Button>
           </div>
         </div>
 
-        {/* Form Container */}
-        <div className="rounded-2xl border border-border/50 bg-card p-6 md:p-8 shadow-[0_8px_30px_rgb(0,0,0,0.02)] backdrop-blur-sm flex flex-col gap-8 animate-in slide-in-from-bottom-4 duration-300">
-          
+        <div className="rounded-2xl border border-border/50 bg-card p-6 md:p-8 shadow-[0_8px_30px_rgb(0,0,0,0.02)] flex flex-col gap-8">
           <h2 className="text-xl md:text-2xl font-semibold tracking-tight flex items-center gap-3 border-b border-border/50 pb-4 text-foreground">
-             <Building2 className="h-6 w-6 text-primary" /> Edit: {formData.name}
+            <Building2 className="h-6 w-6 text-primary" />
+            {formData.id ? `Edit: ${formData.name}` : "Add New Room"}
           </h2>
 
           <div className="grid gap-8 lg:grid-cols-2">
-            
-            {/* Left Column Fields */}
+            {/* Left column */}
             <div className="flex flex-col gap-8">
-              
-              {/* Box 1: Identity & Location */}
+
+              {/* Identity & Location */}
               <div className="rounded-xl border border-border/40 bg-muted/5 p-5 flex flex-col gap-5">
                 <div className="flex items-center gap-2 border-b border-border/30 pb-2.5">
-                   <MapPin className="h-4 w-4 text-primary" />
-                   <h3 className="font-semibold text-sm text-foreground tracking-tight">Identity & Location</h3>
+                  <MapPin className="h-4 w-4 text-primary" />
+                  <h3 className="font-semibold text-sm text-foreground tracking-tight">Identity & Location</h3>
                 </div>
 
-                <div className="flex flex-col gap-2">
-                  <label className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5">
-                    <Building2 className="h-3.5 w-3.5 text-primary" /> Building / Venue Name
-                  </label>
-                  <input 
-                    type="text" 
-                    value={formData.venueName} 
-                    onChange={e => setFormData({...formData, venueName: e.target.value})} 
-                    className="rounded-xl border border-border/60 bg-background/50 px-3.5 py-2.5 font-medium text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:border-primary/80 transition-all duration-200" 
-                  />
-                </div>
-
-                <div className="flex flex-col gap-2">
-                  <label className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5">Exact Street Address</label>
-                  <input 
-                    type="text" 
-                    value={formData.address} 
-                    onChange={e => setFormData({...formData, address: e.target.value})} 
-                    placeholder="e.g. 123 Nguyen Hue, Ben Nghe Ward..." 
-                    className="rounded-xl border border-border/60 bg-background/50 px-3.5 py-2.5 font-medium text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:border-primary/80 transition-all duration-200" 
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="flex flex-col gap-2">
-                    <label className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5">District</label>
-                    <div className="relative">
-                      <select 
-                        value={formData.district} 
-                        onChange={e => setFormData({...formData, district: e.target.value})} 
-                        className="w-full rounded-xl border border-border/60 bg-background/50 px-3.5 py-2.5 font-semibold text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:border-primary/80 transition-all duration-200 appearance-none cursor-pointer"
-                      >
-                        <option value="District 1">District 1</option>
-                        <option value="District 2">District 2</option>
-                        <option value="District 3">District 3</option>
-                        <option value="District 7">District 7</option>
-                        <option value="Thu Duc">Thu Duc</option>
-                      </select>
-                      <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3.5 text-muted-foreground">
-                        <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
-                      </div>
-                    </div>
-                  </div>
+                {/* ── Venue selector (new rooms only) ── */}
+                {isNewRoom && hasExistingVenues && (
                   <div className="flex flex-col gap-2">
                     <label className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5">
-                      <Navigation2 className="h-3.5 w-3.5 text-primary" /> Map Link
+                      <Building2 className="h-3.5 w-3.5 text-primary" /> Venue
                     </label>
-                    <input 
-                      type="text" 
-                      value={formData.googleMapsLink} 
-                      onChange={e => setFormData({...formData, googleMapsLink: e.target.value})} 
-                      placeholder="https://maps.google.com/..." 
-                      className="rounded-xl border border-border/60 bg-background/50 px-3.5 py-2.5 font-medium text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:border-primary/80 transition-all duration-200" 
-                    />
+                    <select
+                      value={formData.venueId ?? "new"}
+                      onChange={e => handleVenueSelect(e.target.value)}
+                      className="rounded-xl border border-border/60 bg-background/50 px-3.5 py-2.5 font-semibold text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 transition-all appearance-none cursor-pointer"
+                    >
+                      {Object.values(venueMap).map(v => (
+                        <option key={v.id} value={v.id}>{v.name} — {v.district}</option>
+                      ))}
+                      <option value="new">+ Create new venue</option>
+                    </select>
+                    {/* Show locked address when existing venue is selected */}
+                    {formData.venueId && (
+                      <div className="rounded-xl border border-border/30 bg-muted/10 px-3.5 py-2.5 text-sm text-muted-foreground flex items-center gap-2">
+                        <MapPin className="h-3.5 w-3.5 shrink-0 text-muted-foreground/60" />
+                        <span>{venueMap[formData.venueId]?.address} · {venueMap[formData.venueId]?.district}</span>
+                      </div>
+                    )}
                   </div>
-                </div>
+                )}
+
+                {/* ── Venue creation fields (new venue OR editing) ── */}
+                {(!isNewRoom || isCreatingNewVenue || !hasExistingVenues) && (
+                  <>
+                    {isCreatingNewVenue && hasExistingVenues && (
+                      <p className="text-xs text-muted-foreground bg-muted/20 rounded-lg px-3 py-2 border border-border/30">
+                        Enter details for the new venue below.
+                      </p>
+                    )}
+                    <div className="flex flex-col gap-2">
+                      <label className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5">
+                        <Building2 className="h-3.5 w-3.5 text-primary" /> Venue / Building Name
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.venueName}
+                        onChange={e => setFormData({ ...formData, venueName: e.target.value })}
+                        placeholder="e.g. The Coffee Lab"
+                        className={cn(
+                          "rounded-xl border bg-background/50 px-3.5 py-2.5 font-medium text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 transition-all",
+                          errors.venueName ? "border-destructive focus-visible:ring-destructive/30" : "border-border/60 focus-visible:ring-ring/50"
+                        )}
+                      />
+                      {errors.venueName && <span className="text-xs font-medium text-destructive">{errors.venueName}</span>}
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <label className="text-xs font-semibold text-muted-foreground">Exact Street Address</label>
+                      <input
+                        type="text"
+                        value={formData.address}
+                        onChange={e => setFormData({ ...formData, address: e.target.value })}
+                        placeholder="e.g. 123 Nguyen Hue, Ben Nghe Ward"
+                        className={cn(
+                          "rounded-xl border bg-background/50 px-3.5 py-2.5 font-medium text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 transition-all",
+                          errors.address ? "border-destructive focus-visible:ring-destructive/30" : "border-border/60 focus-visible:ring-ring/50"
+                        )}
+                      />
+                      {errors.address && <span className="text-xs font-medium text-destructive">{errors.address}</span>}
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <label className="text-xs font-semibold text-muted-foreground">District</label>
+                      <select
+                        value={formData.district}
+                        onChange={e => setFormData({ ...formData, district: e.target.value })}
+                        className="rounded-xl border border-border/60 bg-background/50 px-3.5 py-2.5 font-semibold text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 transition-all appearance-none cursor-pointer"
+                      >
+                        {DISTRICTS.map(d => <option key={d} value={d}>{d}</option>)}
+                      </select>
+                    </div>
+                  </>
+                )}
               </div>
 
-              {/* Box 2: Room Details */}
+              {/* Room Details */}
               <div className="rounded-xl border border-border/40 bg-muted/5 p-5 flex flex-col gap-5">
                 <div className="flex items-center gap-2 border-b border-border/30 pb-2.5">
-                   <LayoutList className="h-4 w-4 text-primary" />
-                   <h3 className="font-semibold text-sm text-foreground tracking-tight">Room Details</h3>
+                  <LayoutList className="h-4 w-4 text-primary" />
+                  <h3 className="font-semibold text-sm text-foreground tracking-tight">Room Details</h3>
                 </div>
-
                 <div className="flex flex-col gap-2">
-                  <label className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5">Room Name</label>
-                  <input 
-                    type="text" 
-                    value={formData.name} 
-                    onChange={e => setFormData({...formData, name: e.target.value})} 
-                    className="rounded-xl border border-primary/30 bg-primary/5 px-4 py-3 font-semibold text-base text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 transition-all" 
+                  <label className="text-xs font-semibold text-muted-foreground">Room Name</label>
+                  <input
+                    type="text"
+                    value={formData.name}
+                    onChange={e => setFormData({ ...formData, name: e.target.value })}
+                    placeholder="e.g. Focus Pod A"
+                    className={cn(
+                      "rounded-xl border bg-primary/5 px-4 py-3 font-semibold text-base text-foreground focus-visible:outline-none focus-visible:ring-2 transition-all",
+                      errors.name ? "border-destructive focus-visible:ring-destructive/30" : "border-primary/30 focus-visible:ring-primary/40"
+                    )}
                   />
+                  {errors.name && <span className="text-xs font-medium text-destructive">{errors.name}</span>}
                 </div>
-
                 <div className="flex flex-col gap-2">
-                  <label className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5">Room Category</label>
-                  <div className="relative">
-                    <select 
-                      value={formData.category} 
-                      onChange={e => setFormData({...formData, category: e.target.value})} 
-                      className="w-full rounded-xl border border-border/60 bg-background/50 px-3.5 py-2.5 font-semibold text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:border-primary/80 transition-all duration-200 appearance-none cursor-pointer"
-                    >
-                      <option value="solo_nook">Solo Nook / Focus Pod</option>
-                      <option value="team_hub">Team Hub / Meeting Room</option>
-                    </select>
-                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3.5 text-muted-foreground">
-                      <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
-                    </div>
-                  </div>
+                  <label className="text-xs font-semibold text-muted-foreground">Room Category</label>
+                  <select
+                    value={formData.category}
+                    onChange={e => setFormData({ ...formData, category: e.target.value as "team_hub" | "solo_nook" })}
+                    className="rounded-xl border border-border/60 bg-background/50 px-3.5 py-2.5 font-semibold text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 transition-all appearance-none cursor-pointer"
+                  >
+                    <option value="solo_nook">Solo Nook / Focus Pod</option>
+                    <option value="team_hub">Team Hub / Meeting Room</option>
+                  </select>
                 </div>
-
-                <div className="grid grid-cols-2 gap-4 mt-1">
+                <div className="grid grid-cols-2 gap-4">
                   <div className="flex flex-col gap-2">
                     <label className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5">
                       <DollarSign className="h-3.5 w-3.5 text-primary" /> Price/Hr (VND)
                     </label>
-                    <input 
-                      type="number" 
-                      step="10000" 
-                      min="0" 
-                      value={formData.pricePerHour} 
-                      onChange={e => setFormData({...formData, pricePerHour: Number(e.target.value)})} 
-                      className="rounded-xl border border-border/60 bg-background/50 px-3.5 py-2.5 font-semibold text-sm text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:border-primary/80 transition-all duration-200" 
+                    <input
+                      type="number"
+                      step="10000"
+                      min="10000"
+                      value={formData.pricePerHour}
+                      onChange={e => setFormData({ ...formData, pricePerHour: Number(e.target.value) })}
+                      className={cn(
+                        "rounded-xl border bg-background/50 px-3.5 py-2.5 font-semibold text-sm text-primary focus-visible:outline-none focus-visible:ring-2 transition-all",
+                        errors.pricePerHour ? "border-destructive focus-visible:ring-destructive/30" : "border-border/60 focus-visible:ring-ring/50"
+                      )}
                     />
+                    {errors.pricePerHour && <span className="text-xs font-medium text-destructive">{errors.pricePerHour}</span>}
                   </div>
                   <div className="flex flex-col gap-2">
                     <label className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5">
                       <Users className="h-3.5 w-3.5 text-primary" /> Capacity
                     </label>
-                    <input 
-                      type="number" 
-                      min="1" 
-                      value={formData.capacity} 
-                      onChange={e => setFormData({...formData, capacity: Number(e.target.value)})} 
-                      className="rounded-xl border border-border/60 bg-background/50 px-3.5 py-2.5 font-semibold text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:border-primary/80 transition-all duration-200" 
+                    <input
+                      type="number"
+                      min="1"
+                      value={formData.capacity}
+                      onChange={e => setFormData({ ...formData, capacity: Number(e.target.value) })}
+                      className={cn(
+                        "rounded-xl border bg-background/50 px-3.5 py-2.5 font-semibold text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 transition-all",
+                        errors.capacity ? "border-destructive focus-visible:ring-destructive/30" : "border-border/60 focus-visible:ring-ring/50"
+                      )}
                     />
+                    {errors.capacity && <span className="text-xs font-medium text-destructive">{errors.capacity}</span>}
                   </div>
                 </div>
-
-                <div className="flex flex-col gap-2 mt-1">
+                <div className="flex flex-col gap-2">
                   <label className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5">
-                    <AlignLeft className="h-3.5 w-3.5 text-primary" /> Marketing Description
+                    <AlignLeft className="h-3.5 w-3.5 text-primary" /> Description
                   </label>
-                  <textarea 
-                    rows={4} 
-                    value={formData.description} 
-                    onChange={e => setFormData({...formData, description: e.target.value})} 
-                    placeholder="Describe the vibe and purpose of this room..." 
-                    className="rounded-xl border border-border/60 bg-background/50 px-3.5 py-2.5 font-medium text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:border-primary/80 transition-all duration-200 resize-none" 
+                  <textarea
+                    rows={4}
+                    value={formData.description}
+                    onChange={e => setFormData({ ...formData, description: e.target.value })}
+                    placeholder="Describe the vibe and purpose of this room..."
+                    className="rounded-xl border border-border/60 bg-background/50 px-3.5 py-2.5 font-medium text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 transition-all resize-none"
                   />
                 </div>
               </div>
-
             </div>
 
-            {/* Right Column Fields */}
+            {/* Right column */}
             <div className="flex flex-col gap-8">
-              
-              {/* Box 3: Specs */}
+
+              {/* Physical Specs */}
               <div className="rounded-xl border border-border/40 bg-muted/5 p-5 flex flex-col gap-5">
                 <div className="flex items-center gap-2 border-b border-border/30 pb-2.5">
-                   <Info className="h-4 w-4 text-primary" />
-                   <h3 className="font-semibold text-sm text-foreground tracking-tight">Physical Specs</h3>
+                  <Info className="h-4 w-4 text-primary" />
+                  <h3 className="font-semibold text-sm text-foreground tracking-tight">Physical Specs</h3>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="flex flex-col gap-2">
                     <label className="text-xs font-semibold text-muted-foreground">Size (sqm)</label>
-                    <input 
-                      type="text" 
-                      value={formData.specs.size} 
-                      onChange={e => setFormData({...formData, specs: {...formData.specs, size: e.target.value}})} 
-                      placeholder="e.g. 15sqm" 
-                      className="rounded-xl border border-border/60 bg-background/50 px-3.5 py-2.5 font-semibold text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:border-primary/80 transition-all duration-200" 
+                    <input
+                      type="text"
+                      value={formData.specs.size}
+                      onChange={e => setFormData({ ...formData, specs: { ...formData.specs, size: e.target.value } })}
+                      placeholder="e.g. 15sqm"
+                      className="rounded-xl border border-border/60 bg-background/50 px-3.5 py-2.5 font-semibold text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 transition-all"
                     />
                   </div>
                   <div className="flex flex-col gap-2">
                     <label className="text-xs font-semibold text-muted-foreground">Floor Level</label>
-                    <input 
-                      type="text" 
-                      value={formData.specs.floor} 
-                      onChange={e => setFormData({...formData, specs: {...formData.specs, floor: e.target.value}})} 
-                      placeholder="e.g. 3rd Floor" 
-                      className="rounded-xl border border-border/60 bg-background/50 px-3.5 py-2.5 font-semibold text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:border-primary/80 transition-all duration-200" 
+                    <input
+                      type="text"
+                      value={formData.specs.floor}
+                      onChange={e => setFormData({ ...formData, specs: { ...formData.specs, floor: e.target.value } })}
+                      placeholder="e.g. 3rd Floor"
+                      className="rounded-xl border border-border/60 bg-background/50 px-3.5 py-2.5 font-semibold text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 transition-all"
                     />
                   </div>
                   <div className="flex flex-col gap-2 col-span-2">
-                    <label className="text-xs font-semibold text-muted-foreground">View Feature</label>
-                    <input 
-                      type="text" 
-                      value={formData.specs.view} 
-                      onChange={e => setFormData({...formData, specs: {...formData.specs, view: e.target.value}})} 
-                      placeholder="e.g. Skyline, Internal Garden" 
-                      className="rounded-xl border border-border/60 bg-background/50 px-3.5 py-2.5 font-semibold text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:border-primary/80 transition-all duration-200" 
+                    <label className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5">
+                      <Navigation2 className="h-3.5 w-3.5 text-primary" /> View Feature
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.specs.view}
+                      onChange={e => setFormData({ ...formData, specs: { ...formData.specs, view: e.target.value } })}
+                      placeholder="e.g. Skyline, Internal Garden"
+                      className="rounded-xl border border-border/60 bg-background/50 px-3.5 py-2.5 font-semibold text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 transition-all"
                     />
                   </div>
                 </div>
               </div>
 
-              {/* Toggles */}
-              <div className="flex flex-col gap-6">
-                <div className="flex flex-col gap-3">
-                  <label className="text-xs font-semibold text-muted-foreground border-b border-border/40 pb-2">Amenities Provided</label>
-                  <div className="grid grid-cols-2 gap-2.5">
-                     {['Whiteboard', 'Smart TV', 'Air Con', 'Coffee Machine', 'Fast WiFi', 'Projector', 'Ergo Chair', 'Power Outlets'].map(item => {
-                       const isChecked = formData.amenities.includes(item)
-                       return (
-                         <label 
-                           key={item} 
-                           className={`flex items-center gap-3 rounded-xl border p-3.5 cursor-pointer transition-all duration-200 ${
-                             isChecked 
-                               ? 'border-primary/30 bg-primary/5 text-primary shadow-[0_2px_10px_rgba(100,181,246,0.08)]' 
-                               : 'border-border/60 hover:border-border hover:bg-muted/30 bg-background/50 text-foreground/90'
-                           }`}
-                         >
-                           <input 
-                             type="checkbox" 
-                             checked={isChecked} 
-                             onChange={() => toggleArrayItem("amenities", item)} 
-                             className="w-4 h-4 accent-primary border-border rounded-lg" 
-                           />
-                           <span className="font-semibold text-xs leading-none mt-0.5">{item}</span>
-                         </label>
-                       )
-                     })}
-                  </div>
+              {/* Amenities */}
+              <div className="flex flex-col gap-3">
+                <div className="flex items-center justify-between border-b border-border/40 pb-2.5">
+                  <label className="text-xs font-semibold text-muted-foreground">
+                    Amenities Provided
+                  </label>
+                  <span className="text-[10px] font-medium text-muted-foreground/70">
+                    {formData.amenities.length} selected
+                  </span>
                 </div>
+                <div className="grid grid-cols-2 gap-2.5">
+                  {AMENITY_OPTIONS.map(({ value, label }) => {
+                    const checked = formData.amenities.includes(value)
+                    return (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => toggleArrayItem("amenities", value)}
+                        className={cn(
+                          "flex items-center gap-3 rounded-xl border p-3.5 cursor-pointer transition-all duration-200 text-left group",
+                          checked
+                            ? "border-primary/40 bg-primary/8 text-primary shadow-sm"
+                            : "border-border/60 hover:border-primary/30 bg-background/50 text-foreground/90 hover:bg-muted/30"
+                        )}
+                      >
+                        <div className={cn(
+                          "w-4 h-4 rounded border transition-all flex items-center justify-center shrink-0",
+                          checked
+                            ? "bg-primary border-primary"
+                            : "border-border/60 group-hover:border-primary/40"
+                        )}>
+                          {checked && <Check className="h-3 w-3 text-background" />}
+                        </div>
+                        <span className="font-semibold text-xs">{label}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
 
-                <div className="flex flex-col gap-3">
-                  <label className="text-xs font-semibold text-muted-foreground border-b border-border/40 pb-2 flex items-center gap-1">
+              {/* Vibe Tags */}
+              <div className="flex flex-col gap-3">
+                <div className="flex items-center justify-between border-b border-border/40 pb-2.5">
+                  <label className="text-xs font-semibold text-muted-foreground flex items-center gap-1">
                     <Tags className="h-3.5 w-3.5 text-primary" /> Vibe Tags
                   </label>
-                  <div className="flex flex-wrap gap-2">
-                     {['ultra_quiet', 'focus', 'creative', 'bright', 'cozy', 'premium', 'nature'].map(tag => {
-                       const isChecked = formData.vibeTags.includes(tag)
-                       return (
-                         <button 
-                           key={tag} 
-                           onClick={() => toggleArrayItem("vibeTags", tag)} 
-                           className={`px-4 py-2 rounded-full border text-xs font-medium transition-all duration-200 ${
-                             isChecked 
-                               ? 'bg-primary/10 text-primary border-primary/30 shadow-[0_2px_10px_rgba(100,181,246,0.06)] font-semibold' 
-                               : 'bg-background/60 text-muted-foreground border-border/60 hover:text-foreground hover:border-border'
-                           }`}
-                         >
-                           #{tag}
-                         </button>
-                       )
-                     })}
-                  </div>
+                  <span className="text-[10px] font-medium text-muted-foreground/70">
+                    {formData.vibeTags.length} selected
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {VIBE_TAG_OPTIONS.map(({ value, label }) => {
+                    const checked = formData.vibeTags.includes(value)
+                    return (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => toggleArrayItem("vibeTags", value)}
+                        className={cn(
+                          "px-3.5 py-2 rounded-full border text-xs font-medium transition-all duration-200 hover:shadow-sm",
+                          checked
+                            ? "bg-primary/10 text-primary border-primary/30 font-semibold shadow-sm"
+                            : "bg-background/60 text-muted-foreground border-border/60 hover:text-foreground hover:border-primary/20"
+                        )}
+                      >
+                        #{label}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* Gallery */}
+              <div className="flex flex-col gap-3">
+                <div className="flex items-center justify-between border-b border-border/40 pb-2">
+                  <label className="text-xs font-semibold text-muted-foreground">Room Gallery</label>
+                  <span className="text-[10px] font-medium text-muted-foreground/70">
+                    {currentImageCount} / 5 photos
+                  </span>
                 </div>
 
-                <div className="flex flex-col gap-3 h-full mt-2">
-                  <label className="text-xs font-semibold text-muted-foreground border-b border-border/40 pb-2">Room Gallery</label>
-                  <div className="border-2 border-dashed border-border/60 rounded-xl flex flex-col items-center justify-center p-8 bg-muted/5 hover:bg-muted/10 hover:border-primary/50 hover:text-primary transition-all duration-200 cursor-pointer text-center group h-full min-h-[160px]">
-                     <ImageIcon className="h-10 w-10 text-muted-foreground mb-3 group-hover:text-primary transition-colors" />
-                     <span className="font-semibold text-sm text-foreground/90 group-hover:text-primary transition-colors">Upload Photos</span>
-                     <span className="text-xs text-muted-foreground mt-1.5 font-medium">Drag & drop JPG, PNG (Max 5MB)</span>
-                  </div>
+                <div className="grid grid-cols-3 gap-2">
+                  {/* Saved images (minus ones marked for deletion) */}
+                  {visibleImages.map(img => (
+                    <div key={img.id} className="relative aspect-square rounded-xl overflow-hidden group">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={img.url} alt="" className="w-full h-full object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => markImageForDeletion(img.id)}
+                        className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity"
+                      >
+                        <X className="h-5 w-5 text-white" />
+                      </button>
+                    </div>
+                  ))}
+
+                  {/* Pending (not-yet-uploaded) previews */}
+                  {pendingPreviews.map((preview, i) => (
+                    <div key={`pending-${i}`} className="relative aspect-square rounded-xl overflow-hidden group">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={preview} alt="" className="w-full h-full object-cover" />
+                      <div className="absolute top-1.5 right-1.5 bg-primary/90 text-primary-foreground text-[9px] font-bold px-1.5 py-0.5 rounded-full">
+                        NEW
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => removePendingFile(i)}
+                        className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity"
+                      >
+                        <X className="h-5 w-5 text-white" />
+                      </button>
+                    </div>
+                  ))}
+
+                  {/* Upload slot */}
+                  {currentImageCount < 5 && (
+                    <label className="aspect-square rounded-xl border-2 border-dashed border-border/60 flex flex-col items-center justify-center gap-1.5 cursor-pointer hover:border-primary/40 hover:bg-muted/10 transition-all">
+                      <Upload className="h-5 w-5 text-muted-foreground/50" />
+                      <span className="text-[10px] font-medium text-muted-foreground/70">Add photo</span>
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        multiple
+                        className="hidden"
+                        onChange={handleFileSelect}
+                      />
+                    </label>
+                  )}
                 </div>
 
+                <p className="text-[10px] text-muted-foreground/60">
+                  JPG · PNG · WebP · Max 5 MB each · Up to 5 photos
+                </p>
               </div>
             </div>
           </div>
@@ -388,16 +877,17 @@ export default function VenuesPage() {
     )
   }
 
-  // List View
+  // ── List view ──────────────────────────────────────────────────────────────
+
   return (
     <div className="flex flex-col gap-8 animate-in fade-in duration-500 max-w-6xl mx-auto w-full">
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div className="flex flex-col gap-2">
           <h1 className="text-3xl md:text-4xl font-bold tracking-tight flex items-center gap-3 text-foreground">
-             <Building2 className="h-8 w-8 text-primary hidden md:block" /> Venues
+            <Building2 className="h-8 w-8 text-primary hidden md:block" /> Venues
           </h1>
           <p className="text-sm md:text-base text-muted-foreground">
-            Manage your physical locations, rooms, capacity, and detailed specifications.
+            Manage your rooms, capacity, amenities, and specifications.
           </p>
         </div>
         <Button onClick={handleAddNew} className="font-semibold rounded-xl flex items-center gap-2 px-6 shadow-sm">
@@ -405,33 +895,189 @@ export default function VenuesPage() {
         </Button>
       </div>
 
-      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-        {rooms.map(room => (
-          <div key={room.id} className="flex flex-col rounded-2xl border border-border/50 bg-card shadow-[0_4px_20px_-4px_rgba(41,35,30,0.04)] hover:-translate-y-0.5 transition-all duration-300 group">
-            <div className="aspect-[16/9] bg-muted/20 border-b border-border/40 relative flex items-center justify-center overflow-hidden rounded-t-2xl">
-               <ImageIcon className="h-12 w-12 text-muted-foreground/30 absolute z-0 group-hover:scale-110 transition-transform" />
-               <div className="absolute top-3 right-3 bg-foreground/90 backdrop-blur-sm text-background px-3 py-1 rounded-full text-[10px] font-semibold tracking-wider uppercase shadow-sm">
-                 {room.category.replace('_', ' ')}
-               </div>
+      {loading ? (
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          {[1, 2, 3].map(i => (
+            <div key={i} className="rounded-2xl border border-border/50 overflow-hidden animate-pulse">
+              <div className="aspect-[16/9] bg-muted/30" />
+              <div className="p-5 flex flex-col gap-3">
+                <div className="h-5 bg-muted/30 rounded-lg w-3/4" />
+                <div className="h-4 bg-muted/20 rounded-lg w-1/2" />
+                <div className="h-4 bg-muted/20 rounded-lg w-2/3" />
+              </div>
             </div>
-            <div className="p-4 md:p-6 flex flex-col flex-1 gap-2">
-               <h3 className="font-semibold text-lg md:text-xl tracking-tight text-foreground line-clamp-1">{room.name}</h3>
-               <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5 mt-1 border-b border-border/40 pb-3 line-clamp-1">
-                 <MapPin className="h-3.5 w-3.5 text-primary shrink-0" /> {room.venueName} • {room.district}
-               </p>
-               <div className="flex items-center justify-between mt-3 text-sm font-semibold">
-                 <span className="flex items-center gap-2 bg-muted/50 px-3 py-1.5 rounded-lg border border-border/60 text-xs font-semibold text-foreground"><Users className="h-4 w-4 text-muted-foreground"/> {room.capacity} Pax</span>
-                 <span className="flex items-center gap-1.5 text-primary bg-primary/10 px-3 py-1.5 rounded-lg border border-primary/20 text-xs font-semibold"><DollarSign className="h-4 w-4"/> {formatVND(room.pricePerHour)}/hr</span>
-               </div>
-            </div>
-            <div className="p-4 border-t border-border/40 mt-auto bg-muted/10 rounded-b-2xl">
-               <Button onClick={() => handleEdit(room)} variant="outline" className="w-full font-semibold rounded-xl shadow-sm bg-transparent">
-                 <Edit2 className="h-4 w-4" /> Edit Room Details
-               </Button>
-            </div>
+          ))}
+        </div>
+      ) : rooms.length === 0 ? (
+        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border/60 bg-muted/10 p-16 text-center gap-4">
+          <Building2 className="h-12 w-12 text-muted-foreground/30" />
+          <div>
+            <p className="text-base font-semibold text-foreground">No rooms yet</p>
+            <p className="text-sm text-muted-foreground mt-1">Add your first room to start accepting bookings.</p>
           </div>
-        ))}
-      </div>
+          <Button onClick={handleAddNew} className="rounded-xl gap-2">
+            <Plus className="h-4 w-4" /> Add Room
+          </Button>
+        </div>
+      ) : (
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          {rooms.map((room, idx) => {
+            const isEmpty = room.status === "empty"
+            const firstImage = room.images?.[0]
+            return (
+              <div
+                key={room.id ?? `empty-${idx}`}
+                className={cn(
+                  "flex flex-col rounded-2xl border bg-card shadow-[0_4px_20px_-4px_rgba(41,35,30,0.04)] hover:-translate-y-0.5 transition-all duration-300 group",
+                  isEmpty ? "border-dashed border-border/60" : "border-border/50"
+                )}
+              >
+                {isEmpty ? (
+                  <div className="aspect-[16/9] bg-muted/10 border-b border-dashed border-border/40 relative flex flex-col items-center justify-center overflow-hidden rounded-t-2xl gap-2">
+                    <Plus className="h-10 w-10 text-muted-foreground/30" />
+                    <span className="text-xs font-medium text-muted-foreground/60">No rooms yet</span>
+                  </div>
+                ) : (
+                  <div className="aspect-[16/9] bg-muted/20 border-b border-border/40 relative flex items-center justify-center overflow-hidden rounded-t-2xl">
+                    {firstImage ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={firstImage.url}
+                        alt={room.name}
+                        className="w-full h-full object-cover absolute inset-0"
+                      />
+                    ) : (
+                      <ImageIcon className="h-12 w-12 text-muted-foreground/30 absolute z-0" />
+                    )}
+                    <div className="absolute top-3 right-3 bg-foreground/90 text-background px-3 py-1 rounded-full text-[10px] font-semibold tracking-wider uppercase z-10">
+                      {room.category.replace("_", " ")}
+                    </div>
+                    {room.status && (
+                      <div className={cn(
+                        "absolute top-3 left-3 px-2.5 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wider z-10",
+                        room.status === "published" ? "bg-emerald-500/20 text-emerald-700 border border-emerald-500/30" :
+                        room.status === "draft" ? "bg-yellow-500/20 text-yellow-700 border border-yellow-500/30" :
+                        room.status === "unavailable" ? "bg-destructive/20 text-destructive border border-destructive/30" :
+                        "bg-muted/50 text-muted-foreground border border-border/40"
+                      )}>
+                        {room.status}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div className="p-4 md:p-6 flex flex-col flex-1 gap-2">
+                  {isEmpty ? (
+                    <>
+                      <h3 className="font-semibold text-lg tracking-tight text-foreground line-clamp-1">{room.venueName}</h3>
+                      <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5 mt-1 border-b border-border/40 pb-3 line-clamp-1">
+                        <MapPin className="h-3.5 w-3.5 text-primary shrink-0" /> {room.district}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-2">Add a room to this venue to start accepting bookings.</p>
+                    </>
+                  ) : (
+                    <>
+                      <h3 className="font-semibold text-lg tracking-tight text-foreground line-clamp-1">{room.name}</h3>
+                      <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5 mt-1 border-b border-border/40 pb-3 line-clamp-1">
+                        <MapPin className="h-3.5 w-3.5 text-primary shrink-0" /> {room.venueName} · {room.district}
+                      </p>
+                      <div className="flex items-center justify-between mt-3">
+                        <span className="flex items-center gap-2 bg-muted/50 px-3 py-1.5 rounded-lg border border-border/60 text-xs font-semibold text-foreground">
+                          <Users className="h-4 w-4 text-muted-foreground" /> {room.capacity} Pax
+                        </span>
+                        <span className="flex items-center gap-1.5 text-primary bg-primary/10 px-3 py-1.5 rounded-lg border border-primary/20 text-xs font-semibold">
+                          <DollarSign className="h-4 w-4" /> {formatVND(room.pricePerHour)}/hr
+                        </span>
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                <div className="p-4 border-t border-border/40 mt-auto bg-muted/10 rounded-b-2xl flex flex-col gap-2">
+                  {isEmpty ? (
+                    <div className="flex gap-2">
+                      <Button
+                        onClick={() => {
+                          setEditingId("new")
+                          setFormData({ ...EMPTY_FORM, venueId: room.venueId, venueName: room.venueName, address: room.address, district: room.district })
+                          resetImageState()
+                          setErrors({})
+                        }}
+                        className="flex-1 font-semibold rounded-xl flex items-center gap-2"
+                      >
+                        <Plus className="h-4 w-4" /> Add First Room
+                      </Button>
+                      {venueMap[room.venueId ?? ""]?.status !== "published" && (
+                        <Button
+                          onClick={() => handlePublishVenue(room.venueId!)}
+                          disabled={publishing === room.venueId}
+                          variant="outline"
+                          className="rounded-xl font-semibold text-emerald-700 border-emerald-500/30 hover:bg-emerald-500/10 bg-transparent"
+                        >
+                          {publishing === room.venueId
+                            ? <Loader2 className="h-4 w-4 animate-spin" />
+                            : <Globe className="h-4 w-4" />
+                          }
+                        </Button>
+                      )}
+                    </div>
+                  ) : (
+                    <>
+                      {(room.status === "draft" || room.status === "unavailable") && (
+                        <Button
+                          onClick={() => handlePublishRoom(room)}
+                          disabled={publishing === room.id}
+                          className="w-full font-semibold rounded-xl flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white"
+                        >
+                          {publishing === room.id
+                            ? <Loader2 className="h-4 w-4 animate-spin" />
+                            : <Globe className="h-4 w-4" />
+                          }
+                          {publishing === room.id ? "Publishing..." : "Publish Room"}
+                        </Button>
+                      )}
+                      {venueMap[room.venueId ?? ""]?.status !== "published" && (
+                        <Button
+                          onClick={() => handlePublishVenue(room.venueId!)}
+                          disabled={publishing === room.venueId}
+                          variant="outline"
+                          className="w-full rounded-xl font-semibold text-emerald-700 border-emerald-500/30 hover:bg-emerald-500/10 bg-transparent"
+                        >
+                          {publishing === room.venueId
+                            ? <Loader2 className="h-4 w-4 animate-spin" />
+                            : <Globe className="h-4 w-4" />
+                          }
+                          {publishing === room.venueId ? "Publishing..." : "Publish Venue"}
+                        </Button>
+                      )}
+                      <div className="flex gap-2">
+                        <Button
+                          onClick={() => handleEdit(room)}
+                          variant="outline"
+                          className="flex-1 font-semibold rounded-xl bg-transparent"
+                        >
+                          <Edit2 className="h-4 w-4" /> Edit
+                        </Button>
+                        <Button
+                          onClick={() => handleDelete(room)}
+                          variant="outline"
+                          disabled={deleting === room.id}
+                          className="rounded-xl text-destructive hover:bg-destructive/10 hover:border-destructive/30 border-border/60 bg-transparent"
+                        >
+                          {deleting === room.id
+                            ? <Loader2 className="h-4 w-4 animate-spin" />
+                            : <Trash2 className="h-4 w-4" />
+                          }
+                        </Button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }

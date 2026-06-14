@@ -1,0 +1,259 @@
+"use client"
+
+import { useMemo, useState } from "react"
+import { useTranslation } from "@/lib/i18n/context"
+import { TrendingUp, TrendingDown, DollarSign, BarChart3, Clock } from "lucide-react"
+import { earningsData } from "@/lib/data/venues"
+import { bookings } from "@/lib/data/bookings"
+import { formatVND } from "@/lib/format"
+import { cn } from "@/lib/utils"
+
+const COMMISSION_RATE = 0.10
+
+type Period = "daily" | "weekly" | "monthly"
+
+export default function EarningsPage() {
+  const { t } = useTranslation()
+  const [period, setPeriod] = useState<Period>("monthly")
+
+  const thisMonthData = earningsData
+  const lastMonthRevenue = 18200000
+  const thisMonthRevenue = useMemo(
+    () => thisMonthData.reduce((sum, d) => sum + d.revenue, 0),
+    [thisMonthData]
+  )
+  const thisMonthCommission = useMemo(
+    () => thisMonthData.reduce((sum, d) => sum + d.commission, 0),
+    [thisMonthData]
+  )
+  const thisMonthNet = thisMonthRevenue - thisMonthCommission
+  const revenueChange = ((thisMonthRevenue - lastMonthRevenue) / lastMonthRevenue) * 100
+
+  const pendingPayout = useMemo(() => {
+    return bookings
+      .filter(b => b.status === "checked_in" || b.status === "completed")
+      .reduce((sum, b) => sum + (b.roomFee - b.platformFee), 0)
+  }, [])
+
+  const perBookingRows = useMemo(() => {
+    return bookings
+      .filter(b => b.status === "confirmed" || b.status === "checked_in" || b.status === "completed")
+      .sort((a, b) => b.date.localeCompare(a.date))
+  }, [])
+
+  const mockPayouts = [
+    { date: "2026-02-14", amount: 19400000, ref: "VCB-20260214-001", status: "paid" },
+    { date: "2026-01-31", amount: 17800000, ref: "VCB-20260131-003", status: "paid" },
+    { date: "2026-01-15", amount: 15200000, ref: "VCB-20260115-007", status: "paid" },
+  ]
+
+  const statCards = [
+    {
+      label: t("partner.totalEarningsMonth"),
+      value: formatVND(thisMonthRevenue),
+      sub: `${revenueChange > 0 ? "+" : ""}${revenueChange.toFixed(1)}% vs last month`,
+      trend: revenueChange >= 0 ? "up" : "down",
+      icon: BarChart3,
+    },
+    {
+      label: t("partner.lastMonth"),
+      value: formatVND(lastMonthRevenue),
+      sub: "Feb 2026",
+      trend: "neutral" as const,
+      icon: Clock,
+    },
+    {
+      label: t("partner.commission"),
+      value: formatVND(thisMonthCommission),
+      sub: "10% of room fee",
+      trend: "neutral" as const,
+      icon: DollarSign,
+    },
+    {
+      label: t("partner.pendingPayout"),
+      value: formatVND(pendingPayout),
+      sub: "Awaiting settlement",
+      trend: "neutral" as const,
+      icon: Clock,
+    },
+  ]
+
+  const periods: Period[] = ["daily", "weekly", "monthly"]
+
+  return (
+    <div className="flex flex-col gap-8 animate-in fade-in duration-500 max-w-5xl mx-auto w-full">
+      <div className="flex flex-col gap-2">
+        <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-foreground">
+          {t("partner.earningsTitle")}
+        </h1>
+        <p className="text-base text-muted-foreground max-w-xl">
+          {t("partner.earningsSubtitle")}
+        </p>
+      </div>
+
+      {/* Stats grid */}
+      <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
+        {statCards.map((card, i) => {
+          const Icon = card.icon
+          return (
+            <div
+              key={i}
+              className="flex flex-col rounded-2xl border border-border/50 bg-card p-5 md:p-6 shadow-[0_4px_20px_-4px_rgba(41,35,30,0.04)] hover:-translate-y-0.5 transition-all duration-300"
+            >
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-xs font-semibold text-muted-foreground tracking-tight">{card.label}</span>
+                <Icon className="h-4 w-4 text-muted-foreground/50" />
+              </div>
+              <span className="text-xl md:text-2xl font-bold tracking-tight text-foreground">{card.value}</span>
+              <div className={cn(
+                "flex items-center gap-1 mt-3 text-[10px] font-semibold",
+                card.trend === "up" ? "text-emerald-600" : card.trend === "down" ? "text-red-600" : "text-muted-foreground"
+              )}>
+                {card.trend === "up" && <TrendingUp className="h-3 w-3" />}
+                {card.trend === "down" && <TrendingDown className="h-3 w-3" />}
+                {card.sub}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Revenue chart */}
+      <div className="rounded-2xl border border-border/50 bg-card p-6 md:p-8 shadow-[0_8px_30px_rgb(0,0,0,0.02)] flex flex-col gap-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border/50 pb-4">
+          <h2 className="text-lg font-semibold tracking-tight flex items-center gap-3 text-foreground">
+            <BarChart3 className="h-5 w-5 text-primary" /> {t("partner.totalEarningsMonth")}
+          </h2>
+          <div className="flex items-center gap-1 rounded-xl border border-border/50 bg-muted/20 p-1">
+            {periods.map(p => (
+              <button
+                key={p}
+                onClick={() => setPeriod(p)}
+                className={cn(
+                  "px-3 py-1.5 text-xs font-semibold rounded-lg transition-all",
+                  period === p
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {t(`partner.${p}`)}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex items-end justify-between gap-1.5 h-40 px-2">
+          {thisMonthData.slice(-14).map((day, i) => {
+            const max = Math.max(...thisMonthData.map(d => d.revenue))
+            const heightPct = (day.revenue / max) * 100
+            const isToday = i === thisMonthData.length - 1
+            return (
+              <div key={day.date} className="flex-1 flex flex-col items-center gap-1 group h-full justify-end">
+                <div
+                  className={cn(
+                    "w-full max-w-[28px] rounded-t-lg transition-all duration-300 group-hover:-translate-y-0.5",
+                    isToday ? "bg-primary" : "bg-primary/15 hover:bg-primary/30"
+                  )}
+                  style={{ height: `${heightPct}%` }}
+                  title={formatVND(day.revenue)}
+                />
+                <span className="text-[9px] font-medium text-muted-foreground hidden sm:block">
+                  {day.date.slice(8)}
+                </span>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Per-booking breakdown */}
+      <div className="rounded-2xl border border-border/50 bg-card overflow-hidden shadow-[0_8px_30px_rgb(0,0,0,0.02)]">
+        <div className="flex items-center justify-between p-5 md:p-6 border-b border-border/50">
+          <h2 className="text-base md:text-lg font-semibold tracking-tight text-foreground">
+            {t("partner.perBookingBreakdown")}
+          </h2>
+          <span className="text-xs font-semibold text-muted-foreground bg-muted/40 border border-border/50 rounded-full px-2.5 py-1">
+            {perBookingRows.length} bookings
+          </span>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border/40 bg-muted/20">
+                <th className="text-left text-xs font-semibold text-muted-foreground px-5 py-3 whitespace-nowrap">{t("confirmation.bookingId")}</th>
+                <th className="text-left text-xs font-semibold text-muted-foreground px-4 py-3 whitespace-nowrap">{t("confirmation.room")}</th>
+                <th className="text-left text-xs font-semibold text-muted-foreground px-4 py-3 whitespace-nowrap">{t("landing.date")}</th>
+                <th className="text-right text-xs font-semibold text-muted-foreground px-4 py-3 whitespace-nowrap">{t("checkout.roomFee")}</th>
+                <th className="text-right text-xs font-semibold text-muted-foreground px-4 py-3 whitespace-nowrap">{t("partner.commission")}</th>
+                <th className="text-right text-xs font-semibold text-muted-foreground px-5 py-3 whitespace-nowrap">{t("partner.netEarnings")}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {perBookingRows.map((b, i) => {
+                const net = b.roomFee - b.platformFee
+                const commission = Math.round(b.roomFee * COMMISSION_RATE)
+                return (
+                  <tr
+                    key={b.id}
+                    className={cn(
+                      "border-b border-border/30 transition-colors hover:bg-muted/20",
+                      i % 2 === 0 ? "bg-card" : "bg-muted/5"
+                    )}
+                  >
+                    <td className="px-5 py-3.5">
+                      <span className="font-mono text-xs font-semibold text-foreground">{b.id}</span>
+                    </td>
+                    <td className="px-4 py-3.5">
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-xs font-semibold text-foreground">{b.roomName}</span>
+                        <span className="text-[11px] text-muted-foreground">{b.guestName}</span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3.5">
+                      <span className="text-xs text-muted-foreground">{b.date}</span>
+                    </td>
+                    <td className="px-4 py-3.5 text-right">
+                      <span className="text-xs font-semibold text-foreground">{formatVND(b.roomFee)}</span>
+                    </td>
+                    <td className="px-4 py-3.5 text-right">
+                      <span className="text-xs text-destructive font-medium">−{formatVND(commission)}</span>
+                    </td>
+                    <td className="px-5 py-3.5 text-right">
+                      <span className="text-xs font-bold text-emerald-700">{formatVND(net)}</span>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Payout history */}
+      <div className="rounded-2xl border border-border/50 bg-card overflow-hidden shadow-[0_8px_30px_rgb(0,0,0,0.02)]">
+        <div className="p-5 md:p-6 border-b border-border/50">
+          <h2 className="text-base md:text-lg font-semibold tracking-tight text-foreground">
+            {t("partner.payoutHistory")}
+          </h2>
+        </div>
+        <div className="flex flex-col divide-y divide-border/30">
+          {mockPayouts.map((payout, i) => (
+            <div key={i} className="flex items-center justify-between px-5 py-4 hover:bg-muted/20 transition-colors">
+              <div className="flex flex-col gap-0.5">
+                <span className="text-xs font-semibold text-foreground">{payout.date}</span>
+                <span className="text-[11px] font-mono text-muted-foreground">{payout.ref}</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-sm font-bold text-foreground">{formatVND(payout.amount)}</span>
+                <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-500/10 border border-emerald-500/20 rounded-full px-2.5 py-0.5 uppercase tracking-wide">
+                  Paid
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}

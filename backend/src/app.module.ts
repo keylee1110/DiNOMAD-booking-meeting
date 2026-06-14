@@ -6,6 +6,7 @@ import supabaseConfig from "./config/supabase.config"
 import { DatabaseModule } from "./database/database.module"
 import { AuthModule } from "./modules/auth/auth.module"
 import { HealthModule } from "./modules/health/health.module"
+import { RoomsModule } from "./modules/rooms/rooms.module"
 import { SuppliersModule } from "./modules/suppliers/suppliers.module"
 import { UsersModule } from "./modules/users/users.module"
 
@@ -21,6 +22,7 @@ import { UsersModule } from "./modules/users/users.module"
     HealthModule,
     UsersModule,
     SuppliersModule,
+    RoomsModule,
   ],
 })
 export class AppModule {}
