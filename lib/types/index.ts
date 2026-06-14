@@ -175,4 +175,22 @@ export interface BookingFlowState {
   confirmedBooking?: Booking | null
 }
 
+
 export type Dictionary = Record<string, string | Record<string, string>>
+
+export type SupplierStatus = "pending" | "approved" | "rejected" | "suspended"
+
+export interface Supplier {
+  id: string
+  legalName: string
+  displayName: string
+  taxCode: string | null
+  businessEmail: string | null
+  businessPhone: string | null
+  status: SupplierStatus
+  onboardingNote: string | null
+  approvedAt: string | null
+  approvedBy: string | null
+  createdAt: string
+  updatedAt: string
+}

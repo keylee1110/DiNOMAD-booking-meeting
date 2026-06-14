@@ -102,7 +102,15 @@ function SignupForm() {
         return
       }
 
-      toast.success(t("auth.signupSuccess") || "Registration successful!")
+      if (role === "supplier") {
+        toast.success(
+          locale === "vi"
+            ? "Đã gửi đơn đăng ký đối tác! Vui lòng chờ admin xét duyệt."
+            : "Partner application submitted! Please wait for admin approval."
+        )
+      } else {
+        toast.success(t("auth.signupSuccess") || "Registration successful!")
+      }
       
       // Determine Redirect Path:
       const isCheckoutOrBooking = redirectTo && (
@@ -156,19 +164,37 @@ function SignupForm() {
           <CheckCircle className="h-8 w-8" />
         </div>
 
-        <h1 className="text-2xl font-extrabold text-foreground tracking-tight mb-3">
-          {locale === "vi" ? "Kiểm tra Email của bạn" : "Check Your Email"}
-        </h1>
-        
-        <p className="text-sm text-muted-foreground leading-relaxed mb-6">
-          {locale === "vi" 
-            ? `Chúng tôi đã gửi một liên kết xác thực tài khoản đến địa chỉ email ` 
-            : `We've sent an account verification link to `}
-          <strong className="text-foreground">{email}</strong>. 
-          {locale === "vi"
-            ? " Vui lòng nhấp vào liên kết trong email để kích hoạt tài khoản trước khi đăng nhập."
-            : " Please click the link inside to activate your account before logging in."}
-        </p>
+        {role === "supplier" ? (
+          <>
+            <h1 className="text-2xl font-extrabold text-foreground tracking-tight mb-3">
+              {locale === "vi" ? "Đã gửi đơn đăng ký!" : "Application Submitted!"}
+            </h1>
+            <p className="text-sm text-muted-foreground leading-relaxed mb-6">
+              {locale === "vi"
+                ? "Chúng tôi đã gửi một liên kết xác thực tài khoản đến địa chỉ email "
+                : "We've sent an account verification link to "}
+              <strong className="text-foreground">{email}</strong>.
+              {locale === "vi"
+                ? " Sau khi xác thực, đơn đăng ký đối tác của bạn sẽ được admin xét duyệt. Chúng tôi sẽ thông báo khi tài khoản được kích hoạt."
+                : " After verification, your partner application will be reviewed by admin. We'll notify you once your account is activated."}
+            </p>
+          </>
+        ) : (
+          <>
+            <h1 className="text-2xl font-extrabold text-foreground tracking-tight mb-3">
+              {locale === "vi" ? "Kiểm tra Email của bạn" : "Check Your Email"}
+            </h1>
+            <p className="text-sm text-muted-foreground leading-relaxed mb-6">
+              {locale === "vi"
+                ? `Chúng tôi đã gửi một liên kết xác thực tài khoản đến địa chỉ email `
+                : `We've sent an account verification link to `}
+              <strong className="text-foreground">{email}</strong>.
+              {locale === "vi"
+                ? " Vui lòng nhấp vào liên kết trong email để kích hoạt tài khoản trước khi đăng nhập."
+                : " Please click the link inside to activate your account before logging in."}
+            </p>
+          </>
+        )}
 
         <div className="flex flex-col gap-3">
           <Link href={`/${locale}/login?redirect_to=${encodeURIComponent(redirectTo)}`} className="w-full">

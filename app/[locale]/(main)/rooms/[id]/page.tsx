@@ -1,10 +1,12 @@
 "use client"
 
-import { useState, useMemo, use } from "react"
+import { useState, useMemo, useEffect, use } from "react"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { useTranslation } from "@/lib/i18n/context"
-import { getRoomById, getReviewsByRoomId } from "@/lib/data/rooms"
+import { getRoomById } from "@/lib/data/rooms"
+import { getRoomReviews } from "@/lib/api/reviews"
+import type { ApiReview } from "@/lib/api/reviews"
 import { generateTimeSlots } from "@/lib/data/time-slots"
 import { useBooking } from "@/lib/store/booking-store"
 import { formatVND, getNextDays, formatDate } from "@/lib/format"
@@ -31,7 +33,8 @@ export default function RoomDetailPage({ params }: { params: Promise<{ locale: s
   const room = getRoomById(id, locale)
   if (!room) notFound()
 
-  const reviews = getReviewsByRoomId(id, locale)
+  const [reviews, setReviews] = useState<ApiReview[]>([])
+  const [reviewsLoading, setReviewsLoading] = useState(true)
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
   const [selectedDate, setSelectedDate] = useState(getNextDays(1)[0])
   const [selectedSlots, setSelectedSlots] = useState<TimeSlot[]>([])
@@ -40,6 +43,13 @@ export default function RoomDetailPage({ params }: { params: Promise<{ locale: s
 
   // Split bill states
   const [splitPeople, setSplitPeople] = useState(room?.capacity || 2)
+
+  useEffect(() => {
+    getRoomReviews(id)
+      .then(setReviews)
+      .catch(() => {})
+      .finally(() => setReviewsLoading(false))
+  }, [id])
 
   const slots = useMemo(() => generateTimeSlots(selectedDate, room.id), [selectedDate, room.id])
 
@@ -260,19 +270,21 @@ export default function RoomDetailPage({ params }: { params: Promise<{ locale: s
           {/* Reviews */}
           <div>
             <h2 className="mb-4 text-lg font-semibold text-foreground">{t("room.reviewsTitle")}</h2>
-            {reviews.length > 0 ? (
+            {reviewsLoading ? (
+              <p className="text-sm text-muted-foreground">{t("common.loading")}</p>
+            ) : reviews.length > 0 ? (
               <div className="flex flex-col gap-4">
                 {reviews.map((review) => (
                   <Card key={review.id} className="p-4">
                     <div className="mb-2 flex items-center justify-between">
-                      <span className="font-medium text-card-foreground">{review.userName}</span>
+                      <span className="font-medium text-card-foreground">{review.customerId}</span>
                       <div className="flex items-center gap-1">
                         <Star className="h-3.5 w-3.5 fill-yellow-400 text-yellow-400" />
                         <span className="text-sm">{review.rating}</span>
                       </div>
                     </div>
                     <p className="text-sm text-muted-foreground">{review.comment}</p>
-                    <p className="mt-1 text-xs text-muted-foreground">{formatDate(review.date, locale)}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">{formatDate(review.createdAt, locale)}</p>
                   </Card>
                 ))}
               </div>

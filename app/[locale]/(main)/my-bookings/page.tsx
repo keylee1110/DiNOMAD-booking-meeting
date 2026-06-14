@@ -10,6 +10,7 @@ import { formatVNDFull } from "@/lib/format"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { createClient } from "@/utils/supabase/client"
+import { submitReview } from "@/lib/api/reviews"
 import { toast } from "sonner"
 import {
   Dialog,
@@ -132,23 +133,15 @@ export default function MyBookingsPage() {
     try {
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
-        const { error } = await supabase
-          .from("reviews")
-          .insert({
-            room_id: selectedBooking.roomId,
-            customer_id: user.id,
-            booking_id: selectedBooking.id,
-            rating,
-            comment
-          })
-
-        if (error) {
-          toast.error(locale === "vi" ? `Gửi đánh giá thất bại: ${error.message}` : `Failed to submit review: ${error.message}`)
-        } else {
-          toast.success(locale === "vi" ? "Đã gửi đánh giá thành công!" : "Review submitted successfully!")
-          markAsReviewed(selectedBooking.id)
-          setIsReviewOpen(false)
-        }
+        await submitReview({
+          roomId: selectedBooking.roomId,
+          bookingId: selectedBooking.id,
+          rating,
+          comment: comment || undefined,
+        })
+        toast.success(locale === "vi" ? "Đã gửi đánh giá thành công!" : "Review submitted successfully!")
+        markAsReviewed(selectedBooking.id)
+        setIsReviewOpen(false)
       } else {
         toast.success(locale === "vi" ? "Đã gửi đánh giá thành công (Demo)!" : "Review submitted successfully (Demo)!")
         markAsReviewed(selectedBooking.id)

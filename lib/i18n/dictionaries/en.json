@@ -294,6 +294,42 @@
       "confirmed": "Confirmed",
       "pending": "Pending",
       "completed": "Completed"
+    },
+    "suppliers": {
+      "title": "Suppliers",
+      "total": "total suppliers",
+      "approved": "Approved",
+      "pending": "Pending Review",
+      "rejected": "Rejected",
+      "search": "Search suppliers...",
+      "columns": {
+        "supplier": "Supplier",
+        "contact": "Contact",
+        "district": "District",
+        "rooms": "Rooms",
+        "status": "Status",
+        "actions": "Actions"
+      },
+      "statusLabels": {
+        "approved": "Approved",
+        "pending": "Pending",
+        "rejected": "Rejected",
+        "suspended": "Suspended"
+      },
+      "actions": {
+        "approve": "Approve",
+        "reject": "Reject",
+        "view": "View",
+        "approveConfirmDesc": "This will grant full partner access to their account.",
+        "rejectConfirmDesc": "This will deny their application to become a partner.",
+        "error": "Failed to update supplier status. Please try again."
+      },
+      "widget": {
+        "title": "Pending Suppliers",
+        "count": "awaiting"
+      },
+      "empty": "No suppliers found.",
+      "noPending": "No pending applications."
     }
   }
 }

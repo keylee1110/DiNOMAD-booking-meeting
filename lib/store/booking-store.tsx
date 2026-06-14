@@ -3,6 +3,7 @@
 import { createContext, useContext, useReducer, useEffect, useState, type ReactNode } from "react"
 import type { BookingFlowState, Room, TimeSlot, PaymentMethod, Booking } from "@/lib/types"
 import { createClient } from "@/utils/supabase/client"
+import { toggleWishlist as apiToggleWishlist, getWishlist as apiGetWishlist } from "@/lib/api/wishlist"
 
 const initialState: BookingFlowState = {
   selectedRoom: null,
@@ -207,21 +208,12 @@ export function BookingProvider({ children }: { children: ReactNode }) {
 
     if (user) {
       try {
-        if (isFav) {
-          const { error } = await supabase
-            .from("wishlists")
-            .delete()
-            .eq("user_id", user.id)
-            .eq("room_id", roomId)
-          if (error) throw error
-        } else {
-          const { error } = await supabase
-            .from("wishlists")
-            .insert({ user_id: user.id, room_id: roomId })
-          if (error) throw error
+        const result = await apiToggleWishlist(roomId)
+        if (!result.favorited === isFav) {
+          setWishlist(result.favorited ? [...wishlist, roomId] : wishlist.filter((id) => id !== roomId))
         }
       } catch (err) {
-        console.warn("Failed to sync wishlist to Supabase, falling back to localStorage:", err)
+        console.warn("Failed to sync wishlist to backend API, falling back to localStorage:", err)
         localStorage.setItem("dinomad_wishlist", JSON.stringify(updated))
       }
     } else {
@@ -254,17 +246,11 @@ export function BookingProvider({ children }: { children: ReactNode }) {
 
       if (session?.user) {
         try {
-          const { data, error } = await supabase
-            .from("wishlists")
-            .select("room_id")
-            .eq("user_id", session.user.id)
-          if (error) throw error
-          if (data) {
-            setWishlist(data.map(item => item.room_id))
-            return
-          }
+          const data = await apiGetWishlist()
+          setWishlist(data.map(item => item.room_id))
+          return
         } catch (e) {
-          console.warn("Failed to fetch wishlist from Supabase, loading from localStorage:", e)
+          console.warn("Failed to fetch wishlist from backend API, loading from localStorage:", e)
         }
       }
       

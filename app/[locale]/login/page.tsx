@@ -233,7 +233,24 @@ function LoginForm() {
         </Button>
       </div>
 
-      <div className="mt-6 text-center border-t border-border/60 pt-5">
+      {/* Demo admin access */}
+      <div className="mt-4 pt-4 border-t border-dashed border-border/40">
+        <button
+          type="button"
+          onClick={() => {
+            if (typeof window !== "undefined") {
+              localStorage.setItem("dinomad_demo_admin", "true")
+            }
+            toast.success(locale === "vi" ? "Đã vào chế độ Demo Admin!" : "Demo Admin mode activated!")
+            setTimeout(() => router.push(`/${locale}/admin/suppliers`), 500)
+          }}
+          className="w-full text-xs font-medium text-muted-foreground hover:text-primary py-2 transition-colors"
+        >
+          {locale === "vi" ? "⚡ Truy cập Demo Admin (không cần đăng nhập)" : "⚡ Demo Admin Access (no login required)"}
+        </button>
+      </div>
+
+      <div className="mt-4 text-center">
         <span className="text-xs text-muted-foreground font-medium">
           {t("auth.noAccount")}{" "}
           <Link
