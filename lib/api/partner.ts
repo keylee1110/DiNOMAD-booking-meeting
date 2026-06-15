@@ -23,7 +23,9 @@ export async function uploadRoomImage(file: File, roomId: string): Promise<strin
   return publicUrl
 }
 
-const BASE = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:4000/api"
+const BASE =
+  process.env.NEXT_PUBLIC_BACKEND_URL ??
+  `${process.env.NEXT_PUBLIC_SUPABASE_URL}`
 
 async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
   const supabase = createClient()
@@ -247,4 +249,80 @@ export function updateSlotStatuses(
     method: "PATCH",
     body: JSON.stringify({ date, startTimes, status }),
   })
+}
+
+// ─── Earnings ─────────────────────────────────────────────────────────────────
+
+export interface EarningsSummary {
+  totalRevenue: number
+  totalCommission: number
+  totalNet: number
+  pendingPayout: number
+}
+
+export interface EarningsChartDay {
+  date: string      // YYYY-MM-DD
+  revenue: number
+  commission: number
+}
+
+export interface EarningsBookingRow {
+  id: string
+  bookingCode: string
+  roomName: string
+  guestName: string
+  date: string
+  startTime: string
+  endTime: string
+  status: string
+  subtotal: number
+  platformFee: number
+  net: number
+  checkedInAt: string | null
+}
+
+export interface EarningsResponse {
+  summary: EarningsSummary
+  chartData: EarningsChartDay[]
+  bookings: EarningsBookingRow[]
+}
+
+export function getPartnerEarnings(startDate?: string, endDate?: string): Promise<EarningsResponse> {
+  const params = new URLSearchParams()
+  if (startDate) params.set("startDate", startDate)
+  if (endDate) params.set("endDate", endDate)
+  const qs = params.toString()
+  return apiFetch<EarningsResponse>(`/partner/earnings${qs ? `?${qs}` : ""}`)
+}
+
+// ─── Scanner ──────────────────────────────────────────────────────────────────
+
+export interface ScannerBooking {
+  id: string
+  bookingCode: string
+  date: string
+  startTime: string
+  endTime: string
+  status: string
+  checkedInAt: string | null
+  roomName: string
+  venueName: string
+  guestName: string
+  guestPhone: string | null
+  subtotal: number
+  platformFee: number
+}
+
+export function scannerLookup(bookingCode: string): Promise<ScannerBooking> {
+  return apiFetch<ScannerBooking>(
+    `/partner/scanner/lookup?bookingCode=${encodeURIComponent(bookingCode)}`,
+  )
+}
+
+export function scannerCheckIn(bookingId: string): Promise<ScannerBooking> {
+  return apiFetch<ScannerBooking>(`/partner/scanner/${bookingId}/checkin`, { method: "PATCH" })
+}
+
+export function scannerNoShow(bookingId: string): Promise<ScannerBooking> {
+  return apiFetch<ScannerBooking>(`/partner/scanner/${bookingId}/no-show`, { method: "PATCH" })
 }

@@ -194,9 +194,7 @@ export default function ProfilePage() {
   const handleLogout = async () => {
     setLoading(true)
     await supabase.auth.signOut()
-    toast.success(locale === "vi" ? "Đã đăng xuất thành công!" : "Logged out successfully!")
-    router.refresh()
-    router.push(`/${locale}`)
+    window.location.href = `/${locale}`
   }
 
   if (loading) {

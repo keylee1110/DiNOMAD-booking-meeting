@@ -1,21 +1,28 @@
 "use client"
 
 import { useTranslation } from "@/lib/i18n/context"
-import { LayoutDashboard, DoorOpen, QrCode, Bell, CalendarCheck, TrendingUp, Building2 } from "lucide-react"
+import { LayoutDashboard, DoorOpen, QrCode, Bell, TrendingUp, Building2, LogOut } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import Image from "next/image"
+import { createClient } from "@/utils/supabase/client"
 
 export default function PartnerLayout({ children }: { children: React.ReactNode }) {
-  const { locale } = useTranslation()
+  const { locale, t } = useTranslation()
   const pathname = usePathname()
+  const supabase = createClient()
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut()
+    window.location.href = `/${locale}`
+  }
 
   const navItems = [
-    { href: `/${locale}/partner`, icon: LayoutDashboard, label: "Dashboard" },
-    { href: `/${locale}/partner/venues`, icon: Building2, label: "Venues" },
-    { href: `/${locale}/partner/inventory`, icon: DoorOpen, label: "Inventory" },
-    { href: `/${locale}/partner/earnings`, icon: TrendingUp, label: "Earnings" },
-    { href: `/${locale}/partner/scanner`, icon: QrCode, label: "Scan QR" },
+    { href: `/${locale}/partner`, icon: LayoutDashboard, label: t("partner.dashboard") },
+    { href: `/${locale}/partner/venues`, icon: Building2, label: t("partner.navVenues") },
+    { href: `/${locale}/partner/inventory`, icon: DoorOpen, label: t("partner.navInventory") },
+    { href: `/${locale}/partner/earnings`, icon: TrendingUp, label: t("partner.earnings") },
+    { href: `/${locale}/partner/scanner`, icon: QrCode, label: t("partner.navScanner") },
   ]
 
   return (
@@ -26,9 +33,12 @@ export default function PartnerLayout({ children }: { children: React.ReactNode 
           <Image src="/logo.png" alt="DiNOMAD Logo" width={32} height={32} className="object-contain" />
           <div className="font-bold tracking-tight text-xl">DiNOMAD <span className="text-primary font-bold">Ops</span></div>
         </div>
-        <button className="relative flex h-10 w-10 items-center justify-center border border-transparent hover:bg-muted/80 rounded-xl transition-colors">
-          <Bell className="h-5 w-5" />
-          <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-destructive border border-background"></span>
+        <button
+          onClick={handleLogout}
+          className="flex h-10 w-10 items-center justify-center rounded-xl border border-transparent hover:bg-muted/80 transition-colors text-muted-foreground hover:text-destructive"
+          aria-label={t("partner.logout")}
+        >
+          <LogOut className="h-5 w-5" />
         </button>
       </header>
 
@@ -42,8 +52,8 @@ export default function PartnerLayout({ children }: { children: React.ReactNode 
             </div>
           </div>
         </div>
-        
-        <div className="flex w-full flex-row justify-around p-2 md:flex-col md:justify-start md:gap-3 md:p-6 overflow-y-auto">
+
+        <div className="flex w-full flex-row justify-around p-2 md:flex-col md:justify-start md:gap-3 md:p-6 overflow-y-auto md:flex-1">
           {navItems.map((item) => {
              const isActive = pathname === item.href
              return (
@@ -51,8 +61,8 @@ export default function PartnerLayout({ children }: { children: React.ReactNode 
                  key={item.href}
                  href={item.href}
                  className={`flex flex-col md:flex-row items-center gap-1 md:gap-4 p-2.5 md:px-4 md:py-3.5 transition-all rounded-xl ${
-                   isActive 
-                     ? 'bg-primary text-primary-foreground font-semibold shadow-sm' 
+                   isActive
+                     ? 'bg-primary text-primary-foreground font-semibold shadow-sm'
                      : 'text-muted-foreground hover:text-foreground font-semibold hover:bg-muted/40'
                  }`}
                >
@@ -61,6 +71,17 @@ export default function PartnerLayout({ children }: { children: React.ReactNode 
                </Link>
              )
           })}
+        </div>
+
+        {/* Logout — desktop only (mobile has it in the header) */}
+        <div className="hidden md:block px-6 pb-6">
+          <button
+            onClick={handleLogout}
+            className="flex w-full flex-row items-center gap-4 px-4 py-3.5 rounded-xl text-muted-foreground hover:text-destructive hover:bg-destructive/10 font-semibold transition-all"
+          >
+            <LogOut className="h-[22px] w-[22px]" />
+            <span className="text-[13px] uppercase tracking-wider">{t("partner.logout")}</span>
+          </button>
         </div>
       </nav>
 
