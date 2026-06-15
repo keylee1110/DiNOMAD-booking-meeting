@@ -3,22 +3,28 @@
 import { useState, useMemo, useCallback } from "react"
 import { useSearchParams } from "next/navigation"
 import { useTranslation } from "@/lib/i18n/context"
-import { searchRooms, rooms as allRooms } from "@/lib/data/rooms"
+import { searchRooms } from "@/lib/data/rooms"
 import { RoomCard } from "@/components/room-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Slider } from "@/components/ui/slider"
 import { Badge } from "@/components/ui/badge"
+import { Switch } from "@/components/ui/switch"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import { Checkbox } from "@/components/ui/checkbox"
-import { SlidersHorizontal, List, Map, Search } from "lucide-react"
+import { Calendar } from "@/components/ui/calendar"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { SlidersHorizontal, List, Map, Search, CalendarIcon, ChevronLeft, ChevronRight } from "lucide-react"
 import { formatVND } from "@/lib/format"
-import type { Amenity } from "@/lib/types"
+import type { Amenity, VibeTag } from "@/lib/types"
 
 const districts = ["Thu Duc", "District 1", "District 7", "District 10", "Binh Thanh"]
-const amenityOptions: Amenity[] = ["wifi", "tv", "whiteboard", "ac", "hdmi", "projector", "power_outlets", "coffee", "parking"]
+const amenityOptions: Amenity[] = ["wifi", "tv", "whiteboard", "ac", "hdmi", "projector", "power_outlets", "coffee", "water", "parking"]
+const vibeTagOptions: VibeTag[] = ["ultra_quiet", "discussion_friendly", "cold_ac", "natural_light", "cozy", "modern", "rooftop", "garden_view"]
+const categoryOptions = ["team_hub", "solo_nook"] as const
+const PAGE_SIZE = 6
 
 export default function SearchPage() {
   const { locale, t } = useTranslation()
@@ -36,6 +42,12 @@ export default function SearchPage() {
   const [maxPrice, setMaxPrice] = useState(initialMaxPrice ? [parseInt(initialMaxPrice)] : [300000])
   const [minCapacity, setMinCapacity] = useState(initialCapacity ? parseInt(initialCapacity) : 0)
   const [selectedAmenities, setSelectedAmenities] = useState<string[]>(initialAmenities)
+  const [selectedVibes, setSelectedVibes] = useState<string[]>(initialVibes)
+  const [category, setCategory] = useState("")
+  const [verifiedOnly, setVerifiedOnly] = useState(false)
+  const [noiseLevelMin, setNoiseLevelMin] = useState(0)
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined)
+  const [page, setPage] = useState(1)
   const [sortBy, setSortBy] = useState("rating")
   const [viewMode, setViewMode] = useState<"list" | "map">("list")
 
@@ -43,33 +55,47 @@ export default function SearchPage() {
     setSelectedAmenities(prev =>
       prev.includes(amenity) ? prev.filter(a => a !== amenity) : [...prev, amenity]
     )
+    setPage(1)
   }, [])
 
-  const results = useMemo(() => {
-    let filtered = searchRooms({
+  const toggleVibe = useCallback((vibe: string) => {
+    setSelectedVibes(prev =>
+      prev.includes(vibe) ? prev.filter(v => v !== vibe) : [...prev, vibe]
+    )
+    setPage(1)
+  }, [])
+
+  const { results, total, totalPages } = useMemo(() => {
+    const result = searchRooms({
       district: district || undefined,
       minCapacity: minCapacity || undefined,
       maxPrice: maxPrice[0],
       amenities: selectedAmenities.length > 0 ? selectedAmenities : undefined,
-      vibeTags: initialVibes.length > 0 ? initialVibes : undefined,
+      vibeTags: selectedVibes.length > 0 ? selectedVibes : undefined,
       query: query || undefined,
+      category: category || undefined,
+      verified: verifiedOnly || undefined,
+      noiseLevelMin: noiseLevelMin || undefined,
+      date: selectedDate ? selectedDate.toISOString().split("T")[0] : undefined,
+      page,
+      pageSize: PAGE_SIZE,
     }, locale)
 
-    // Sort
+    let sorted = result.rooms
     switch (sortBy) {
       case "price_asc":
-        filtered.sort((a, b) => a.pricePerHour - b.pricePerHour)
+        sorted.sort((a, b) => a.pricePerHour - b.pricePerHour)
         break
       case "price_desc":
-        filtered.sort((a, b) => b.pricePerHour - a.pricePerHour)
+        sorted.sort((a, b) => b.pricePerHour - a.pricePerHour)
         break
       case "rating":
-        filtered.sort((a, b) => b.rating - a.rating)
+        sorted.sort((a, b) => b.rating - a.rating)
         break
     }
 
-    return filtered
-  }, [query, district, maxPrice, minCapacity, selectedAmenities, sortBy, initialVibes, locale])
+    return { results: sorted, total: result.total, totalPages: result.totalPages }
+  }, [query, district, maxPrice, minCapacity, selectedAmenities, selectedVibes, category, verifiedOnly, noiseLevelMin, selectedDate, page, sortBy, locale])
 
   const clearFilters = () => {
     setQuery("")
@@ -77,13 +103,21 @@ export default function SearchPage() {
     setMaxPrice([300000])
     setMinCapacity(0)
     setSelectedAmenities([])
+    setSelectedVibes([])
+    setCategory("")
+    setVerifiedOnly(false)
+    setNoiseLevelMin(0)
+    setSelectedDate(undefined)
+    setPage(1)
   }
+
+  const hasActiveFilters = district || selectedAmenities.length > 0 || selectedVibes.length > 0 || minCapacity > 0 || category || verifiedOnly || noiseLevelMin > 0 || selectedDate
 
   const renderFilterPanel = () => (
     <div className="flex flex-col gap-6">
       <div>
         <Label className="mb-2 text-sm font-semibold">{t("landing.district")}</Label>
-        <Select value={district} onValueChange={setDistrict}>
+        <Select value={district} onValueChange={(v) => { setDistrict(v); setPage(1) }}>
           <SelectTrigger>
             <SelectValue placeholder={t("landing.allDistricts")} />
           </SelectTrigger>
@@ -100,7 +134,7 @@ export default function SearchPage() {
         <Label className="mb-2 text-sm font-semibold">{t("search.priceRange")}</Label>
         <Slider
           value={maxPrice}
-          onValueChange={setMaxPrice}
+          onValueChange={(v) => { setMaxPrice(v); setPage(1) }}
           max={500000}
           min={50000}
           step={10000}
@@ -122,7 +156,7 @@ export default function SearchPage() {
         <div className="px-1">
           <Slider
             value={[minCapacity === 0 ? 2 : minCapacity]}
-            onValueChange={(val) => setMinCapacity(val[0])}
+            onValueChange={(val) => { setMinCapacity(val[0]); setPage(1) }}
             min={2}
             max={12}
             step={2}
@@ -136,7 +170,7 @@ export default function SearchPage() {
                 <div
                   key={num}
                   className="flex flex-col items-center gap-1 cursor-pointer"
-                  onClick={() => setMinCapacity(num)}
+                  onClick={() => { setMinCapacity(num); setPage(1) }}
                 >
                   <div className={`h-2.5 w-2.5 rounded-full transition-all duration-200 border ${
                     isSelected
@@ -174,6 +208,88 @@ export default function SearchPage() {
         </div>
       </div>
 
+      <div>
+        <Label className="mb-2 text-sm font-semibold">{t("search.vibeTags")}</Label>
+        <div className="flex flex-col gap-2">
+          {vibeTagOptions.map((vibe) => (
+            <label key={vibe} className="flex items-center gap-2 text-sm">
+              <Checkbox
+                checked={selectedVibes.includes(vibe)}
+                onCheckedChange={() => toggleVibe(vibe)}
+              />
+              {t(`vibes.${vibe}`)}
+            </label>
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <Label className="mb-2 text-sm font-semibold">{t("search.category")}</Label>
+        <Select value={category} onValueChange={(v) => { setCategory(v === "all" ? "" : v); setPage(1) }}>
+          <SelectTrigger>
+            <SelectValue placeholder={t("search.categoryAll")} />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">{t("search.categoryAll")}</SelectItem>
+            {categoryOptions.map((c) => (
+              <SelectItem key={c} value={c}>{t(`search.${c === "team_hub" ? "teamHub" : "soloNook"}`)}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="flex items-center justify-between">
+        <Label className="text-sm font-semibold">{t("search.verifiedOnly")}</Label>
+        <Switch
+          checked={verifiedOnly}
+          onCheckedChange={(v) => { setVerifiedOnly(v); setPage(1) }}
+        />
+      </div>
+
+      <div>
+        <Label className="mb-2 text-sm font-semibold">{t("search.noiseLevel")}</Label>
+        <Slider
+          value={[noiseLevelMin === 0 ? 2 : noiseLevelMin]}
+          onValueChange={(val) => { setNoiseLevelMin(val[0]); setPage(1) }}
+          min={2}
+          max={10}
+          step={1}
+          className="mt-3"
+        />
+        <div className="mt-1 flex justify-between text-xs text-muted-foreground">
+          <span>{t("search.anyNoise")}</span>
+          <span className="font-medium text-foreground">
+            {noiseLevelMin === 0
+              ? t("search.anyNoise")
+              : noiseLevelMin >= 8
+                ? t("search.veryQuiet")
+                : noiseLevelMin >= 5
+                  ? t("search.quiet")
+                  : t("search.moderate")}
+          </span>
+        </div>
+      </div>
+
+      <div>
+        <Label className="mb-2 text-sm font-semibold">{t("search.date")}</Label>
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="outline" className="w-full justify-start text-left font-normal">
+              <CalendarIcon className="mr-2 h-4 w-4" />
+              {selectedDate ? selectedDate.toLocaleDateString() : t("search.anyDate")}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0" align="start">
+            <Calendar
+              mode="single"
+              selected={selectedDate}
+              onSelect={(d) => { setSelectedDate(d); setPage(1) }}
+              disabled={{ before: new Date() }}
+            />
+          </PopoverContent>
+        </Popover>
+      </div>
+
       <Button variant="outline" onClick={clearFilters} className="w-full">
         {t("search.clearFilters")}
       </Button>
@@ -190,7 +306,7 @@ export default function SearchPage() {
             <Input
               placeholder={t("landing.searchPlaceholder")}
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              onChange={(e) => { setQuery(e.target.value); setPage(1) }}
               className="pl-9"
             />
           </div>
@@ -201,7 +317,7 @@ export default function SearchPage() {
                 {t("search.filters")}
               </Button>
             </SheetTrigger>
-            <SheetContent side="left">
+            <SheetContent side="left" className="overflow-y-auto">
               <SheetHeader>
                 <SheetTitle>{t("search.filters")}</SheetTitle>
               </SheetHeader>
@@ -214,7 +330,7 @@ export default function SearchPage() {
 
         <div className="flex items-center justify-between">
           <p className="text-sm text-muted-foreground">
-            <span className="font-semibold text-foreground">{results.length}</span> {t("search.resultsCount")}
+            <span className="font-semibold text-foreground">{total}</span> {t("search.resultsCount")}
           </p>
           <div className="flex items-center gap-2">
             <Select value={sortBy} onValueChange={setSortBy}>
@@ -246,12 +362,12 @@ export default function SearchPage() {
           </div>
         </div>
 
-        {(district || selectedAmenities.length > 0 || minCapacity > 0) && (
+        {hasActiveFilters && (
           <div className="flex flex-wrap items-center gap-2">
             {district && (
               <Badge variant="secondary" className="gap-1">
                 {district}
-                <button onClick={() => setDistrict("")} className="ml-1 text-xs">&times;</button>
+                <button onClick={() => { setDistrict(""); setPage(1) }} className="ml-1 text-xs">&times;</button>
               </Badge>
             )}
             {selectedAmenities.map(a => (
@@ -260,10 +376,40 @@ export default function SearchPage() {
                 <button onClick={() => toggleAmenity(a)} className="ml-1 text-xs">&times;</button>
               </Badge>
             ))}
+            {selectedVibes.map(v => (
+              <Badge key={v} variant="secondary" className="gap-1">
+                {t(`vibes.${v}`)}
+                <button onClick={() => toggleVibe(v)} className="ml-1 text-xs">&times;</button>
+              </Badge>
+            ))}
             {minCapacity > 0 && (
               <Badge variant="secondary" className="gap-1">
                 {minCapacity}+ {t("common.people")}
-                <button onClick={() => setMinCapacity(0)} className="ml-1 text-xs">&times;</button>
+                <button onClick={() => { setMinCapacity(0); setPage(1) }} className="ml-1 text-xs">&times;</button>
+              </Badge>
+            )}
+            {category && (
+              <Badge variant="secondary" className="gap-1">
+                {t(`search.${category === "team_hub" ? "teamHub" : "soloNook"}`)}
+                <button onClick={() => { setCategory(""); setPage(1) }} className="ml-1 text-xs">&times;</button>
+              </Badge>
+            )}
+            {verifiedOnly && (
+              <Badge variant="secondary" className="gap-1">
+                {t("search.verifiedOnly")}
+                <button onClick={() => { setVerifiedOnly(false); setPage(1) }} className="ml-1 text-xs">&times;</button>
+              </Badge>
+            )}
+            {noiseLevelMin > 0 && (
+              <Badge variant="secondary" className="gap-1">
+                {t("common.quiet")} {noiseLevelMin}+
+                <button onClick={() => { setNoiseLevelMin(0); setPage(1) }} className="ml-1 text-xs">&times;</button>
+              </Badge>
+            )}
+            {selectedDate && (
+              <Badge variant="secondary" className="gap-1">
+                {selectedDate.toLocaleDateString()}
+                <button onClick={() => { setSelectedDate(undefined); setPage(1) }} className="ml-1 text-xs">&times;</button>
               </Badge>
             )}
           </div>
@@ -274,7 +420,7 @@ export default function SearchPage() {
       <div className="flex gap-6">
         {/* Desktop Filters */}
         <aside className="hidden w-64 shrink-0 md:block">
-          <div className="sticky top-20 rounded-xl border border-border bg-card p-4">
+          <div className="sticky top-20 max-h-[calc(100vh-6rem)] overflow-y-auto rounded-xl border border-border bg-card p-4">
             <h3 className="mb-4 font-semibold text-card-foreground">{t("search.filters")}</h3>
             {renderFilterPanel()}
           </div>
@@ -283,21 +429,58 @@ export default function SearchPage() {
         {/* Results */}
         <div className="flex-1">
           {viewMode === "list" ? (
-            results.length > 0 ? (
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {results.map((room) => (
-                  <RoomCard key={room.id} room={room} />
-                ))}
-              </div>
-            ) : (
-              <div className="flex flex-col items-center py-16 text-center">
-                <Search className="mb-4 h-12 w-12 text-muted-foreground" />
-                <p className="text-lg font-medium text-foreground">{t("common.noResults")}</p>
-                <Button variant="outline" onClick={clearFilters} className="mt-4">
-                  {t("search.clearFilters")}
-                </Button>
-              </div>
-            )
+            <>
+              {results.length > 0 ? (
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {results.map((room) => (
+                    <RoomCard key={room.id} room={room} />
+                  ))}
+                </div>
+              ) : (
+                <div className="flex flex-col items-center py-16 text-center">
+                  <Search className="mb-4 h-12 w-12 text-muted-foreground" />
+                  <p className="text-lg font-medium text-foreground">{t("common.noResults")}</p>
+                  <Button variant="outline" onClick={clearFilters} className="mt-4">
+                    {t("search.clearFilters")}
+                  </Button>
+                </div>
+              )}
+
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div className="mt-8 flex items-center justify-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={page <= 1}
+                    onClick={() => setPage(p => Math.max(1, p - 1))}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                    {t("search.prev")}
+                  </Button>
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+                    <Button
+                      key={p}
+                      variant={p === page ? "default" : "outline"}
+                      size="sm"
+                      className="min-w-[36px]"
+                      onClick={() => setPage(p)}
+                    >
+                      {p}
+                    </Button>
+                  ))}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={page >= totalPages}
+                    onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                  >
+                    {t("search.next")}
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
+            </>
           ) : (
             /* Map View Placeholder */
             <div className="relative aspect-[4/3] overflow-hidden rounded-xl border border-border bg-muted">
