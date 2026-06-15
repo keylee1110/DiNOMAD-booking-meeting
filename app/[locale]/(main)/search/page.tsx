@@ -17,8 +17,22 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { SlidersHorizontal, List, Map, Search, CalendarIcon, ChevronLeft, ChevronRight } from "lucide-react"
+import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet"
+import L from "leaflet"
+import "leaflet/dist/leaflet.css"
 import { formatVND } from "@/lib/format"
-import type { Amenity, VibeTag } from "@/lib/types"
+import type { Amenity, VibeTag, Room } from "@/lib/types"
+
+// Fix Leaflet default icon paths for bundlers
+const defaultIcon = L.icon({
+  iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
+  iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
+  shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41],
+})
 
 const districts = ["Thu Duc", "District 1", "District 7", "District 10", "Binh Thanh"]
 const amenityOptions: Amenity[] = ["wifi", "tv", "whiteboard", "ac", "hdmi", "projector", "power_outlets", "coffee", "water", "parking"]
@@ -482,29 +496,34 @@ export default function SearchPage() {
               )}
             </>
           ) : (
-            /* Map View Placeholder */
-            <div className="relative aspect-[4/3] overflow-hidden rounded-xl border border-border bg-muted">
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="text-center">
-                  <Map className="mx-auto mb-2 h-12 w-12 text-muted-foreground" />
-                  <p className="text-sm text-muted-foreground">
-                    {locale === "vi" ? "Bản đồ sẽ hiển thị ở đây" : "Map view would display here"}
-                  </p>
-                </div>
-              </div>
-              {/* Room pins on map placeholder */}
-              {results.map((room, i) => (
-                <div
-                  key={room.id}
-                  className="absolute flex items-center gap-1 rounded-full bg-primary px-2 py-1 text-xs font-semibold text-primary-foreground shadow-lg"
-                  style={{
-                    left: `${15 + (i * 17) % 70}%`,
-                    top: `${20 + (i * 23) % 60}%`,
-                  }}
-                >
-                  {formatVND(room.pricePerHour)}
-                </div>
-              ))}
+            /* Map View — Leaflet */
+            <div className="h-[600px] overflow-hidden rounded-xl border border-border">
+              <MapContainer
+                center={[10.78, 106.70]}
+                zoom={12}
+                className="h-full w-full"
+                scrollWheelZoom={true}
+              >
+                <TileLayer
+                  attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                />
+                {results.map((room: Room) => (
+                  <Marker
+                    key={room.id}
+                    position={[room.lat, room.lng]}
+                    icon={defaultIcon}
+                  >
+                    <Popup>
+                      <div className="text-sm">
+                        <p className="font-semibold">{room.name}</p>
+                        <p className="text-xs text-muted-foreground">{room.venueName}</p>
+                        <p className="mt-1 font-bold text-primary">{formatVND(room.pricePerHour)}{t("common.perHour")}</p>
+                      </div>
+                    </Popup>
+                  </Marker>
+                ))}
+              </MapContainer>
             </div>
           )}
         </div>
