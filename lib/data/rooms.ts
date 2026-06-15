@@ -420,9 +420,15 @@ export function searchRooms(
     amenities?: string[]
     vibeTags?: string[]
     query?: string
+    category?: string
+    verified?: boolean
+    noiseLevelMin?: number
+    date?: string
+    page?: number
+    pageSize?: number
   },
   locale?: string
-): Room[] {
+): { rooms: Room[]; total: number; page: number; pageSize: number; totalPages: number } {
   let list = [...rooms]
   if (locale) {
     list = list.map((r) => getLocalizedRoom(r, locale))
@@ -431,11 +437,8 @@ export function searchRooms(
   let result = list
 
   if (filters.district) {
-    // Standardize comparison for district names
     const filterDistrictLower = filters.district.toLowerCase()
     result = result.filter((r) => {
-      // Map English district names to Vietnamese display dynamically if needed, 
-      // or handle comparisons flexibly
       const roomDistrictLower = r.district.toLowerCase()
       if (filterDistrictLower === "thu duc") {
         return roomDistrictLower === "thu duc" || roomDistrictLower.includes("thủ đức")
@@ -467,6 +470,15 @@ export function searchRooms(
   if (filters.vibeTags && filters.vibeTags.length > 0) {
     result = result.filter((r) => filters.vibeTags!.some((v) => r.vibeTags.includes(v as VibeTag)))
   }
+  if (filters.category) {
+    result = result.filter((r) => r.category === filters.category)
+  }
+  if (filters.verified) {
+    result = result.filter((r) => r.verified)
+  }
+  if (filters.noiseLevelMin) {
+    result = result.filter((r) => (r.noiseLevel ?? 0) >= filters.noiseLevelMin!)
+  }
   if (filters.query) {
     const q = filters.query.toLowerCase()
     result = result.filter(
@@ -478,5 +490,12 @@ export function searchRooms(
     )
   }
 
-  return result
+  const total = result.length
+  const pageSize = filters.pageSize || 6
+  const page = filters.page || 1
+  const totalPages = Math.max(1, Math.ceil(total / pageSize))
+  const start = (page - 1) * pageSize
+  const paginated = result.slice(start, start + pageSize)
+
+  return { rooms: paginated, total, page, pageSize, totalPages }
 }
