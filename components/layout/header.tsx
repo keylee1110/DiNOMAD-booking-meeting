@@ -9,13 +9,10 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { useBooking } from "@/lib/store/booking-store"
 import { createClient } from "@/utils/supabase/client"
-import { useRouter } from "next/navigation"
-import { toast } from "sonner"
 import type { User } from "@supabase/supabase-js"
 
 export function Header() {
   const { locale, t } = useTranslation()
-  const router = useRouter()
   const [menuOpen, setMenuOpen] = useState(false)
   const { myBookings, wishlist } = useBooking()
   
@@ -50,10 +47,8 @@ export function Header() {
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
-    toast.success(locale === "vi" ? "Đã đăng xuất thành công!" : "Logged out successfully!")
     setMenuOpen(false)
-    router.refresh()
-    router.push(`/${locale}`)
+    window.location.href = `/${locale}`
   }
 
   return (

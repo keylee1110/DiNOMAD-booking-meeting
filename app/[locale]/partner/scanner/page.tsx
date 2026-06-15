@@ -1,147 +1,82 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useCallback } from "react"
 import { useTranslation } from "@/lib/i18n/context"
-import { QrCode, Search, CheckCircle2, XCircle, Loader2, User, MapPin, Clock, ArrowLeft } from "lucide-react"
+import {
+  QrCode, Search, CheckCircle2, XCircle, Loader2,
+  User, MapPin, Clock, ArrowLeft, UserX, AlertTriangle,
+} from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { bookings as mockBookings } from "@/lib/data/bookings"
 import { cn } from "@/lib/utils"
-import type { Booking, CheckInRecord } from "@/lib/types"
+import { formatVND } from "@/lib/format"
+import { scannerLookup, scannerCheckIn, scannerNoShow, type ScannerBooking } from "@/lib/api/partner"
+import { toast } from "sonner"
 
-type ScannerPhase =
+type Phase =
   | { phase: "idle" }
   | { phase: "searching" }
-  | { phase: "found"; booking: Booking }
+  | { phase: "found"; booking: ScannerBooking }
+  | { phase: "confirming-no-show"; booking: ScannerBooking }
   | { phase: "error"; message: string }
-  | { phase: "success"; booking: Booking; checkedInAt: string }
-
-function timeToMinutes(time: string): number {
-  const [h, m] = time.split(":").map(Number)
-  return h * 60 + m
-}
+  | { phase: "success-checkin"; booking: ScannerBooking }
+  | { phase: "success-noshow"; booking: ScannerBooking }
 
 export default function ScannerPage() {
   const { t } = useTranslation()
-  const [bookingId, setBookingId] = useState("")
-  const [accessCode, setAccessCode] = useState("")
-  const [state, setState] = useState<ScannerPhase>({ phase: "idle" })
-  const [recentScans, setRecentScans] = useState<CheckInRecord[]>([])
-  const [hydrated, setHydrated] = useState(false)
+  const [bookingCode, setBookingCode] = useState("")
+  const [state, setState] = useState<Phase>({ phase: "idle" })
+  const [actionLoading, setActionLoading] = useState(false)
 
-  useEffect(() => {
-    const stored: CheckInRecord[] = JSON.parse(localStorage.getItem("dinomad_checkins") || "[]")
-    setRecentScans([...stored].reverse().slice(0, 5))
-    setHydrated(true)
-  }, [])
+  const handleSearch = useCallback(async () => {
+    const code = bookingCode.trim().toUpperCase()
+    if (!code) return
 
-  const handleSearch = useCallback(() => {
-    if (!bookingId.trim() || !accessCode.trim()) return
     setState({ phase: "searching" })
-
-    setTimeout(() => {
-      const lsBookings: Booking[] = JSON.parse(localStorage.getItem("dinomad_bookings") || "[]")
-      // Merge; localStorage version wins for duplicate IDs
-      const map = new Map([...mockBookings, ...lsBookings].map(b => [b.id, b]))
-      const allBookings = Array.from(map.values())
-
-      const booking = allBookings.find(
-        b => b.id.toUpperCase() === bookingId.trim().toUpperCase()
-      )
-
-      if (!booking) {
-        setState({ phase: "error", message: t("partner.checkInNotFound") })
-        return
-      }
-
-      if (!booking.accessCode || booking.accessCode !== accessCode.trim().toUpperCase()) {
-        setState({ phase: "error", message: t("partner.checkInNotFound") })
-        return
-      }
-
-      if (booking.status === "checked_in") {
-        const time = booking.checkedInAt
-          ? new Date(booking.checkedInAt).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })
-          : "N/A"
-        setState({
-          phase: "error",
-          message: t("partner.checkInAlreadyDone").replace("{time}", time),
-        })
-        return
-      }
-      if (booking.status === "cancelled") {
-        setState({ phase: "error", message: t("partner.checkInCancelled") })
-        return
-      }
-      if (booking.status === "completed") {
-        setState({ phase: "error", message: t("partner.checkInEnded") })
-        return
-      }
-      if (booking.status === "pending") {
-        setState({ phase: "error", message: t("partner.checkInPending") })
-        return
-      }
-
-      const today = new Date().toISOString().slice(0, 10)
-      if (booking.date !== today) {
-        setState({ phase: "error", message: t("partner.checkInWrongDate") })
-        return
-      }
-
-      const now = new Date()
-      const nowMinutes = now.getHours() * 60 + now.getMinutes()
-      const windowOpen = timeToMinutes(booking.startTime) - 15
-      const windowClose = timeToMinutes(booking.endTime) + 30
-
-      if (nowMinutes < windowOpen) {
-        setState({ phase: "error", message: t("partner.checkInNotYet") })
-        return
-      }
-      if (nowMinutes > windowClose) {
-        setState({ phase: "error", message: t("partner.checkInWindowClosed") })
-        return
-      }
-
+    try {
+      const booking = await scannerLookup(code)
       setState({ phase: "found", booking })
-    }, 400)
-  }, [bookingId, accessCode, t])
-
-  const handleConfirmCheckIn = useCallback((booking: Booking) => {
-    const now = new Date().toISOString()
-    const updatedBooking: Booking = { ...booking, status: "checked_in", checkedInAt: now }
-
-    // Update dinomad_bookings
-    const lsBookings: Booking[] = JSON.parse(localStorage.getItem("dinomad_bookings") || "[]")
-    const idx = lsBookings.findIndex(b => b.id === booking.id)
-    if (idx >= 0) {
-      lsBookings[idx] = updatedBooking
-    } else {
-      lsBookings.push(updatedBooking)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      setState({ phase: "error", message: msg })
     }
-    localStorage.setItem("dinomad_bookings", JSON.stringify(lsBookings))
+  }, [bookingCode])
 
-    // Append to dinomad_checkins
-    const checkIns: CheckInRecord[] = JSON.parse(localStorage.getItem("dinomad_checkins") || "[]")
-    const record: CheckInRecord = {
-      bookingId: booking.id,
-      guestName: booking.guestName,
-      roomName: booking.roomName,
-      checkedInAt: now,
+  const handleConfirmCheckIn = useCallback(async (booking: ScannerBooking) => {
+    setActionLoading(true)
+    try {
+      const updated = await scannerCheckIn(booking.id)
+      setState({ phase: "success-checkin", booking: updated })
+      toast.success(t("partner.checkInSuccess"))
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      setState({ phase: "error", message: msg })
+    } finally {
+      setActionLoading(false)
     }
-    checkIns.push(record)
-    localStorage.setItem("dinomad_checkins", JSON.stringify(checkIns))
+  }, [t])
 
-    setRecentScans([...checkIns].reverse().slice(0, 5))
-    setState({ phase: "success", booking: updatedBooking, checkedInAt: now })
-  }, [])
+  const handleConfirmNoShow = useCallback(async (booking: ScannerBooking) => {
+    setActionLoading(true)
+    try {
+      const updated = await scannerNoShow(booking.id)
+      setState({ phase: "success-noshow", booking: updated })
+      toast.success(t("partner.noShowSuccess"))
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      setState({ phase: "error", message: msg })
+    } finally {
+      setActionLoading(false)
+    }
+  }, [t])
 
   const handleReset = () => {
     setState({ phase: "idle" })
-    setBookingId("")
-    setAccessCode("")
+    setBookingCode("")
   }
 
   const isSearching = state.phase === "searching"
+
 
   return (
     <div className="flex flex-col gap-8 animate-in fade-in duration-500 max-w-4xl mx-auto w-full">
@@ -169,15 +104,30 @@ export default function ScannerPage() {
               {t("partner.cameraComingSoon")}
             </h2>
             <p className="text-sm text-muted-foreground/70">
-              Use the manual form to verify bookings.
+              {t("partner.useManualForm")}
             </p>
+          </div>
+
+          {/* Legend */}
+          <div className="rounded-xl border border-border/50 bg-card p-4 flex flex-col gap-2">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">{t("partner.statusGuide")}</p>
+            {[
+              { color: "bg-emerald-500", label: t("partner.statusCheckedIn") },
+              { color: "bg-amber-500", label: t("partner.statusNoShow") },
+              { color: "bg-muted-foreground/30", label: t("partner.statusConfirmed") },
+            ].map(item => (
+              <div key={item.label} className="flex items-center gap-2.5">
+                <span className={cn("h-2.5 w-2.5 rounded-full shrink-0", item.color)} />
+                <span className="text-xs text-muted-foreground">{item.label}</span>
+              </div>
+            ))}
           </div>
         </div>
 
-        {/* Right: Verification form + result */}
+        {/* Right: Verification form + states */}
         <div className="flex flex-col gap-6">
 
-          {/* Idle / Error: show form */}
+          {/* ── Idle / Error / Searching: show form ── */}
           {(state.phase === "idle" || state.phase === "error" || state.phase === "searching") && (
             <div className="flex flex-col gap-4">
               <h3 className="font-semibold text-base uppercase tracking-wider text-foreground border-b border-border/40 pb-2">
@@ -190,43 +140,27 @@ export default function ScannerPage() {
                     {t("partner.bookingIdLabel")}
                   </label>
                   <Input
-                    value={bookingId}
-                    onChange={e => setBookingId(e.target.value)}
-                    placeholder={t("partner.enterBookingIdPlaceholder")}
+                    value={bookingCode}
+                    onChange={e => setBookingCode(e.target.value.toUpperCase())}
+                    placeholder="DN-ABC123"
                     disabled={isSearching}
                     onKeyDown={e => e.key === "Enter" && handleSearch()}
-                    className="font-mono text-sm"
-                  />
-                </div>
-
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                    {t("partner.accessCode")}
-                  </label>
-                  <Input
-                    value={accessCode}
-                    onChange={e => setAccessCode(e.target.value.toUpperCase())}
-                    placeholder={t("partner.enterAccessCode")}
-                    maxLength={4}
-                    disabled={isSearching}
-                    onKeyDown={e => e.key === "Enter" && handleSearch()}
-                    className="font-mono text-sm tracking-widest uppercase"
+                    className="font-mono text-sm tracking-widest"
                   />
                 </div>
 
                 <Button
                   onClick={handleSearch}
-                  disabled={isSearching || !bookingId.trim() || !accessCode.trim()}
+                  disabled={isSearching || !bookingCode.trim()}
                   className="w-full rounded-xl font-semibold gap-2"
                 >
                   {isSearching
-                    ? <><Loader2 className="h-4 w-4 animate-spin" /> Searching...</>
+                    ? <><Loader2 className="h-4 w-4 animate-spin" /> {t("partner.searching")}</>
                     : <><Search className="h-4 w-4" /> {t("partner.searchVerify")}</>
                   }
                 </Button>
               </div>
 
-              {/* Error message */}
               {state.phase === "error" && (
                 <div className="flex items-start gap-3 rounded-xl border border-destructive/30 bg-destructive/5 p-4 animate-in fade-in slide-in-from-top-2 duration-200">
                   <XCircle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
@@ -239,7 +173,7 @@ export default function ScannerPage() {
             </div>
           )}
 
-          {/* Found: show booking summary */}
+          {/* ── Found: booking summary + actions ── */}
           {state.phase === "found" && (
             <div className="flex flex-col gap-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
               <div className="flex items-center gap-2 border-b border-border/40 pb-3">
@@ -247,45 +181,77 @@ export default function ScannerPage() {
                 <h3 className="font-semibold text-base text-foreground">{t("partner.bookingFound")}</h3>
               </div>
 
-              <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4 flex flex-col gap-3">
-                <div className="flex items-center gap-2">
-                  <User className="h-4 w-4 text-muted-foreground shrink-0" />
-                  <div>
-                    <p className="text-sm font-bold text-foreground">{state.booking.guestName}</p>
-                    <p className="text-xs text-muted-foreground">{state.booking.guestPhone}</p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-2">
-                  <MapPin className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
-                  <div>
-                    <p className="text-sm font-semibold text-foreground">{state.booking.roomName}</p>
-                    <p className="text-xs text-muted-foreground">{state.booking.venueName}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Clock className="h-4 w-4 text-muted-foreground shrink-0" />
-                  <p className="text-sm text-foreground">
-                    {state.booking.date} · {state.booking.startTime} → {state.booking.endTime}
-                  </p>
-                </div>
-              </div>
+              <BookingCard booking={state.booking} />
 
               <div className="flex gap-2">
                 <Button
                   onClick={() => handleConfirmCheckIn(state.booking)}
+                  disabled={actionLoading}
                   className="flex-1 rounded-xl font-semibold gap-2 bg-emerald-600 hover:bg-emerald-700 text-white"
                 >
-                  <CheckCircle2 className="h-4 w-4" /> {t("partner.confirmCheckIn")}
+                  {actionLoading
+                    ? <Loader2 className="h-4 w-4 animate-spin" />
+                    : <CheckCircle2 className="h-4 w-4" />
+                  }
+                  {t("partner.confirmCheckIn")}
                 </Button>
-                <Button variant="outline" onClick={handleReset} className="rounded-xl">
+                <Button
+                  variant="outline"
+                  onClick={() => setState({ phase: "confirming-no-show", booking: state.booking })}
+                  disabled={actionLoading}
+                  className="rounded-xl border-amber-400/40 text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950/20 gap-2"
+                >
+                  <UserX className="h-4 w-4" />
+                  <span className="hidden sm:inline">{t("partner.markNoShow")}</span>
+                </Button>
+                <Button variant="outline" onClick={handleReset} className="rounded-xl px-3">
                   <ArrowLeft className="h-4 w-4" />
                 </Button>
               </div>
             </div>
           )}
 
-          {/* Success */}
-          {state.phase === "success" && (
+          {/* ── Confirming No-Show: destructive confirmation step ── */}
+          {state.phase === "confirming-no-show" && (
+            <div className="flex flex-col gap-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
+              <div className="flex items-center gap-2 border-b border-border/40 pb-3">
+                <AlertTriangle className="h-5 w-5 text-amber-500" />
+                <h3 className="font-semibold text-base text-foreground">{t("partner.noShowConfirm")}</h3>
+              </div>
+
+              <BookingCard booking={state.booking} />
+
+              <div className="rounded-xl border border-amber-400/30 bg-amber-500/5 p-4">
+                <p className="text-sm text-amber-700 dark:text-amber-400">{t("partner.noShowDesc")}</p>
+              </div>
+
+              <div className="flex gap-2">
+                <Button
+                  onClick={() => handleConfirmNoShow(state.booking)}
+                  disabled={actionLoading}
+                  variant="destructive"
+                  className="flex-1 rounded-xl font-semibold gap-2"
+                >
+                  {actionLoading
+                    ? <Loader2 className="h-4 w-4 animate-spin" />
+                    : <UserX className="h-4 w-4" />
+                  }
+                  {t("partner.confirmNoShow")}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => setState({ phase: "found", booking: state.booking })}
+                  disabled={actionLoading}
+                  className="rounded-xl"
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* ── Success: Checked In ── */}
+          {state.phase === "success-checkin" && (
             <div className="flex flex-col gap-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
               <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-5 flex flex-col items-center text-center gap-3">
                 <CheckCircle2 className="h-12 w-12 text-emerald-500" />
@@ -293,55 +259,120 @@ export default function ScannerPage() {
                   <p className="text-lg font-bold text-foreground">{t("partner.checkInSuccess")}</p>
                   <p className="text-sm text-muted-foreground mt-1">{t("partner.checkInSuccessDesc")}</p>
                 </div>
-                <div className="w-full rounded-lg bg-background/60 border border-border/40 p-3 text-left flex flex-col gap-1">
-                  <p className="text-xs font-semibold text-foreground">{state.booking.guestName}</p>
-                  <p className="text-xs text-muted-foreground">{state.booking.roomName} · {state.booking.startTime} → {state.booking.endTime}</p>
-                  <p className="text-[11px] text-muted-foreground/70 font-mono mt-1">
-                    {new Date(state.checkedInAt).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
-                  </p>
-                </div>
+                <BookingSummaryLine booking={state.booking} />
               </div>
               <Button onClick={handleReset} className="w-full rounded-xl font-semibold">
-                {t("partner.scannerTitle")} — Scan Another
+                {t("partner.verifyAnother")}
               </Button>
             </div>
           )}
 
-          {/* Recent Scans */}
-          {hydrated && (
-            <div className="flex flex-col gap-3 mt-2">
-              <h3 className="font-semibold text-base uppercase tracking-wider text-foreground border-b border-border/40 pb-2">
-                {t("partner.recentScans")}
-              </h3>
-              {recentScans.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-4">No recent check-ins.</p>
-              ) : (
-                <div className="flex flex-col gap-2">
-                  {recentScans.map((scan, i) => (
-                    <div
-                      key={`${scan.bookingId}-${i}`}
-                      className={cn(
-                        "flex items-center gap-3 rounded-xl border p-3.5 transition-all duration-200 shadow-sm bg-card",
-                        i === 0 ? "border-emerald-500/30 bg-emerald-500/5" : "border-border/60"
-                      )}
-                    >
-                      <CheckCircle2 className={cn("h-5 w-5 shrink-0", i === 0 ? "text-emerald-500" : "text-muted-foreground")} />
-                      <div className="flex flex-col min-w-0">
-                        <span className="font-semibold text-sm text-foreground truncate">
-                          {scan.bookingId} — {scan.roomName}
-                        </span>
-                        <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mt-0.5">
-                          {scan.guestName} · {new Date(scan.checkedInAt).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
+          {/* ── Success: No-Show ── */}
+          {state.phase === "success-noshow" && (
+            <div className="flex flex-col gap-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
+              <div className="rounded-xl border border-amber-400/30 bg-amber-500/10 p-5 flex flex-col items-center text-center gap-3">
+                <UserX className="h-12 w-12 text-amber-500" />
+                <div>
+                  <p className="text-lg font-bold text-foreground">{t("partner.noShowSuccess")}</p>
+                  <p className="text-sm text-muted-foreground mt-1">{t("partner.noShowSuccessDesc")}</p>
                 </div>
-              )}
+                <BookingSummaryLine booking={state.booking} />
+              </div>
+              <Button onClick={handleReset} variant="outline" className="w-full rounded-xl font-semibold">
+                {t("partner.verifyAnother")}
+              </Button>
             </div>
           )}
         </div>
       </div>
     </div>
+  )
+}
+
+// ─── Sub-components ───────────────────────────────────────────────────────────
+
+function BookingCard({ booking }: { booking: ScannerBooking }) {
+  const { t } = useTranslation()
+  return (
+    <div className="rounded-xl border border-border/50 bg-muted/10 p-4 flex flex-col gap-3">
+      <div className="flex items-center justify-between gap-2">
+        <span className="font-mono text-xs font-bold text-foreground bg-muted/40 border border-border/50 rounded-lg px-2.5 py-1">
+          {booking.bookingCode}
+        </span>
+        <StatusBadge status={booking.status} checkedInAt={booking.checkedInAt} />
+      </div>
+
+      <div className="flex items-center gap-2">
+        <User className="h-4 w-4 text-muted-foreground shrink-0" />
+        <div>
+          <p className="text-sm font-bold text-foreground">{booking.guestName}</p>
+          {booking.guestPhone && (
+            <p className="text-xs text-muted-foreground">{booking.guestPhone}</p>
+          )}
+        </div>
+      </div>
+
+      <div className="flex items-start gap-2">
+        <MapPin className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
+        <div>
+          <p className="text-sm font-semibold text-foreground">{booking.roomName}</p>
+          <p className="text-xs text-muted-foreground">{booking.venueName}</p>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-2">
+        <Clock className="h-4 w-4 text-muted-foreground shrink-0" />
+        <p className="text-sm text-foreground">
+          {booking.date} · {booking.startTime} → {booking.endTime}
+        </p>
+      </div>
+
+      <div className="border-t border-border/30 pt-3 flex items-center justify-between text-xs">
+        <span className="text-muted-foreground">{t("partner.roomFeeLabel")}</span>
+        <span className="font-semibold text-foreground">{formatVND(booking.subtotal)}</span>
+      </div>
+    </div>
+  )
+}
+
+function BookingSummaryLine({ booking }: { booking: ScannerBooking }) {
+  return (
+    <div className="w-full rounded-lg bg-background/60 border border-border/40 p-3 text-left flex flex-col gap-1">
+      <p className="text-xs font-semibold text-foreground">{booking.guestName}</p>
+      <p className="text-xs text-muted-foreground">
+        {booking.roomName} · {booking.startTime} → {booking.endTime}
+      </p>
+      <p className="font-mono text-[11px] text-muted-foreground/70 mt-0.5">{booking.bookingCode}</p>
+    </div>
+  )
+}
+
+function StatusBadge({ status, checkedInAt }: { status: string; checkedInAt: string | null }) {
+  const { t } = useTranslation()
+  if (checkedInAt || status === "checked_in") {
+    return (
+      <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-500/10 border border-emerald-500/20 rounded-full px-2.5 py-0.5 uppercase tracking-wide">
+        {t("partner.statusCheckedIn")}
+      </span>
+    )
+  }
+  if (status === "no_show") {
+    return (
+      <span className="text-[10px] font-semibold text-amber-700 bg-amber-500/10 border border-amber-500/20 rounded-full px-2.5 py-0.5 uppercase tracking-wide">
+        {t("partner.statusNoShow")}
+      </span>
+    )
+  }
+  if (status === "confirmed") {
+    return (
+      <span className="text-[10px] font-semibold text-blue-700 bg-blue-500/10 border border-blue-500/20 rounded-full px-2.5 py-0.5 uppercase tracking-wide">
+        {t("partner.statusConfirmed")}
+      </span>
+    )
+  }
+  return (
+    <span className="text-[10px] font-semibold text-muted-foreground bg-muted/40 border border-border/50 rounded-full px-2.5 py-0.5 uppercase tracking-wide">
+      {status}
+    </span>
   )
 }

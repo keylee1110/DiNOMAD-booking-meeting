@@ -54,29 +54,8 @@ interface FormErrors {
   description?: string
 }
 
-const AMENITY_OPTIONS: { value: Amenity; label: string }[] = [
-  { value: "wifi", label: "WiFi" },
-  { value: "tv", label: "Smart TV" },
-  { value: "whiteboard", label: "Whiteboard" },
-  { value: "ac", label: "Air Con" },
-  { value: "hdmi", label: "HDMI" },
-  { value: "projector", label: "Projector" },
-  { value: "power_outlets", label: "Power Outlets" },
-  { value: "coffee", label: "Coffee" },
-  { value: "water", label: "Water" },
-  { value: "parking", label: "Parking" },
-]
-
-const VIBE_TAG_OPTIONS: { value: VibeTag; label: string }[] = [
-  { value: "ultra_quiet", label: "ultra_quiet" },
-  { value: "discussion_friendly", label: "discussion_friendly" },
-  { value: "cold_ac", label: "cold_ac" },
-  { value: "natural_light", label: "natural_light" },
-  { value: "cozy", label: "cozy" },
-  { value: "modern", label: "modern" },
-  { value: "rooftop", label: "rooftop" },
-  { value: "garden_view", label: "garden_view" },
-]
+const AMENITY_VALUES: Amenity[] = ["wifi", "tv", "whiteboard", "ac", "hdmi", "projector", "power_outlets", "coffee", "water", "parking"]
+const VIBE_VALUES: VibeTag[] = ["ultra_quiet", "discussion_friendly", "cold_ac", "natural_light", "cozy", "modern", "rooftop", "garden_view"]
 
 const DISTRICTS = ["District 1", "District 2", "District 3", "District 4", "District 5",
   "District 6", "District 7", "District 8", "District 9", "District 10",
@@ -150,6 +129,21 @@ const EMPTY_FORM: RoomFormData = {
 export default function VenuesPage() {
   const { t } = useTranslation()
 
+  const AMENITY_KEY: Record<string, string> = {
+    wifi: "partner.amenityWifi", tv: "partner.amenityTv", whiteboard: "partner.amenityWhiteboard",
+    ac: "partner.amenityAc", hdmi: "partner.amenityHdmi", projector: "partner.amenityProjector",
+    power_outlets: "partner.amenityPowerOutlets", coffee: "partner.amenityCoffee",
+    water: "partner.amenityWater", parking: "partner.amenityParking",
+  }
+  const VIBE_KEY: Record<string, string> = {
+    ultra_quiet: "partner.vibeUltraQuiet", discussion_friendly: "partner.vibeDiscussionFriendly",
+    cold_ac: "partner.vibeColdAc", natural_light: "partner.vibeNaturalLight",
+    cozy: "partner.vibeCozy", modern: "partner.vibeModern",
+    rooftop: "partner.vibeRooftop", garden_view: "partner.vibeGardenView",
+  }
+  const AMENITY_OPTIONS = AMENITY_VALUES.map(v => ({ value: v, label: t(AMENITY_KEY[v]) }))
+  const VIBE_TAG_OPTIONS = VIBE_VALUES.map(v => ({ value: v, label: t(VIBE_KEY[v]) }))
+
   const [rooms, setRooms] = useState<RoomFormData[]>([])
   const [venueMap, setVenueMap] = useState<Record<string, ApiVenue>>({})
   const [loading, setLoading] = useState(true)
@@ -175,47 +169,47 @@ export default function VenuesPage() {
     const newErrors: FormErrors = {}
 
     if (!formData.name.trim()) {
-      newErrors.name = "Room name is required"
+      newErrors.name = t("partner.validRoomNameRequired")
     } else if (formData.name.trim().length < 3) {
-      newErrors.name = "Room name must be at least 3 characters"
+      newErrors.name = t("partner.validRoomNameMin")
     } else if (formData.name.trim().length > 50) {
-      newErrors.name = "Room name must not exceed 50 characters"
+      newErrors.name = t("partner.validRoomNameMax")
     }
 
     // Validate venue fields only when creating a new venue OR editing an existing room
     const needsVenueValidation = formData.id !== null || isCreatingNewVenue
     if (needsVenueValidation) {
       if (!formData.venueName.trim()) {
-        newErrors.venueName = "Venue name is required"
+        newErrors.venueName = t("partner.validVenueNameRequired")
       } else if (formData.venueName.trim().length < 3) {
-        newErrors.venueName = "Venue name must be at least 3 characters"
+        newErrors.venueName = t("partner.validVenueNameMin")
       } else if (formData.venueName.trim().length > 100) {
-        newErrors.venueName = "Venue name must not exceed 100 characters"
+        newErrors.venueName = t("partner.validVenueNameMax")
       }
 
       if (!formData.address.trim()) {
-        newErrors.address = "Address is required"
+        newErrors.address = t("partner.validAddressRequired")
       } else if (formData.address.trim().length < 5) {
-        newErrors.address = "Address must be at least 5 characters"
+        newErrors.address = t("partner.validAddressMin")
       }
     }
 
     if (formData.capacity < 1) {
-      newErrors.capacity = "Capacity must be at least 1"
+      newErrors.capacity = t("partner.validCapacityMin")
     } else if (formData.capacity > 100) {
-      newErrors.capacity = "Capacity must not exceed 100"
+      newErrors.capacity = t("partner.validCapacityMax")
     } else if (!Number.isInteger(formData.capacity)) {
-      newErrors.capacity = "Capacity must be a whole number"
+      newErrors.capacity = t("partner.validCapacityWhole")
     }
 
     if (formData.pricePerHour < 10000) {
-      newErrors.pricePerHour = "Minimum price is 10,000 VND per hour"
+      newErrors.pricePerHour = t("partner.validPriceMin")
     } else if (formData.pricePerHour > 50000000) {
-      newErrors.pricePerHour = "Maximum price is 50,000,000 VND per hour"
+      newErrors.pricePerHour = t("partner.validPriceMax")
     }
 
     if (formData.description.trim().length > 500) {
-      newErrors.description = "Description must not exceed 500 characters"
+      newErrors.description = t("partner.validDescMax")
     }
 
     setErrors(newErrors)
@@ -325,7 +319,7 @@ export default function VenuesPage() {
 
   const handleSave = async () => {
     if (!validateForm()) {
-      toast.error("Please fix the errors above")
+      toast.error(t("partner.fixErrorsAbove"))
       return
     }
     setSaving(true)
@@ -377,7 +371,7 @@ export default function VenuesPage() {
 
         resetImageState()
         await loadVenues()
-        toast.success("Room created successfully.")
+        toast.success(t("partner.roomCreatedSuccess"))
       } else {
         // ── Update room ────────────────────────────────────────────────────
         if (formData.venueId) {
@@ -415,7 +409,7 @@ export default function VenuesPage() {
 
         resetImageState()
         await loadVenues()
-        toast.success("Room updated successfully.")
+        toast.success(t("partner.roomUpdatedSuccess"))
       }
 
       setEditingId(null)
@@ -434,7 +428,7 @@ export default function VenuesPage() {
     try {
       await updateRoomStatus(room.id, "published")
       setRooms(prev => prev.map(r => r.id === room.id ? { ...r, status: "published" } : r))
-      toast.success(`"${room.name}" is now live.`)
+      toast.success(`"${room.name}" ${t("partner.roomPublishedLive")}.`)
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Failed to publish room"
       toast.error(msg)
@@ -448,7 +442,7 @@ export default function VenuesPage() {
     try {
       const updated = await updateVenueStatus(venueId, "published")
       setVenueMap(prev => ({ ...prev, [venueId]: { ...prev[venueId], status: updated.status } }))
-      toast.success("Venue published.")
+      toast.success(t("partner.venuePublishedSuccess"))
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Failed to publish venue"
       toast.error(msg)
@@ -459,12 +453,12 @@ export default function VenuesPage() {
 
   const handleDelete = async (room: RoomFormData) => {
     if (!room.id) return
-    if (!confirm(`Archive "${room.name}"? It will be hidden from listings.`)) return
+    if (!confirm(`${t("partner.archiveConfirmTitle")} "${room.name}"? ${t("partner.archiveConfirmBody")}`)) return
     setDeleting(room.id)
     try {
       await deleteRoom(room.id)
       setRooms(prev => prev.filter(r => r.id !== room.id))
-      toast.success("Room archived.")
+      toast.success(t("partner.roomArchivedSuccess"))
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Failed to archive room"
       toast.error(msg)
@@ -496,11 +490,11 @@ export default function VenuesPage() {
             onClick={handleCancel}
             className="flex items-center gap-2 font-semibold text-sm text-muted-foreground hover:text-foreground transition-all duration-200 hover:-translate-x-0.5"
           >
-            <ArrowLeft className="h-4 w-4" /> Back to Venues
+            <ArrowLeft className="h-4 w-4" /> {t("partner.backToVenues")}
           </button>
           <div className="flex gap-2.5">
             <Button variant="outline" onClick={handleCancel} className="rounded-xl px-5 font-semibold text-sm">
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button
               onClick={handleSave}
@@ -508,7 +502,7 @@ export default function VenuesPage() {
               className="rounded-xl px-6 font-semibold text-sm flex items-center gap-2 shadow-sm"
             >
               {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
-              {saving ? "Saving..." : "Save Changes"}
+              {saving ? t("partner.saving") : t("partner.saveChanges")}
             </Button>
           </div>
         </div>
@@ -516,7 +510,7 @@ export default function VenuesPage() {
         <div className="rounded-2xl border border-border/50 bg-card p-6 md:p-8 shadow-[0_8px_30px_rgb(0,0,0,0.02)] flex flex-col gap-8">
           <h2 className="text-xl md:text-2xl font-semibold tracking-tight flex items-center gap-3 border-b border-border/50 pb-4 text-foreground">
             <Building2 className="h-6 w-6 text-primary" />
-            {formData.id ? `Edit: ${formData.name}` : "Add New Room"}
+            {formData.id ? `${t("partner.editLabel")}: ${formData.name}` : t("partner.addNewRoom")}
           </h2>
 
           <div className="grid gap-8 lg:grid-cols-2">
@@ -527,14 +521,14 @@ export default function VenuesPage() {
               <div className="rounded-xl border border-border/40 bg-muted/5 p-5 flex flex-col gap-5">
                 <div className="flex items-center gap-2 border-b border-border/30 pb-2.5">
                   <MapPin className="h-4 w-4 text-primary" />
-                  <h3 className="font-semibold text-sm text-foreground tracking-tight">Identity & Location</h3>
+                  <h3 className="font-semibold text-sm text-foreground tracking-tight">{t("partner.identityLocation")}</h3>
                 </div>
 
                 {/* ── Venue selector (new rooms only) ── */}
                 {isNewRoom && hasExistingVenues && (
                   <div className="flex flex-col gap-2">
                     <label className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5">
-                      <Building2 className="h-3.5 w-3.5 text-primary" /> Venue
+                      <Building2 className="h-3.5 w-3.5 text-primary" /> {t("partner.venueLabel")}
                     </label>
                     <select
                       value={formData.venueId ?? "new"}
@@ -544,7 +538,7 @@ export default function VenuesPage() {
                       {Object.values(venueMap).map(v => (
                         <option key={v.id} value={v.id}>{v.name} — {v.district}</option>
                       ))}
-                      <option value="new">+ Create new venue</option>
+                      <option value="new">{t("partner.createNewVenueOption")}</option>
                     </select>
                     {/* Show locked address when existing venue is selected */}
                     {formData.venueId && (
@@ -561,12 +555,12 @@ export default function VenuesPage() {
                   <>
                     {isCreatingNewVenue && hasExistingVenues && (
                       <p className="text-xs text-muted-foreground bg-muted/20 rounded-lg px-3 py-2 border border-border/30">
-                        Enter details for the new venue below.
+                        {t("partner.newVenueDetailsHint")}
                       </p>
                     )}
                     <div className="flex flex-col gap-2">
                       <label className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5">
-                        <Building2 className="h-3.5 w-3.5 text-primary" /> Venue / Building Name
+                        <Building2 className="h-3.5 w-3.5 text-primary" /> {t("partner.venueBuildingName")}
                       </label>
                       <input
                         type="text"
@@ -581,7 +575,7 @@ export default function VenuesPage() {
                       {errors.venueName && <span className="text-xs font-medium text-destructive">{errors.venueName}</span>}
                     </div>
                     <div className="flex flex-col gap-2">
-                      <label className="text-xs font-semibold text-muted-foreground">Exact Street Address</label>
+                      <label className="text-xs font-semibold text-muted-foreground">{t("partner.exactStreetAddress")}</label>
                       <input
                         type="text"
                         value={formData.address}
@@ -595,7 +589,7 @@ export default function VenuesPage() {
                       {errors.address && <span className="text-xs font-medium text-destructive">{errors.address}</span>}
                     </div>
                     <div className="flex flex-col gap-2">
-                      <label className="text-xs font-semibold text-muted-foreground">District</label>
+                      <label className="text-xs font-semibold text-muted-foreground">{t("partner.districtLabel")}</label>
                       <select
                         value={formData.district}
                         onChange={e => setFormData({ ...formData, district: e.target.value })}
@@ -612,10 +606,10 @@ export default function VenuesPage() {
               <div className="rounded-xl border border-border/40 bg-muted/5 p-5 flex flex-col gap-5">
                 <div className="flex items-center gap-2 border-b border-border/30 pb-2.5">
                   <LayoutList className="h-4 w-4 text-primary" />
-                  <h3 className="font-semibold text-sm text-foreground tracking-tight">Room Details</h3>
+                  <h3 className="font-semibold text-sm text-foreground tracking-tight">{t("partner.roomDetailsSection")}</h3>
                 </div>
                 <div className="flex flex-col gap-2">
-                  <label className="text-xs font-semibold text-muted-foreground">Room Name</label>
+                  <label className="text-xs font-semibold text-muted-foreground">{t("partner.roomNameLabel")}</label>
                   <input
                     type="text"
                     value={formData.name}
@@ -629,20 +623,20 @@ export default function VenuesPage() {
                   {errors.name && <span className="text-xs font-medium text-destructive">{errors.name}</span>}
                 </div>
                 <div className="flex flex-col gap-2">
-                  <label className="text-xs font-semibold text-muted-foreground">Room Category</label>
+                  <label className="text-xs font-semibold text-muted-foreground">{t("partner.roomCategoryLabel")}</label>
                   <select
                     value={formData.category}
                     onChange={e => setFormData({ ...formData, category: e.target.value as "team_hub" | "solo_nook" })}
                     className="rounded-xl border border-border/60 bg-background/50 px-3.5 py-2.5 font-semibold text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 transition-all appearance-none cursor-pointer"
                   >
-                    <option value="solo_nook">Solo Nook / Focus Pod</option>
-                    <option value="team_hub">Team Hub / Meeting Room</option>
+                    <option value="solo_nook">{t("partner.categorySoloNook")}</option>
+                    <option value="team_hub">{t("partner.categoryTeamHub")}</option>
                   </select>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="flex flex-col gap-2">
                     <label className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5">
-                      <DollarSign className="h-3.5 w-3.5 text-primary" /> Price/Hr (VND)
+                      <DollarSign className="h-3.5 w-3.5 text-primary" /> {t("partner.pricePerHrLabel")}
                     </label>
                     <input
                       type="number"
@@ -659,7 +653,7 @@ export default function VenuesPage() {
                   </div>
                   <div className="flex flex-col gap-2">
                     <label className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5">
-                      <Users className="h-3.5 w-3.5 text-primary" /> Capacity
+                      <Users className="h-3.5 w-3.5 text-primary" /> {t("partner.capacityLabel")}
                     </label>
                     <input
                       type="number"
@@ -676,13 +670,13 @@ export default function VenuesPage() {
                 </div>
                 <div className="flex flex-col gap-2">
                   <label className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5">
-                    <AlignLeft className="h-3.5 w-3.5 text-primary" /> Description
+                    <AlignLeft className="h-3.5 w-3.5 text-primary" /> {t("partner.descriptionLabel")}
                   </label>
                   <textarea
                     rows={4}
                     value={formData.description}
                     onChange={e => setFormData({ ...formData, description: e.target.value })}
-                    placeholder="Describe the vibe and purpose of this room..."
+                    placeholder={t("partner.descriptionPlaceholder")}
                     className="rounded-xl border border-border/60 bg-background/50 px-3.5 py-2.5 font-medium text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 transition-all resize-none"
                   />
                 </div>
@@ -696,11 +690,11 @@ export default function VenuesPage() {
               <div className="rounded-xl border border-border/40 bg-muted/5 p-5 flex flex-col gap-5">
                 <div className="flex items-center gap-2 border-b border-border/30 pb-2.5">
                   <Info className="h-4 w-4 text-primary" />
-                  <h3 className="font-semibold text-sm text-foreground tracking-tight">Physical Specs</h3>
+                  <h3 className="font-semibold text-sm text-foreground tracking-tight">{t("partner.physicalSpecs")}</h3>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="flex flex-col gap-2">
-                    <label className="text-xs font-semibold text-muted-foreground">Size (sqm)</label>
+                    <label className="text-xs font-semibold text-muted-foreground">{t("partner.sizeLabel")}</label>
                     <input
                       type="text"
                       value={formData.specs.size}
@@ -710,7 +704,7 @@ export default function VenuesPage() {
                     />
                   </div>
                   <div className="flex flex-col gap-2">
-                    <label className="text-xs font-semibold text-muted-foreground">Floor Level</label>
+                    <label className="text-xs font-semibold text-muted-foreground">{t("partner.floorLevel")}</label>
                     <input
                       type="text"
                       value={formData.specs.floor}
@@ -721,7 +715,7 @@ export default function VenuesPage() {
                   </div>
                   <div className="flex flex-col gap-2 col-span-2">
                     <label className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5">
-                      <Navigation2 className="h-3.5 w-3.5 text-primary" /> View Feature
+                      <Navigation2 className="h-3.5 w-3.5 text-primary" /> {t("partner.viewFeature")}
                     </label>
                     <input
                       type="text"
@@ -738,10 +732,10 @@ export default function VenuesPage() {
               <div className="flex flex-col gap-3">
                 <div className="flex items-center justify-between border-b border-border/40 pb-2.5">
                   <label className="text-xs font-semibold text-muted-foreground">
-                    Amenities Provided
+                    {t("partner.amenitiesProvided")}
                   </label>
                   <span className="text-[10px] font-medium text-muted-foreground/70">
-                    {formData.amenities.length} selected
+                    {formData.amenities.length} {t("partner.selectedCountLabel")}
                   </span>
                 </div>
                 <div className="grid grid-cols-2 gap-2.5">
@@ -778,10 +772,10 @@ export default function VenuesPage() {
               <div className="flex flex-col gap-3">
                 <div className="flex items-center justify-between border-b border-border/40 pb-2.5">
                   <label className="text-xs font-semibold text-muted-foreground flex items-center gap-1">
-                    <Tags className="h-3.5 w-3.5 text-primary" /> Vibe Tags
+                    <Tags className="h-3.5 w-3.5 text-primary" /> {t("partner.vibeTagsLabel")}
                   </label>
                   <span className="text-[10px] font-medium text-muted-foreground/70">
-                    {formData.vibeTags.length} selected
+                    {formData.vibeTags.length} {t("partner.selectedCountLabel")}
                   </span>
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -809,9 +803,9 @@ export default function VenuesPage() {
               {/* Gallery */}
               <div className="flex flex-col gap-3">
                 <div className="flex items-center justify-between border-b border-border/40 pb-2">
-                  <label className="text-xs font-semibold text-muted-foreground">Room Gallery</label>
+                  <label className="text-xs font-semibold text-muted-foreground">{t("partner.roomGallery")}</label>
                   <span className="text-[10px] font-medium text-muted-foreground/70">
-                    {currentImageCount} / 5 photos
+                    {currentImageCount} / 5 {t("partner.photosCountLabel")}
                   </span>
                 </div>
 
@@ -837,7 +831,7 @@ export default function VenuesPage() {
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={preview} alt="" className="w-full h-full object-cover" />
                       <div className="absolute top-1.5 right-1.5 bg-primary/90 text-primary-foreground text-[9px] font-bold px-1.5 py-0.5 rounded-full">
-                        NEW
+                        {t("partner.newBadge")}
                       </div>
                       <button
                         type="button"
@@ -853,7 +847,7 @@ export default function VenuesPage() {
                   {currentImageCount < 5 && (
                     <label className="aspect-square rounded-xl border-2 border-dashed border-border/60 flex flex-col items-center justify-center gap-1.5 cursor-pointer hover:border-primary/40 hover:bg-muted/10 transition-all">
                       <Upload className="h-5 w-5 text-muted-foreground/50" />
-                      <span className="text-[10px] font-medium text-muted-foreground/70">Add photo</span>
+                      <span className="text-[10px] font-medium text-muted-foreground/70">{t("partner.addPhotoLabel")}</span>
                       <input
                         ref={fileInputRef}
                         type="file"
@@ -867,7 +861,7 @@ export default function VenuesPage() {
                 </div>
 
                 <p className="text-[10px] text-muted-foreground/60">
-                  JPG · PNG · WebP · Max 5 MB each · Up to 5 photos
+                  {t("partner.photoRequirements")}
                 </p>
               </div>
             </div>
@@ -884,14 +878,14 @@ export default function VenuesPage() {
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div className="flex flex-col gap-2">
           <h1 className="text-3xl md:text-4xl font-bold tracking-tight flex items-center gap-3 text-foreground">
-            <Building2 className="h-8 w-8 text-primary hidden md:block" /> Venues
+            <Building2 className="h-8 w-8 text-primary hidden md:block" /> {t("partner.venuesTitle")}
           </h1>
           <p className="text-sm md:text-base text-muted-foreground">
-            Manage your rooms, capacity, amenities, and specifications.
+            {t("partner.venuesSubtitle")}
           </p>
         </div>
         <Button onClick={handleAddNew} className="font-semibold rounded-xl flex items-center gap-2 px-6 shadow-sm">
-          <Plus className="h-5 w-5" /> Add Room
+          <Plus className="h-5 w-5" /> {t("partner.addRoom")}
         </Button>
       </div>
 
@@ -912,11 +906,11 @@ export default function VenuesPage() {
         <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border/60 bg-muted/10 p-16 text-center gap-4">
           <Building2 className="h-12 w-12 text-muted-foreground/30" />
           <div>
-            <p className="text-base font-semibold text-foreground">No rooms yet</p>
-            <p className="text-sm text-muted-foreground mt-1">Add your first room to start accepting bookings.</p>
+            <p className="text-base font-semibold text-foreground">{t("partner.noRoomsYet")}</p>
+            <p className="text-sm text-muted-foreground mt-1">{t("partner.noRoomsYetDesc")}</p>
           </div>
           <Button onClick={handleAddNew} className="rounded-xl gap-2">
-            <Plus className="h-4 w-4" /> Add Room
+            <Plus className="h-4 w-4" /> {t("partner.addRoom")}
           </Button>
         </div>
       ) : (
@@ -935,7 +929,7 @@ export default function VenuesPage() {
                 {isEmpty ? (
                   <div className="aspect-[16/9] bg-muted/10 border-b border-dashed border-border/40 relative flex flex-col items-center justify-center overflow-hidden rounded-t-2xl gap-2">
                     <Plus className="h-10 w-10 text-muted-foreground/30" />
-                    <span className="text-xs font-medium text-muted-foreground/60">No rooms yet</span>
+                    <span className="text-xs font-medium text-muted-foreground/60">{t("partner.noRoomsYet")}</span>
                   </div>
                 ) : (
                   <div className="aspect-[16/9] bg-muted/20 border-b border-border/40 relative flex items-center justify-center overflow-hidden rounded-t-2xl">
@@ -973,7 +967,7 @@ export default function VenuesPage() {
                       <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5 mt-1 border-b border-border/40 pb-3 line-clamp-1">
                         <MapPin className="h-3.5 w-3.5 text-primary shrink-0" /> {room.district}
                       </p>
-                      <p className="text-xs text-muted-foreground mt-2">Add a room to this venue to start accepting bookings.</p>
+                      <p className="text-xs text-muted-foreground mt-2">{t("partner.addRoomToVenueHint")}</p>
                     </>
                   ) : (
                     <>
@@ -1005,7 +999,7 @@ export default function VenuesPage() {
                         }}
                         className="flex-1 font-semibold rounded-xl flex items-center gap-2"
                       >
-                        <Plus className="h-4 w-4" /> Add First Room
+                        <Plus className="h-4 w-4" /> {t("partner.addFirstRoom")}
                       </Button>
                       {venueMap[room.venueId ?? ""]?.status !== "published" && (
                         <Button
@@ -1033,7 +1027,7 @@ export default function VenuesPage() {
                             ? <Loader2 className="h-4 w-4 animate-spin" />
                             : <Globe className="h-4 w-4" />
                           }
-                          {publishing === room.id ? "Publishing..." : "Publish Room"}
+                          {publishing === room.id ? t("partner.publishing") : t("partner.publishRoom")}
                         </Button>
                       )}
                       {venueMap[room.venueId ?? ""]?.status !== "published" && (
@@ -1047,7 +1041,7 @@ export default function VenuesPage() {
                             ? <Loader2 className="h-4 w-4 animate-spin" />
                             : <Globe className="h-4 w-4" />
                           }
-                          {publishing === room.venueId ? "Publishing..." : "Publish Venue"}
+                          {publishing === room.venueId ? t("partner.publishing") : t("partner.publishVenue")}
                         </Button>
                       )}
                       <div className="flex gap-2">
@@ -1056,7 +1050,7 @@ export default function VenuesPage() {
                           variant="outline"
                           className="flex-1 font-semibold rounded-xl bg-transparent"
                         >
-                          <Edit2 className="h-4 w-4" /> Edit
+                          <Edit2 className="h-4 w-4" /> {t("partner.editLabel")}
                         </Button>
                         <Button
                           onClick={() => handleDelete(room)}
