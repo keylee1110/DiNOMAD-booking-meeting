@@ -4,6 +4,7 @@ import { createContext, useContext, useReducer, useEffect, useState, type ReactN
 import type { BookingFlowState, Room, TimeSlot, PaymentMethod, Booking } from "@/lib/types"
 import { createClient } from "@/utils/supabase/client"
 import { toggleWishlist as apiToggleWishlist, getWishlist as apiGetWishlist } from "@/lib/api/wishlist"
+import { buildCheckInQrPayload } from "@/lib/booking/check-in"
 
 const initialState: BookingFlowState = {
   selectedRoom: null,
@@ -91,18 +92,20 @@ export function BookingProvider({ children }: { children: ReactNode }) {
       try {
         const { data: dbBookings, error } = await supabase
           .from("bookings")
-          .select("*")
+          .select(`
+            *,
+            rooms!inner(
+              name,
+              venues!inner(name, address)
+            )
+          `)
           .eq("customer_id", user.id)
           .order("created_at", { ascending: false })
 
         if (error) throw error
 
         if (dbBookings) {
-          const { rooms: allRooms } = await import("@/lib/data/rooms")
-          
           const mappedBookings: Booking[] = dbBookings.map((b: any) => {
-            const roomObj = allRooms.find((r) => r.id === b.room_id)
-            
             const start = new Date(b.start_time)
             const end = new Date(b.end_time)
             const pad = (n: number) => n.toString().padStart(2, '0')
@@ -112,9 +115,9 @@ export function BookingProvider({ children }: { children: ReactNode }) {
             return {
               id: b.id,
               roomId: b.room_id,
-              roomName: roomObj?.name || "Room",
-              venueName: roomObj?.venueName || "Venue",
-              venueAddress: roomObj?.address || "",
+              roomName: b.rooms?.name || "Room",
+              venueName: b.rooms?.venues?.name || "Venue",
+              venueAddress: b.rooms?.venues?.address || "",
               date: b.booking_date,
               startTime,
               endTime,
@@ -127,7 +130,8 @@ export function BookingProvider({ children }: { children: ReactNode }) {
               platformFee: b.platform_fee,
               status: b.status,
               paymentMethod: "vietqr",
-              checkInQr: `DINOMAD-${b.id}`,
+              checkInQr: buildCheckInQrPayload(b.id, b.qr_code_token || ""),
+              accessCode: b.qr_code_token || undefined,
               wifiPassword: `${b.room_id}-wifi-${b.id.slice(-3)}`,
               createdAt: b.created_at,
               paidAmount: b.payment_status === "deposited"

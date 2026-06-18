@@ -1,9 +1,11 @@
 "use client"
 
-import { useState, useMemo, useCallback } from "react"
+import { useState, useMemo, useCallback, useEffect } from "react"
 import { useSearchParams } from "next/navigation"
 import { useTranslation } from "@/lib/i18n/context"
-import { searchRooms } from "@/lib/data/rooms"
+import { rooms as demoRooms } from "@/lib/data/rooms"
+import { getPublicRooms } from "@/lib/api/public-rooms"
+import { selectCustomerRooms } from "@/lib/booking/check-in"
 import { RoomCard } from "@/components/room-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -64,6 +66,15 @@ export default function SearchPage() {
   const [page, setPage] = useState(1)
   const [sortBy, setSortBy] = useState("rating")
   const [viewMode, setViewMode] = useState<"list" | "map">("list")
+  const [availableRooms, setAvailableRooms] = useState<Room[]>(demoRooms)
+
+  useEffect(() => {
+    getPublicRooms()
+      .then((publicRooms) => {
+        setAvailableRooms(selectCustomerRooms(publicRooms, demoRooms))
+      })
+      .catch((error) => console.warn("Could not load published partner rooms:", error))
+  }, [])
 
   const toggleAmenity = useCallback((amenity: string) => {
     setSelectedAmenities(prev =>
@@ -80,36 +91,82 @@ export default function SearchPage() {
   }, [])
 
   const { results, total, totalPages } = useMemo(() => {
-    const result = searchRooms({
-      district: district || undefined,
-      minCapacity: minCapacity || undefined,
-      maxPrice: maxPrice[0],
-      amenities: selectedAmenities.length > 0 ? selectedAmenities : undefined,
-      vibeTags: selectedVibes.length > 0 ? selectedVibes : undefined,
-      query: query || undefined,
-      category: category || undefined,
-      verified: verifiedOnly || undefined,
-      noiseLevelMin: noiseLevelMin || undefined,
-      date: selectedDate ? selectedDate.toISOString().split("T")[0] : undefined,
-      page,
-      pageSize: PAGE_SIZE,
-    }, locale)
+    let filtered = availableRooms.filter(room => {
+      // District filter
+      if (district && district !== "all") {
+        const filterDistrictLower = district.toLowerCase()
+        const roomDistrictLower = room.district.toLowerCase()
+        const matchesDistrict = (filterDistrictLower === "thu duc" && (roomDistrictLower === "thu duc" || roomDistrictLower.includes("thủ đức"))) ||
+          (filterDistrictLower === "district 1" && (roomDistrictLower === "district 1" || roomDistrictLower.includes("quận 1"))) ||
+          (filterDistrictLower === "district 7" && (roomDistrictLower === "district 7" || roomDistrictLower.includes("quận 7"))) ||
+          (filterDistrictLower === "district 10" && (roomDistrictLower === "district 10" || roomDistrictLower.includes("quận 10"))) ||
+          (filterDistrictLower === "binh thanh" && (roomDistrictLower === "binh thanh" || roomDistrictLower.includes("bình thạnh"))) ||
+          (roomDistrictLower === filterDistrictLower)
 
-    let sorted = result.rooms
+        if (!matchesDistrict) return false
+      }
+
+      // Capacity filter
+      if (minCapacity && room.capacity < minCapacity) return false
+
+      // Price filter
+      if (maxPrice[0] && room.pricePerHour > maxPrice[0]) return false
+
+      // Amenities filter
+      if (selectedAmenities.length > 0) {
+        const hasAllAmenities = selectedAmenities.every(amenity => room.amenities.includes(amenity as Amenity))
+        if (!hasAllAmenities) return false
+      }
+
+      // Vibe Tags filter
+      if (selectedVibes.length > 0) {
+        const hasSomeVibes = selectedVibes.some(vibe => room.vibeTags.includes(vibe as VibeTag))
+        if (!hasSomeVibes) return false
+      }
+
+      // Category filter
+      if (category && room.category !== category) return false
+
+      // Verified filter
+      if (verifiedOnly && !room.verified) return false
+
+      // Noise Level filter
+      if (noiseLevelMin && (room.noiseLevel ?? 0) < noiseLevelMin) return false
+
+      // Query filter
+      if (query) {
+        const q = query.toLowerCase()
+        const matchesQuery = room.name.toLowerCase().includes(q) ||
+          room.venueName.toLowerCase().includes(q) ||
+          room.district.toLowerCase().includes(q) ||
+          room.description.toLowerCase().includes(q)
+
+        if (!matchesQuery) return false
+      }
+
+      return true
+    })
+
+    // Sort
     switch (sortBy) {
       case "price_asc":
-        sorted.sort((a, b) => a.pricePerHour - b.pricePerHour)
+        filtered.sort((a, b) => a.pricePerHour - b.pricePerHour)
         break
       case "price_desc":
-        sorted.sort((a, b) => b.pricePerHour - a.pricePerHour)
+        filtered.sort((a, b) => b.pricePerHour - a.pricePerHour)
         break
       case "rating":
-        sorted.sort((a, b) => b.rating - a.rating)
+        filtered.sort((a, b) => b.rating - a.rating)
         break
     }
 
-    return { results: sorted, total: result.total, totalPages: result.totalPages }
-  }, [query, district, maxPrice, minCapacity, selectedAmenities, selectedVibes, category, verifiedOnly, noiseLevelMin, selectedDate, page, sortBy, locale])
+    const total = filtered.length
+    const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
+    const start = (page - 1) * PAGE_SIZE
+    const paginated = filtered.slice(start, start + PAGE_SIZE)
+
+    return { results: paginated, total, totalPages }
+  }, [availableRooms, district, minCapacity, maxPrice, selectedAmenities, selectedVibes, category, verifiedOnly, noiseLevelMin, query, sortBy, page])
 
   const clearFilters = () => {
     setQuery("")

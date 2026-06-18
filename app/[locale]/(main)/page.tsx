@@ -1,9 +1,11 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useTranslation } from "@/lib/i18n/context"
 import { rooms, getLocalizedRoom } from "@/lib/data/rooms"
+import { getPublicRooms } from "@/lib/api/public-rooms"
+import { selectCustomerRooms } from "@/lib/booking/check-in"
 import { RoomCard } from "@/components/room-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -20,10 +22,19 @@ export default function LandingPage() {
   const [district, setDistrict] = useState("")
   const [capacity, setCapacity] = useState("")
   const [activeTab, setActiveTab] = useState<"team_hub" | "solo_nook">("team_hub")
+  const [availableRooms, setAvailableRooms] = useState(rooms)
 
-  const featuredRooms = rooms
+  useEffect(() => {
+    getPublicRooms()
+      .then((publicRooms) => {
+        setAvailableRooms(selectCustomerRooms(publicRooms, rooms))
+      })
+      .catch((error) => console.warn("Could not load published partner rooms:", error))
+  }, [])
+
+  const featuredRooms = availableRooms
     .map((r) => getLocalizedRoom(r, locale))
-    .filter((r) => r.verified && r.category === activeTab)
+    .filter((r) => r.category === activeTab)
     .slice(0, 4)
 
   const handleSearch = () => {

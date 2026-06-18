@@ -18,6 +18,25 @@ export class ReviewsService {
   constructor(private readonly supabase: SupabaseService) {}
 
   async create(userId: string, dto: CreateReviewDto) {
+    // 1. Verify booking ownership and details
+    const { data: booking, error: bookingErr } = await this.supabase.admin
+      .from("bookings")
+      .select("customer_id, room_id")
+      .eq("id", dto.bookingId)
+      .single()
+
+    if (bookingErr || !booking) {
+      throw new BadRequestException("Booking not found.")
+    }
+
+    if (booking.customer_id !== userId) {
+      throw new BadRequestException("You do not own this booking.")
+    }
+
+    if (booking.room_id !== dto.roomId) {
+      throw new BadRequestException("This booking is for a different room.")
+    }
+
     const insertData = {
       customer_id: userId,
       room_id: dto.roomId,

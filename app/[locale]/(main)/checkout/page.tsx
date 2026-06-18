@@ -14,6 +14,7 @@ import { Label } from "@/components/ui/label"
 import { QrCode as DinomadQrCode } from "@/components/qr-code"
 import { CreditCard, Smartphone, Check, Loader2, ShieldCheck, Clock, Sparkles } from "lucide-react"
 import { createClient } from "@/utils/supabase/client"
+import { toast } from "sonner"
 
 import { BookingSummary } from "./_components/booking-summary"
 import { GuestInfoForm } from "./_components/guest-info-form"
@@ -266,33 +267,37 @@ export default function CheckoutPage({ params }: { params: Promise<{ locale: str
           dbBookingCode = data.booking_code || newBookingCode
           
           // Update user points balance: add earned, subtract redeemed
-          const netPoints = pointsEarned - pointsDiscount
+          // Deposit bookings (paymentMode === "deposit") only earn points when checking in, not at checkout.
+          const netPoints = (paymentMode === "deposit" ? 0 : pointsEarned) - pointsDiscount
           if (netPoints !== 0) {
-            await supabase.rpc("increment_user_points", {
-              user_id: user.id,
-              delta: netPoints
-            }).catch((err: any) => {
+            try {
+              const { error: rpcError } = await supabase.rpc("increment_user_points", {
+                user_id: user.id,
+                delta: netPoints
+              })
+              if (rpcError) throw rpcError
+            } catch (err: any) {
               console.warn("Could not update points via RPC, trying manual update:", err)
               // Fallback: manual fetch + update
-              supabase
+              const { data: profile } = await supabase
                 .from("profiles")
                 .select("points")
                 .eq("id", user.id)
                 .single()
-                .then(({ data: profile }) => {
-                  if (profile) {
-                    const newPoints = Math.max(0, (profile.points || 0) + netPoints)
-                    supabase.from("profiles").update({ points: newPoints }).eq("id", user.id)
-                  }
-                })
-            })
+              if (profile) {
+                const newPoints = Math.max(0, (profile.points || 0) + netPoints)
+                await supabase.from("profiles").update({ points: newPoints }).eq("id", user.id)
+              }
+            }
           }
         } else if (error) {
           console.warn("Supabase insert error, falling back to local storage:", error.message)
+          toast.error(locale === "vi" ? `Không thể lưu đơn đặt vào database: ${error.message}` : `Failed to save booking to database: ${error.message}`)
         }
       }
-    } catch (e) {
+    } catch (e: any) {
       console.warn("Supabase insert exception, falling back to local storage:", e)
+      toast.error(locale === "vi" ? `Lỗi hệ thống khi lưu đơn đặt: ${e.message || e}` : `System error saving booking: ${e.message || e}`)
     }
 
     const newBooking: Booking = {
