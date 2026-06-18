@@ -12,6 +12,7 @@ backend/dist/
 backend/.env
 .DS_Store
 .vercel
+.pnpm-store/
 
 # Agent & Build info
 .agent/

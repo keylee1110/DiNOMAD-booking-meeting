@@ -8,9 +8,9 @@ import { notFound } from "next/navigation"
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
   const { locale } = await params
   return {
-    title: locale === "vi" ? "DiNOMAD - Dat Phong Hop TP.HCM" : "DiNOMAD - Book Meeting Rooms in HCMC",
+    title: locale === "vi" ? "DiNOMAD - Đặt Phòng Họp TP.HCM" : "DiNOMAD - Book Meeting Rooms in HCMC",
     description: locale === "vi"
-      ? "Nen tang dat phong hop cho sinh vien va freelancer tai TP.HCM. Dat phong trong 60 giay."
+      ? "Nền tảng đặt phòng họp cho sinh viên và freelancer tại TP.HCM. Đặt phòng trong 60 giây."
       : "Meeting room booking platform for students and freelancers in HCMC. Book in 60 seconds.",
   }
 }

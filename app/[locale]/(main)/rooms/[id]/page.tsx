@@ -5,6 +5,7 @@ import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { useTranslation } from "@/lib/i18n/context"
 import { getRoomById } from "@/lib/data/rooms"
+import { getPublicRoomById } from "@/lib/api/public-rooms"
 import { getRoomReviews } from "@/lib/api/reviews"
 import type { ApiReview } from "@/lib/api/reviews"
 import { generateTimeSlots } from "@/lib/data/time-slots"
@@ -19,7 +20,7 @@ import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { Star, MapPin, Users, ChevronLeft, ChevronRight, ExternalLink, Minus, Plus, Heart } from "lucide-react"
-import type { TimeSlot } from "@/lib/types"
+import type { Room, TimeSlot } from "@/lib/types"
 import { notFound } from "next/navigation"
 import { cn } from "@/lib/utils"
 
@@ -30,9 +31,9 @@ export default function RoomDetailPage({ params }: { params: Promise<{ locale: s
   const { state, dispatch, wishlist, toggleWishlist } = useBooking()
   const isFavorited = wishlist ? wishlist.includes(id) : false
 
-  const room = getRoomById(id, locale)
-  if (!room) notFound()
-
+  const demoRoom = getRoomById(id, locale) ?? null
+  const [room, setRoom] = useState<Room | null>(demoRoom)
+  const [roomLoading, setRoomLoading] = useState(!demoRoom)
   const [reviews, setReviews] = useState<ApiReview[]>([])
   const [reviewsLoading, setReviewsLoading] = useState(true)
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
@@ -42,7 +43,19 @@ export default function RoomDetailPage({ params }: { params: Promise<{ locale: s
   const [holdTimerKey, setHoldTimerKey] = useState(0)
 
   // Split bill states
-  const [splitPeople, setSplitPeople] = useState(room?.capacity || 2)
+  const [splitPeople, setSplitPeople] = useState(demoRoom?.capacity || 2)
+
+  useEffect(() => {
+    if (demoRoom) return
+
+    getPublicRoomById(id)
+      .then((publicRoom) => {
+        setRoom(publicRoom)
+        if (publicRoom) setSplitPeople(publicRoom.capacity)
+      })
+      .catch((error) => console.warn("Could not load published room:", error))
+      .finally(() => setRoomLoading(false))
+  }, [demoRoom, id])
 
   useEffect(() => {
     getRoomReviews(id)
@@ -51,7 +64,10 @@ export default function RoomDetailPage({ params }: { params: Promise<{ locale: s
       .finally(() => setReviewsLoading(false))
   }, [id])
 
-  const slots = useMemo(() => generateTimeSlots(selectedDate, room.id), [selectedDate, room.id])
+  const slots = useMemo(
+    () => room ? generateTimeSlots(selectedDate, room.id) : [],
+    [selectedDate, room],
+  )
 
   const handleToggleSlot = (slot: TimeSlot) => {
     setSelectedSlots((prev) => {
@@ -90,11 +106,12 @@ export default function RoomDetailPage({ params }: { params: Promise<{ locale: s
   }
 
   const duration = selectedSlots.length
-  const roomFee = room.pricePerHour * duration
+  const roomFee = (room?.pricePerHour ?? 0) * duration
   const platformFee = Math.round(roomFee * 0.1)
   const totalPrice = roomFee + platformFee
 
   const handleBookNow = () => {
+    if (!room) return
     dispatch({ type: "SET_ROOM", room })
     dispatch({ type: "SET_DATE", date: selectedDate })
     dispatch({ type: "SET_SLOTS", slots: selectedSlots })
@@ -102,11 +119,20 @@ export default function RoomDetailPage({ params }: { params: Promise<{ locale: s
     router.push(`/${locale}/checkout`)
   }
 
-  const nextImage = () => setCurrentImageIndex((i) => (i + 1) % room.images.length)
-  const prevImage = () => setCurrentImageIndex((i) => (i - 1 + room.images.length) % room.images.length)
+  const nextImage = () => {
+    if (room) setCurrentImageIndex((i) => (i + 1) % room.images.length)
+  }
+  const prevImage = () => {
+    if (room) setCurrentImageIndex((i) => (i - 1 + room.images.length) % room.images.length)
+  }
 
   // Split bill logic
   const splitAmount = Math.ceil(totalPrice / splitPeople)
+
+  if (roomLoading) {
+    return <div className="mx-auto max-w-7xl px-4 py-16 text-center text-muted-foreground">Loading room...</div>
+  }
+  if (!room) notFound()
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-6">

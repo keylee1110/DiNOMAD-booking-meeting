@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useTranslation } from "@/lib/i18n/context"
 import {
   QrCode, Search, CheckCircle2, XCircle, Loader2,
@@ -13,20 +13,71 @@ import { formatVND } from "@/lib/format"
 import { scannerLookup, scannerCheckIn, scannerNoShow, type ScannerBooking } from "@/lib/api/partner"
 import { toast } from "sonner"
 
+interface CheckInRecord {
+  bookingId: string
+  bookingCode: string
+  guestName: string
+  roomName: string
+  checkedInAt: string
+}
+
 type Phase =
   | { phase: "idle" }
   | { phase: "searching" }
-  | { phase: "found"; booking: ScannerBooking }
+  | { phase: "found"; booking: ScannerBooking; timeWarning?: string }
   | { phase: "confirming-no-show"; booking: ScannerBooking }
   | { phase: "error"; message: string }
   | { phase: "success-checkin"; booking: ScannerBooking }
   | { phase: "success-noshow"; booking: ScannerBooking }
 
+function timeToMinutes(time: string): number {
+  const [h, m] = time.split(":").map(Number)
+  return h * 60 + m
+}
+
 export default function ScannerPage() {
-  const { t } = useTranslation()
+  const { locale, t } = useTranslation()
   const [bookingCode, setBookingCode] = useState("")
   const [state, setState] = useState<Phase>({ phase: "idle" })
   const [actionLoading, setActionLoading] = useState(false)
+  const [recentScans, setRecentScans] = useState<CheckInRecord[]>([])
+  const [hydrated, setHydrated] = useState(false)
+
+  const [isScanning, setIsScanning] = useState(false)
+  const [html5QrScanner, setHtml5QrScanner] = useState<any>(null)
+
+  useEffect(() => {
+    const stored: CheckInRecord[] = JSON.parse(localStorage.getItem("dinomad_checkins") || "[]")
+    setRecentScans([...stored].reverse().slice(0, 5))
+    setHydrated(true)
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      if (html5QrScanner) {
+        html5QrScanner.clear()
+      }
+    }
+  }, [html5QrScanner])
+
+  const verifyBookingAndTransition = useCallback((booking: ScannerBooking) => {
+    const today = new Date().toISOString().slice(0, 10)
+    const now = new Date()
+    const nowMinutes = now.getHours() * 60 + now.getMinutes()
+    const windowOpen = timeToMinutes(booking.startTime) - 15
+    const windowClose = timeToMinutes(booking.endTime) + 30
+
+    let timeWarning = ""
+    if (booking.date !== today) {
+      timeWarning = t("partner.checkInWrongDate") || "Đơn đặt không thuộc ngày hôm nay."
+    } else if (nowMinutes < windowOpen) {
+      timeWarning = t("partner.checkInNotYet") || "Khách đến sớm hơn khung giờ đặt phòng."
+    } else if (nowMinutes > windowClose) {
+      timeWarning = t("partner.checkInWindowClosed") || "Khách đến muộn hơn khung giờ đặt phòng."
+    }
+
+    setState({ phase: "found", booking, timeWarning })
+  }, [t])
 
   const handleSearch = useCallback(async () => {
     const code = bookingCode.trim().toUpperCase()
@@ -35,12 +86,12 @@ export default function ScannerPage() {
     setState({ phase: "searching" })
     try {
       const booking = await scannerLookup(code)
-      setState({ phase: "found", booking })
+      verifyBookingAndTransition(booking)
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
       setState({ phase: "error", message: msg })
     }
-  }, [bookingCode])
+  }, [bookingCode, verifyBookingAndTransition])
 
   const handleConfirmCheckIn = useCallback(async (booking: ScannerBooking) => {
     setActionLoading(true)
@@ -48,6 +99,20 @@ export default function ScannerPage() {
       const updated = await scannerCheckIn(booking.id)
       setState({ phase: "success-checkin", booking: updated })
       toast.success(t("partner.checkInSuccess"))
+
+      // Add to local recent scans
+      const now = new Date().toISOString()
+      const checkIns: CheckInRecord[] = JSON.parse(localStorage.getItem("dinomad_checkins") || "[]")
+      const record: CheckInRecord = {
+        bookingId: booking.id,
+        bookingCode: booking.bookingCode,
+        guestName: booking.guestName,
+        roomName: booking.roomName,
+        checkedInAt: now,
+      }
+      checkIns.push(record)
+      localStorage.setItem("dinomad_checkins", JSON.stringify(checkIns))
+      setRecentScans([...checkIns].reverse().slice(0, 5))
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
       setState({ phase: "error", message: msg })
@@ -75,8 +140,57 @@ export default function ScannerPage() {
     setBookingCode("")
   }
 
-  const isSearching = state.phase === "searching"
+  const startScanning = useCallback(() => {
+    import("html5-qrcode").then((module) => {
+      const scanner = new module.Html5Qrcode("reader")
+      setHtml5QrScanner(scanner)
+      setIsScanning(true)
 
+      scanner.start(
+        { facingMode: "environment" },
+        {
+          fps: 10,
+          qrbox: { width: 250, height: 250 },
+        },
+        async (decodedText) => {
+          setIsScanning(false)
+          
+          await scanner.stop().catch(console.error)
+          scanner.clear()
+          setHtml5QrScanner(null)
+          
+          const codeMatch = decodedText.match(/(DN-[A-Z0-9]+)/i) || decodedText.match(/(BK-[A-Z0-9]+)/i)
+          const parsedCode = codeMatch ? codeMatch[0] : decodedText.trim()
+          setBookingCode(parsedCode.toUpperCase())
+          
+          // Trigger search directly
+          setState({ phase: "searching" })
+          try {
+            const booking = await scannerLookup(parsedCode.toUpperCase())
+            verifyBookingAndTransition(booking)
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err)
+            setState({ phase: "error", message: msg })
+          }
+        },
+        () => {}
+      ).catch((err) => {
+        console.error("Failed to start scanner:", err)
+        setIsScanning(false)
+      })
+    })
+  }, [verifyBookingAndTransition])
+
+  const stopScanning = useCallback(async () => {
+    if (html5QrScanner) {
+      await html5QrScanner.stop().catch(console.error)
+      html5QrScanner.clear()
+      setHtml5QrScanner(null)
+    }
+    setIsScanning(false)
+  }, [html5QrScanner])
+
+  const isSearching = state.phase === "searching"
 
   return (
     <div className="flex flex-col gap-8 animate-in fade-in duration-500 max-w-4xl mx-auto w-full">
@@ -90,22 +204,26 @@ export default function ScannerPage() {
       </div>
 
       <div className="grid gap-8 md:grid-cols-2">
-        {/* Left: QR placeholder */}
+        {/* Left: QR Scanner Viewport */}
         <div className="flex flex-col gap-4">
-          <div className="rounded-2xl border border-border/50 bg-card p-6 md:p-10 flex flex-col items-center text-center shadow-sm opacity-60 pointer-events-none select-none">
-            <div className="relative w-full max-w-[220px] aspect-square rounded-2xl border-2 border-dashed border-muted-foreground/30 bg-muted/20 flex items-center justify-center mb-6 overflow-hidden">
-              <QrCode className="h-20 w-20 text-muted-foreground/30" />
-              <div className="absolute top-4 left-4 w-6 h-6 border-t-2 border-l-2 border-muted-foreground/40" />
-              <div className="absolute top-4 right-4 w-6 h-6 border-t-2 border-r-2 border-muted-foreground/40" />
-              <div className="absolute bottom-4 left-4 w-6 h-6 border-b-2 border-l-2 border-muted-foreground/40" />
-              <div className="absolute bottom-4 right-4 w-6 h-6 border-b-2 border-r-2 border-muted-foreground/40" />
+          <div className="rounded-2xl border border-border/50 bg-card p-6 md:p-10 flex flex-col items-center text-center shadow-sm">
+            <div id="reader" className="w-full max-w-[280px] aspect-square overflow-hidden rounded-2xl bg-muted/20 mb-6 flex items-center justify-center border-2 border-dashed border-muted-foreground/20">
+              {!isScanning && (
+                <div className="flex flex-col items-center">
+                  <QrCode className="h-20 w-20 text-muted-foreground/30 mb-2" />
+                  <span className="text-xs text-muted-foreground/60">Camera Preview</span>
+                </div>
+              )}
             </div>
-            <h2 className="text-base font-semibold tracking-tight mb-1 text-muted-foreground">
-              {t("partner.cameraComingSoon")}
-            </h2>
-            <p className="text-sm text-muted-foreground/70">
-              {t("partner.useManualForm")}
-            </p>
+            {isScanning ? (
+              <Button onClick={stopScanning} variant="destructive" className="w-full max-w-[200px] rounded-xl font-semibold gap-2">
+                Stop Camera
+              </Button>
+            ) : (
+              <Button onClick={startScanning} className="w-full max-w-[200px] rounded-xl font-semibold gap-2">
+                <QrCode className="h-4 w-4" /> Start Camera
+              </Button>
+            )}
           </div>
 
           {/* Legend */}
@@ -181,6 +299,17 @@ export default function ScannerPage() {
                 <h3 className="font-semibold text-base text-foreground">{t("partner.bookingFound")}</h3>
               </div>
 
+              {/* Time warning banner */}
+              {state.timeWarning && (
+                <div className="flex items-start gap-3 rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 animate-in fade-in duration-200">
+                  <AlertTriangle className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
+                  <div className="flex flex-col gap-1">
+                    <span className="text-sm font-semibold text-amber-500">{locale === "vi" ? "Cảnh báo Check-in lệch giờ" : "Check-in Time Warning"}</span>
+                    <span className="text-xs text-amber-500/80">{state.timeWarning}</span>
+                  </div>
+                </div>
+              )}
+
               <BookingCard booking={state.booking} />
 
               <div className="flex gap-2">
@@ -189,11 +318,12 @@ export default function ScannerPage() {
                   disabled={actionLoading}
                   className="flex-1 rounded-xl font-semibold gap-2 bg-emerald-600 hover:bg-emerald-700 text-white"
                 >
-                  {actionLoading
-                    ? <Loader2 className="h-4 w-4 animate-spin" />
-                    : <CheckCircle2 className="h-4 w-4" />
-                  }
-                  {t("partner.confirmCheckIn")}
+                  {actionLoading ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <CheckCircle2 className="h-4 w-4" />
+                  )}
+                  {state.timeWarning ? (locale === "vi" ? "Bỏ qua & Check-in" : "Bypass & Check-in") : t("partner.confirmCheckIn")}
                 </Button>
                 <Button
                   variant="outline"
@@ -281,6 +411,40 @@ export default function ScannerPage() {
               <Button onClick={handleReset} variant="outline" className="w-full rounded-xl font-semibold">
                 {t("partner.verifyAnother")}
               </Button>
+            </div>
+          )}
+
+          {/* Recent Scans */}
+          {hydrated && (
+            <div className="flex flex-col gap-3 mt-2">
+              <h3 className="font-semibold text-base uppercase tracking-wider text-foreground border-b border-border/40 pb-2">
+                {t("partner.recentScans")}
+              </h3>
+              {recentScans.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-4">No recent check-ins.</p>
+              ) : (
+                <div className="flex flex-col gap-2">
+                  {recentScans.map((scan, i) => (
+                    <div
+                      key={`${scan.bookingId}-${i}`}
+                      className={cn(
+                        "flex items-center gap-3 rounded-xl border p-3.5 transition-all duration-200 shadow-sm bg-card",
+                        i === 0 ? "border-emerald-500/30 bg-emerald-500/5" : "border-border/60"
+                      )}
+                    >
+                      <CheckCircle2 className={cn("h-5 w-5 shrink-0", i === 0 ? "text-emerald-500" : "text-muted-foreground")} />
+                      <div className="flex flex-col min-w-0">
+                        <span className="font-semibold text-sm text-foreground truncate">
+                          {scan.bookingCode} — {scan.roomName}
+                        </span>
+                        <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mt-0.5">
+                          {scan.guestName} · {new Date(scan.checkedInAt).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>

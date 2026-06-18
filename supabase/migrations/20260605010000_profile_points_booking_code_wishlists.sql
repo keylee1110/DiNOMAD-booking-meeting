@@ -12,6 +12,7 @@ alter table public.bookings
   add column if not exists payment_status text;
 
 -- Add UPDATE policy to bookings so customers can mark their bookings as completed
+drop policy if exists "Users can update own bookings status" on public.bookings;
 create policy "Users can update own bookings status"
   on public.bookings for update
   to authenticated
@@ -28,10 +29,12 @@ create table if not exists public.wishlists (
 
 alter table public.wishlists enable row level security;
 
+drop policy if exists "Users can read own wishlist" on public.wishlists;
 create policy "Users can read own wishlist"
   on public.wishlists for select to authenticated
   using (user_id = auth.uid());
 
+drop policy if exists "Users can manage own wishlist" on public.wishlists;
 create policy "Users can manage own wishlist"
   on public.wishlists for all to authenticated
   using (user_id = auth.uid())
@@ -50,6 +53,7 @@ create table if not exists public.point_transactions (
 
 alter table public.point_transactions enable row level security;
 
+drop policy if exists "Users can view own transactions" on public.point_transactions;
 create policy "Users can view own transactions"
   on public.point_transactions for select to authenticated
   using (profile_id = auth.uid());
@@ -82,7 +86,7 @@ begin
   
   return NEW;
 end;
-$$ language plpgsql;
+$$ language plpgsql security definer;
 
 drop trigger if exists bookings_generate_booking_code on public.bookings;
 create trigger bookings_generate_booking_code
@@ -178,7 +182,7 @@ begin
   
   return NEW;
 end;
-$$ language plpgsql;
+$$ language plpgsql security definer;
 
 drop trigger if exists bookings_loyalty_points_trigger on public.bookings;
 create trigger bookings_loyalty_points_trigger

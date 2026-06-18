@@ -1,11 +1,13 @@
 "use client"
 
-import { use, useEffect } from "react"
+import { use, useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useTranslation } from "@/lib/i18n/context"
 import confetti from "canvas-confetti"
 import { useBooking } from "@/lib/store/booking-store"
 import { ConfirmationView } from "../_components/confirmation-view"
+import { getPublicRoomById } from "@/lib/api/public-rooms"
+import type { Room } from "@/lib/types"
 
 import { rooms } from "@/lib/data/rooms"
 
@@ -22,15 +24,58 @@ export default function CheckoutSuccessPage({
   const router = useRouter()
   const { state, dispatch, myBookings } = useBooking()
 
+  const [room, setRoom] = useState<Room | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+
   // Load from state or query parameter
   const confirmedBooking = id ? myBookings.find(b => b.id === id) : state.confirmedBooking
-  const selectedRoom = confirmedBooking ? rooms.find(r => r.id === confirmedBooking.roomId) : state.selectedRoom
 
   useEffect(() => {
+    async function loadRoom() {
+      if (!confirmedBooking) {
+        setIsLoading(false)
+        return
+      }
+
+      // Try finding in mock data first
+      const staticRoom = rooms.find(r => r.id === confirmedBooking.roomId)
+      if (staticRoom) {
+        setRoom(staticRoom)
+        setIsLoading(false)
+        return
+      }
+
+      // Try state selection if matches
+      if (state.selectedRoom && state.selectedRoom.id === confirmedBooking.roomId) {
+        setRoom(state.selectedRoom)
+        setIsLoading(false)
+        return
+      }
+
+      // Fallback: Fetch from database
+      try {
+        const dbRoom = await getPublicRoomById(confirmedBooking.roomId)
+        setRoom(dbRoom)
+      } catch (error) {
+        console.error("Failed to load room from database:", error)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    loadRoom()
+  }, [confirmedBooking, state.selectedRoom])
+
+  useEffect(() => {
+    if (isLoading) return
+
     // If no booking data is found in store, redirect to home.
-    if (!confirmedBooking || !selectedRoom) {
+    if (!confirmedBooking || !room) {
       router.push(`/${locale}`)
-    } else if (!id) {
+      return
+    }
+
+    if (!id) {
       // Trigger a confetti explosion only for new checkout bookings (where id param is not present)
       const duration = 2.5 * 1000;
       const animationEnd = Date.now() + duration;
@@ -58,9 +103,20 @@ export default function CheckoutSuccessPage({
 
       return () => clearInterval(interval);
     }
-  }, [confirmedBooking, selectedRoom, router, locale])
+  }, [confirmedBooking, room, isLoading, router, locale, id])
 
-  if (!confirmedBooking || !selectedRoom) {
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[50vh] gap-4">
+        <div className="h-10 w-10 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+        <p className="text-sm font-semibold text-muted-foreground">
+          {locale === "vi" ? "Đang tải thông tin đơn đặt..." : "Loading booking details..."}
+        </p>
+      </div>
+    )
+  }
+
+  if (!confirmedBooking || !room) {
     return null
   }
 
@@ -73,7 +129,7 @@ export default function CheckoutSuccessPage({
     <div className="mx-auto max-w-4xl px-4 py-8">
       <ConfirmationView 
         booking={confirmedBooking}
-        room={selectedRoom}
+        room={room}
         onBackHome={handleBackHome}
         locale={locale}
       />

@@ -23,9 +23,7 @@ export async function uploadRoomImage(file: File, roomId: string): Promise<strin
   return publicUrl
 }
 
-const BASE =
-  process.env.NEXT_PUBLIC_BACKEND_URL ??
-  `${process.env.NEXT_PUBLIC_SUPABASE_URL}`
+const BASE = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:4000/api"
 
 async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
   const supabase = createClient()
