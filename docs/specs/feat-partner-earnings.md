@@ -1,6 +1,6 @@
 # Spec: Partner Earnings Tab
 
-**Status:** `done`  
+**Status:** `done` *(backend + real API wired 2026-06-14)*  
 **PRD ref:** §10.4  
 **Branch:** `feat/ViNTD`  
 **Author:** Claude (AI)  
@@ -30,8 +30,16 @@ This creates the Earnings page at `/partner/earnings` using mock data, giving pa
 
 ## Backend
 
-> **Not yet built.** Uses `earningsData[]` and `bookings[]` from `lib/data/`.  
-> When ready: replace static data sources with `GET /partner/earnings?startDate=&endDate=`.
+`GET /partner/earnings?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD`  
+Defaults to current calendar month when params omitted.
+
+| File | Purpose |
+|---|---|
+| `backend/src/modules/rooms/earnings.service.ts` | 3-step query: supplier → venues → rooms → bookings |
+| `backend/src/modules/rooms/earnings.controller.ts` | `GET /partner/earnings` route |
+| `backend/src/modules/rooms/rooms.module.ts` | Registered EarningsController + EarningsService |
+
+Response shape: `{ summary, chartData, bookings }` wrapped in standard `{ success, data }` interceptor.
 
 ---
 

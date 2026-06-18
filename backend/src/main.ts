@@ -11,7 +11,7 @@ async function bootstrap() {
 
   app.setGlobalPrefix(config.getOrThrow<string>("app.apiPrefix"))
   app.enableCors({
-    origin: config.getOrThrow<string>("app.corsOrigin").split(","),
+    origin: config.getOrThrow<string>("app.corsOrigin").split(",").map(o => o.trim()),
     credentials: true,
   })
   app.useGlobalPipes(

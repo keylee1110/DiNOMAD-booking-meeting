@@ -3,7 +3,6 @@ import { SupabaseService } from "../../database/supabase.service"
 import { ToggleWishlistDto } from "./dto/toggle-wishlist.dto"
 
 type WishlistRow = {
-  id: string
   user_id: string
   room_id: string
   created_at: string
@@ -27,7 +26,8 @@ export class WishlistService {
       const { error } = await this.supabase.admin
         .from("wishlists")
         .delete()
-        .eq("id", existing.id)
+        .eq("user_id", userId)
+        .eq("room_id", dto.roomId)
 
       if (error) throw new Error(error.message)
       return { favorited: false, message: "Removed from wishlist" }
@@ -50,7 +50,6 @@ export class WishlistService {
     const { data, error } = await this.supabase.admin
       .from("wishlists")
       .select(`
-        id,
         created_at,
         rooms (
           id,

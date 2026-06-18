@@ -14,6 +14,7 @@ import { Label } from "@/components/ui/label"
 import { QrCode as DinomadQrCode } from "@/components/qr-code"
 import { CreditCard, Smartphone, Check, Loader2, ShieldCheck, Clock, Sparkles } from "lucide-react"
 import { createClient } from "@/utils/supabase/client"
+import { toast } from "sonner"
 
 import { BookingSummary } from "./_components/booking-summary"
 import { GuestInfoForm } from "./_components/guest-info-form"
@@ -57,20 +58,27 @@ export default function CheckoutPage({ params }: { params: Promise<{ locale: str
   const [redeemPoints, setRedeemPoints] = useState(false)
 
   useEffect(() => {
-    async function getPoints() {
+    async function getProfileData() {
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
         const { data, error } = await supabase
           .from("profiles")
-          .select("points")
+          .select("points, full_name, phone, email")
           .eq("id", user.id)
           .single()
         if (data && !error) {
           setUserPoints(data.points || 0)
+          setFullName(prev => prev || data.full_name || "")
+          setPhone(prev => prev || data.phone || "")
+          setEmail(prev => prev || data.email || "")
+        } else {
+          setFullName(prev => prev || user.user_metadata?.full_name || "")
+          setPhone(prev => prev || user.user_metadata?.phone || "")
+          setEmail(prev => prev || user.email || "")
         }
       }
     }
-    getPoints()
+    getProfileData()
   }, [])
 
   // Booking Flow & Payment Options (Agoda/Booking style)
@@ -90,9 +98,9 @@ export default function CheckoutPage({ params }: { params: Promise<{ locale: str
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      setFullName(state.guestName)
-      setPhone(state.guestPhone)
-      setEmail(state.guestEmail)
+      if (state.guestName) setFullName(state.guestName)
+      if (state.guestPhone) setPhone(state.guestPhone)
+      if (state.guestEmail) setEmail(state.guestEmail)
     }, 0)
     return () => clearTimeout(timer)
   }, [state.guestName, state.guestPhone, state.guestEmail])
@@ -233,10 +241,12 @@ export default function CheckoutPage({ params }: { params: Promise<{ locale: str
     const newBookingCode = generateFrontCode()
     let dbBookingCode = newBookingCode
 
-    // Sync to database if authenticated
+    // Sync to database if authenticated and room.id is a valid UUID
     try {
       const { data: { user } } = await supabase.auth.getUser()
-      if (user) {
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(room.id)
+      
+      if (user && isUuid) {
         const startTimeStr = `${state.selectedDate}T${timeRange.startTime}:00`
         const endTimeStr = `${state.selectedDate}T${timeRange.endTime}:00`
         
@@ -264,35 +274,14 @@ export default function CheckoutPage({ params }: { params: Promise<{ locale: str
           
         if (data && !error) {
           dbBookingCode = data.booking_code || newBookingCode
-          
-          // Update user points balance: add earned, subtract redeemed
-          const netPoints = pointsEarned - pointsDiscount
-          if (netPoints !== 0) {
-            await supabase.rpc("increment_user_points", {
-              user_id: user.id,
-              delta: netPoints
-            }).catch((err: any) => {
-              console.warn("Could not update points via RPC, trying manual update:", err)
-              // Fallback: manual fetch + update
-              supabase
-                .from("profiles")
-                .select("points")
-                .eq("id", user.id)
-                .single()
-                .then(({ data: profile }) => {
-                  if (profile) {
-                    const newPoints = Math.max(0, (profile.points || 0) + netPoints)
-                    supabase.from("profiles").update({ points: newPoints }).eq("id", user.id)
-                  }
-                })
-            })
-          }
         } else if (error) {
           console.warn("Supabase insert error, falling back to local storage:", error.message)
+          toast.error(locale === "vi" ? `Không thể lưu đơn đặt vào database: ${error.message}` : `Failed to save booking to database: ${error.message}`)
         }
       }
-    } catch (e) {
+    } catch (e: any) {
       console.warn("Supabase insert exception, falling back to local storage:", e)
+      toast.error(locale === "vi" ? `Lỗi hệ thống khi lưu đơn đặt: ${e.message || e}` : `System error saving booking: ${e.message || e}`)
     }
 
     const newBooking: Booking = {
@@ -336,7 +325,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ locale: str
     setIsPaymentDialogOpen(false)
     addBooking(newBooking)
     dispatch({ type: "SET_CONFIRMED_BOOKING", booking: newBooking })
-    router.push(`/${locale}/checkout/success`)
+    router.push(`/${locale}/checkout/success?id=${newBookingId}`)
   }
 
   if (!room || state.selectedSlots.length === 0) {

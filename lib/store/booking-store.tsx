@@ -4,6 +4,7 @@ import { createContext, useContext, useReducer, useEffect, useState, type ReactN
 import type { BookingFlowState, Room, TimeSlot, PaymentMethod, Booking } from "@/lib/types"
 import { createClient } from "@/utils/supabase/client"
 import { toggleWishlist as apiToggleWishlist, getWishlist as apiGetWishlist } from "@/lib/api/wishlist"
+import { buildCheckInQrPayload } from "@/lib/booking/check-in"
 
 const initialState: BookingFlowState = {
   selectedRoom: null,
@@ -71,6 +72,9 @@ interface BookingContextType {
 
 const BookingContext = createContext<BookingContextType | null>(null)
 
+
+
+
 export function BookingProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(bookingReducer, initialState)
   const [myBookings, setMyBookings] = useState<Booking[]>([])
@@ -86,23 +90,35 @@ export function BookingProvider({ children }: { children: ReactNode }) {
       console.warn("Could not get supabase user:", e)
     }
 
+    // Load local bookings as cache/fallback
+    let localBookings: Booking[] = []
+    if (typeof window !== "undefined") {
+      try {
+        localBookings = JSON.parse(localStorage.getItem("dinomad_bookings") || "[]")
+      } catch (e) {
+        console.error("Failed to parse local bookings:", e)
+      }
+    }
+
     if (user) {
       // Logged-in user: Fetch from Supabase
       try {
         const { data: dbBookings, error } = await supabase
           .from("bookings")
-          .select("*")
+          .select(`
+            *,
+            rooms(
+              name,
+              venues(name, address)
+            )
+          `)
           .eq("customer_id", user.id)
           .order("created_at", { ascending: false })
 
         if (error) throw error
 
         if (dbBookings) {
-          const { rooms: allRooms } = await import("@/lib/data/rooms")
-          
           const mappedBookings: Booking[] = dbBookings.map((b: any) => {
-            const roomObj = allRooms.find((r) => r.id === b.room_id)
-            
             const start = new Date(b.start_time)
             const end = new Date(b.end_time)
             const pad = (n: number) => n.toString().padStart(2, '0')
@@ -112,9 +128,9 @@ export function BookingProvider({ children }: { children: ReactNode }) {
             return {
               id: b.id,
               roomId: b.room_id,
-              roomName: roomObj?.name || "Room",
-              venueName: roomObj?.venueName || "Venue",
-              venueAddress: roomObj?.address || "",
+              roomName: b.rooms?.name || "Room",
+              venueName: b.rooms?.venues?.name || "Venue",
+              venueAddress: b.rooms?.venues?.address || "",
               date: b.booking_date,
               startTime,
               endTime,
@@ -127,7 +143,8 @@ export function BookingProvider({ children }: { children: ReactNode }) {
               platformFee: b.platform_fee,
               status: b.status,
               paymentMethod: "vietqr",
-              checkInQr: `DINOMAD-${b.id}`,
+              checkInQr: buildCheckInQrPayload(b.id, b.qr_code_token || ""),
+              accessCode: b.qr_code_token || undefined,
               wifiPassword: `${b.room_id}-wifi-${b.id.slice(-3)}`,
               createdAt: b.created_at,
               paidAmount: b.payment_status === "deposited"
@@ -139,7 +156,19 @@ export function BookingProvider({ children }: { children: ReactNode }) {
               pointsEarned: b.points_earned
             }
           })
-          setMyBookings(mappedBookings)
+
+          // Merge Supabase bookings and local storage bookings (avoiding duplicates)
+          const mergedBookings = [...mappedBookings]
+          localBookings.forEach((local) => {
+            if (!mergedBookings.some((db) => db.id === local.id)) {
+              mergedBookings.push(local)
+            }
+          })
+          
+          // Sort by createdAt descending
+          mergedBookings.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
+          
+          setMyBookings(mergedBookings)
         }
       } catch (err) {
         console.warn("Failed to fetch bookings from Supabase, falling back to localStorage:", err)
@@ -173,16 +202,12 @@ export function BookingProvider({ children }: { children: ReactNode }) {
     })
 
     if (typeof window !== "undefined") {
-      // Write to localStorage ONLY if guest (not logged in)
-      supabase.auth.getUser().then(({ data }) => {
-        if (!data?.user) {
-          const existing: Booking[] = JSON.parse(localStorage.getItem("dinomad_bookings") || "[]")
-          if (!existing.some((b) => b.id === booking.id)) {
-            const updated = [booking, ...existing]
-            localStorage.setItem("dinomad_bookings", JSON.stringify(updated))
-          }
-        }
-      })
+      // Write to localStorage as cache/fallback for all users
+      const existing: Booking[] = JSON.parse(localStorage.getItem("dinomad_bookings") || "[]")
+      if (!existing.some((b) => b.id === booking.id)) {
+        const updated = [booking, ...existing]
+        localStorage.setItem("dinomad_bookings", JSON.stringify(updated))
+      }
     }
   }
 

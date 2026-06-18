@@ -1,7 +1,9 @@
 import { Body, Controller, Get, Post, UseGuards } from "@nestjs/common"
 import { CurrentUser } from "../../common/decorators/current-user.decorator"
+import { Roles } from "../../common/decorators/roles.decorator"
 import type { AuthUser } from "../../common/types/auth-user"
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard"
+import { RolesGuard } from "../auth/guards/roles.guard"
 import { CreatePointTransactionDto } from "./dto/create-point-transaction.dto"
 import { RedeemPointDto } from "./dto/redeem-point.dto"
 import { PointTransactionsService } from "./point-transactions.service"
@@ -13,6 +15,8 @@ export class PointTransactionsController {
 
   // API tạo giao dịch điểm thông thường (Earn điểm khi hoàn thành / Refund điểm khi hủy đơn)
   @Post()
+  @Roles("admin")
+  @UseGuards(RolesGuard)
   create(@CurrentUser() user: AuthUser, @Body() dto: CreatePointTransactionDto) {
     return this.pointTransactionsService.create(user.id, dto)
   }

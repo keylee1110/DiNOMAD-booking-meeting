@@ -138,13 +138,14 @@ export class RoomsService {
 
     // Overlay confirmed/pending bookings so partners see booked slots as occupied
     // bookings.start_time is timestamptz; use a UTC-day range that covers venue hours (UTC+7)
-    const nextDayUtc = new Date(new Date(date + "T00:00:00Z").getTime() + 86400000).toISOString()
+    const startDayUtc = new Date(new Date(date + "T00:00:00Z").getTime() - 7 * 3600000).toISOString()
+    const endDayUtc = new Date(new Date(date + "T00:00:00Z").getTime() + 17 * 3600000).toISOString()
     const { data: activeBookings } = await this.supabase.admin
       .from("bookings")
       .select("start_time, end_time")
       .eq("room_id", roomId)
-      .gte("start_time", `${date}T00:00:00.000Z`)
-      .lt("start_time", nextDayUtc)
+      .gte("start_time", startDayUtc)
+      .lt("start_time", endDayUtc)
       .neq("status", "cancelled")
 
     // Expand each booking into 30-min slot keys (convert UTC → Vietnam UTC+7)
