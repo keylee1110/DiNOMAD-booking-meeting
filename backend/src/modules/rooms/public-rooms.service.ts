@@ -28,8 +28,8 @@ type RoomRow = {
     lat: number | null
     lng: number | null
     image_url: string | null
-    open_time: string
-    close_time: string
+    open_time: string | null
+    close_time: string | null
   }
 }
 
