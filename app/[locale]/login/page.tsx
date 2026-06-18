@@ -50,7 +50,11 @@ function LoginForm() {
       }, 800)
       
     } catch (err: any) {
-      toast.error(t("auth.loginError"))
+      if (err?.message === "Failed to fetch") {
+        toast.error(locale === "vi" ? "Không thể kết nối đến máy chủ. Vui lòng thử lại sau." : "Cannot connect to server. Please try again.")
+      } else {
+        toast.error(t("auth.loginError"))
+      }
       setIsLoading(false)
     }
   }
@@ -70,7 +74,11 @@ function LoginForm() {
         setIsLoading(false)
       }
     } catch (err: any) {
-      toast.error(locale === "vi" ? "Đăng nhập thất bại!" : "OAuth login failed!")
+      if (err?.message === "Failed to fetch") {
+        toast.error(locale === "vi" ? "Không thể kết nối đến máy chủ. Vui lòng thử lại sau." : "Cannot connect to server. Please try again.")
+      } else {
+        toast.error(locale === "vi" ? "Đăng nhập thất bại!" : "OAuth login failed!")
+      }
       setIsLoading(false)
     }
   }
