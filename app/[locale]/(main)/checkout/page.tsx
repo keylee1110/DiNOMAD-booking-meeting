@@ -58,20 +58,27 @@ export default function CheckoutPage({ params }: { params: Promise<{ locale: str
   const [redeemPoints, setRedeemPoints] = useState(false)
 
   useEffect(() => {
-    async function getPoints() {
+    async function getProfileData() {
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
         const { data, error } = await supabase
           .from("profiles")
-          .select("points")
+          .select("points, full_name, phone, email")
           .eq("id", user.id)
           .single()
         if (data && !error) {
           setUserPoints(data.points || 0)
+          setFullName(prev => prev || data.full_name || "")
+          setPhone(prev => prev || data.phone || "")
+          setEmail(prev => prev || data.email || "")
+        } else {
+          setFullName(prev => prev || user.user_metadata?.full_name || "")
+          setPhone(prev => prev || user.user_metadata?.phone || "")
+          setEmail(prev => prev || user.email || "")
         }
       }
     }
-    getPoints()
+    getProfileData()
   }, [])
 
   // Booking Flow & Payment Options (Agoda/Booking style)
@@ -91,9 +98,9 @@ export default function CheckoutPage({ params }: { params: Promise<{ locale: str
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      setFullName(state.guestName)
-      setPhone(state.guestPhone)
-      setEmail(state.guestEmail)
+      if (state.guestName) setFullName(state.guestName)
+      if (state.guestPhone) setPhone(state.guestPhone)
+      if (state.guestEmail) setEmail(state.guestEmail)
     }, 0)
     return () => clearTimeout(timer)
   }, [state.guestName, state.guestPhone, state.guestEmail])
@@ -234,10 +241,12 @@ export default function CheckoutPage({ params }: { params: Promise<{ locale: str
     const newBookingCode = generateFrontCode()
     let dbBookingCode = newBookingCode
 
-    // Sync to database if authenticated
+    // Sync to database if authenticated and room.id is a valid UUID
     try {
       const { data: { user } } = await supabase.auth.getUser()
-      if (user) {
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(room.id)
+      
+      if (user && isUuid) {
         const startTimeStr = `${state.selectedDate}T${timeRange.startTime}:00`
         const endTimeStr = `${state.selectedDate}T${timeRange.endTime}:00`
         
@@ -265,31 +274,6 @@ export default function CheckoutPage({ params }: { params: Promise<{ locale: str
           
         if (data && !error) {
           dbBookingCode = data.booking_code || newBookingCode
-          
-          // Update user points balance: add earned, subtract redeemed
-          // Deposit bookings (paymentMode === "deposit") only earn points when checking in, not at checkout.
-          const netPoints = (paymentMode === "deposit" ? 0 : pointsEarned) - pointsDiscount
-          if (netPoints !== 0) {
-            try {
-              const { error: rpcError } = await supabase.rpc("increment_user_points", {
-                user_id: user.id,
-                delta: netPoints
-              })
-              if (rpcError) throw rpcError
-            } catch (err: any) {
-              console.warn("Could not update points via RPC, trying manual update:", err)
-              // Fallback: manual fetch + update
-              const { data: profile } = await supabase
-                .from("profiles")
-                .select("points")
-                .eq("id", user.id)
-                .single()
-              if (profile) {
-                const newPoints = Math.max(0, (profile.points || 0) + netPoints)
-                await supabase.from("profiles").update({ points: newPoints }).eq("id", user.id)
-              }
-            }
-          }
         } else if (error) {
           console.warn("Supabase insert error, falling back to local storage:", error.message)
           toast.error(locale === "vi" ? `Không thể lưu đơn đặt vào database: ${error.message}` : `Failed to save booking to database: ${error.message}`)
@@ -341,7 +325,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ locale: str
     setIsPaymentDialogOpen(false)
     addBooking(newBooking)
     dispatch({ type: "SET_CONFIRMED_BOOKING", booking: newBooking })
-    router.push(`/${locale}/checkout/success`)
+    router.push(`/${locale}/checkout/success?id=${newBookingId}`)
   }
 
   if (!room || state.selectedSlots.length === 0) {
