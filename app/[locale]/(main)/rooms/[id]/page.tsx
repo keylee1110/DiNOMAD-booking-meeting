@@ -5,6 +5,7 @@ import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { useTranslation } from "@/lib/i18n/context"
 import { getRoomByIdApi } from "@/lib/api/rooms"
+import { getLocalizedRoom } from "@/lib/data/rooms"
 import { getRoomReviews } from "@/lib/api/reviews"
 import type { ApiReview } from "@/lib/api/reviews"
 import { generateTimeSlots } from "@/lib/data/time-slots"
@@ -36,7 +37,7 @@ export default function RoomDetailPage({ params }: { params: Promise<{ locale: s
 
   useEffect(() => {
     getRoomByIdApi(id, locale).then((r) => {
-      setRoom(r)
+      setRoom(r ? getLocalizedRoom(r, locale) : null)
       setRoomLoading(false)
     })
   }, [id, locale])

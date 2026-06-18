@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react"
 import { useSearchParams } from "next/navigation"
 import { useTranslation } from "@/lib/i18n/context"
 import { searchRoomsApi } from "@/lib/api/rooms"
+import { getLocalizedRoom } from "@/lib/data/rooms"
 import { RoomCard } from "@/components/room-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -87,7 +88,7 @@ export default function SearchPage() {
         break
     }
 
-    setResults(sorted)
+    setResults(sorted.map((r) => getLocalizedRoom(r, locale)))
     setTotal(result.total)
     setTotalPages(result.totalPages)
     setLoading(false)
