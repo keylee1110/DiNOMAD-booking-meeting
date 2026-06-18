@@ -1,9 +1,9 @@
 "use client"
 
-import { useState, useMemo, useCallback } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useSearchParams } from "next/navigation"
 import { useTranslation } from "@/lib/i18n/context"
-import { searchRooms } from "@/lib/data/rooms"
+import { searchRoomsApi } from "@/lib/api/rooms"
 import { RoomCard } from "@/components/room-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -64,23 +64,14 @@ export default function SearchPage() {
   const [page, setPage] = useState(1)
   const [sortBy, setSortBy] = useState("rating")
   const [viewMode, setViewMode] = useState<"list" | "map">("list")
+  const [results, setResults] = useState<Room[]>([])
+  const [total, setTotal] = useState(0)
+  const [totalPages, setTotalPages] = useState(1)
+  const [loading, setLoading] = useState(true)
 
-  const toggleAmenity = useCallback((amenity: string) => {
-    setSelectedAmenities(prev =>
-      prev.includes(amenity) ? prev.filter(a => a !== amenity) : [...prev, amenity]
-    )
-    setPage(1)
-  }, [])
-
-  const toggleVibe = useCallback((vibe: string) => {
-    setSelectedVibes(prev =>
-      prev.includes(vibe) ? prev.filter(v => v !== vibe) : [...prev, vibe]
-    )
-    setPage(1)
-  }, [])
-
-  const { results, total, totalPages } = useMemo(() => {
-    const result = searchRooms({
+  const fetchResults = useCallback(async () => {
+    setLoading(true)
+    const result = await searchRoomsApi({
       district: district || undefined,
       minCapacity: minCapacity || undefined,
       maxPrice: maxPrice[0],
@@ -90,7 +81,6 @@ export default function SearchPage() {
       category: category || undefined,
       verified: verifiedOnly || undefined,
       noiseLevelMin: noiseLevelMin || undefined,
-      date: selectedDate ? selectedDate.toISOString().split("T")[0] : undefined,
       page,
       pageSize: PAGE_SIZE,
     }, locale)
@@ -108,8 +98,29 @@ export default function SearchPage() {
         break
     }
 
-    return { results: sorted, total: result.total, totalPages: result.totalPages }
-  }, [query, district, maxPrice, minCapacity, selectedAmenities, selectedVibes, category, verifiedOnly, noiseLevelMin, selectedDate, page, sortBy, locale])
+    setResults(sorted)
+    setTotal(result.total)
+    setTotalPages(result.totalPages)
+    setLoading(false)
+  }, [query, district, maxPrice, minCapacity, selectedAmenities, selectedVibes, category, verifiedOnly, page, sortBy, locale])
+
+  useEffect(() => {
+    fetchResults()
+  }, [fetchResults])
+
+  const toggleAmenity = useCallback((amenity: string) => {
+    setSelectedAmenities(prev =>
+      prev.includes(amenity) ? prev.filter(a => a !== amenity) : [...prev, amenity]
+    )
+    setPage(1)
+  }, [])
+
+  const toggleVibe = useCallback((vibe: string) => {
+    setSelectedVibes(prev =>
+      prev.includes(vibe) ? prev.filter(v => v !== vibe) : [...prev, vibe]
+    )
+    setPage(1)
+  }, [])
 
   const clearFilters = () => {
     setQuery("")
@@ -444,7 +455,11 @@ export default function SearchPage() {
         <div className="flex-1">
           {viewMode === "list" ? (
             <>
-              {results.length > 0 ? (
+              {loading ? (
+                <div className="flex items-center justify-center py-16">
+                  <div className="h-8 w-8 animate-spin rounded-full border-4 border-border border-t-primary" />
+                </div>
+              ) : results.length > 0 ? (
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   {results.map((room) => (
                     <RoomCard key={room.id} room={room} />
@@ -461,7 +476,7 @@ export default function SearchPage() {
               )}
 
               {/* Pagination */}
-              {totalPages > 1 && (
+              {!loading && totalPages > 1 && (
                 <div className="mt-8 flex items-center justify-center gap-2">
                   <Button
                     variant="outline"
@@ -498,32 +513,38 @@ export default function SearchPage() {
           ) : (
             /* Map View — Leaflet */
             <div className="h-[600px] overflow-hidden rounded-xl border border-border">
-              <MapContainer
-                center={[10.78, 106.70]}
-                zoom={12}
-                className="h-full w-full"
-                scrollWheelZoom={true}
-              >
-                <TileLayer
-                  attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                />
-                {results.map((room: Room) => (
-                  <Marker
-                    key={room.id}
-                    position={[room.lat, room.lng]}
-                    icon={defaultIcon}
-                  >
-                    <Popup>
-                      <div className="text-sm">
-                        <p className="font-semibold">{room.name}</p>
-                        <p className="text-xs text-muted-foreground">{room.venueName}</p>
-                        <p className="mt-1 font-bold text-primary">{formatVND(room.pricePerHour)}{t("common.perHour")}</p>
-                      </div>
-                    </Popup>
-                  </Marker>
-                ))}
-              </MapContainer>
+              {loading ? (
+                <div className="flex h-full items-center justify-center">
+                  <div className="h-8 w-8 animate-spin rounded-full border-4 border-border border-t-primary" />
+                </div>
+              ) : (
+                <MapContainer
+                  center={[10.78, 106.70]}
+                  zoom={12}
+                  className="h-full w-full"
+                  scrollWheelZoom={true}
+                >
+                  <TileLayer
+                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                  />
+                  {results.map((room: Room) => (
+                    <Marker
+                      key={room.id}
+                      position={[room.lat, room.lng]}
+                      icon={defaultIcon}
+                    >
+                      <Popup>
+                        <div className="text-sm">
+                          <p className="font-semibold">{room.name}</p>
+                          <p className="text-xs text-muted-foreground">{room.venueName}</p>
+                          <p className="mt-1 font-bold text-primary">{formatVND(room.pricePerHour)}{t("common.perHour")}</p>
+                        </div>
+                      </Popup>
+                    </Marker>
+                  ))}
+                </MapContainer>
+              )}
             </div>
           )}
         </div>
