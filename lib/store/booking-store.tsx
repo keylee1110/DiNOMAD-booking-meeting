@@ -72,6 +72,9 @@ interface BookingContextType {
 
 const BookingContext = createContext<BookingContextType | null>(null)
 
+
+
+
 export function BookingProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(bookingReducer, initialState)
   const [myBookings, setMyBookings] = useState<Booking[]>([])
@@ -87,6 +90,16 @@ export function BookingProvider({ children }: { children: ReactNode }) {
       console.warn("Could not get supabase user:", e)
     }
 
+    // Load local bookings as cache/fallback
+    let localBookings: Booking[] = []
+    if (typeof window !== "undefined") {
+      try {
+        localBookings = JSON.parse(localStorage.getItem("dinomad_bookings") || "[]")
+      } catch (e) {
+        console.error("Failed to parse local bookings:", e)
+      }
+    }
+
     if (user) {
       // Logged-in user: Fetch from Supabase
       try {
@@ -94,9 +107,9 @@ export function BookingProvider({ children }: { children: ReactNode }) {
           .from("bookings")
           .select(`
             *,
-            rooms!inner(
+            rooms(
               name,
-              venues!inner(name, address)
+              venues(name, address)
             )
           `)
           .eq("customer_id", user.id)
@@ -143,7 +156,19 @@ export function BookingProvider({ children }: { children: ReactNode }) {
               pointsEarned: b.points_earned
             }
           })
-          setMyBookings(mappedBookings)
+
+          // Merge Supabase bookings and local storage bookings (avoiding duplicates)
+          const mergedBookings = [...mappedBookings]
+          localBookings.forEach((local) => {
+            if (!mergedBookings.some((db) => db.id === local.id)) {
+              mergedBookings.push(local)
+            }
+          })
+          
+          // Sort by createdAt descending
+          mergedBookings.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
+          
+          setMyBookings(mergedBookings)
         }
       } catch (err) {
         console.warn("Failed to fetch bookings from Supabase, falling back to localStorage:", err)
@@ -177,16 +202,12 @@ export function BookingProvider({ children }: { children: ReactNode }) {
     })
 
     if (typeof window !== "undefined") {
-      // Write to localStorage ONLY if guest (not logged in)
-      supabase.auth.getUser().then(({ data }) => {
-        if (!data?.user) {
-          const existing: Booking[] = JSON.parse(localStorage.getItem("dinomad_bookings") || "[]")
-          if (!existing.some((b) => b.id === booking.id)) {
-            const updated = [booking, ...existing]
-            localStorage.setItem("dinomad_bookings", JSON.stringify(updated))
-          }
-        }
-      })
+      // Write to localStorage as cache/fallback for all users
+      const existing: Booking[] = JSON.parse(localStorage.getItem("dinomad_bookings") || "[]")
+      if (!existing.some((b) => b.id === booking.id)) {
+        const updated = [booking, ...existing]
+        localStorage.setItem("dinomad_bookings", JSON.stringify(updated))
+      }
     }
   }
 

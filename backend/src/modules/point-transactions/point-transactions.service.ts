@@ -4,7 +4,7 @@ import { CreatePointTransactionDto } from "./dto/create-point-transaction.dto"
 
 type PointTransactionRow = {
   id: string
-  customer_id: string
+  profile_id: string
   booking_id: string | null
   amount: number
   type: "earn" | "redeem" | "refund"
@@ -16,24 +16,16 @@ type PointTransactionRow = {
 export class PointTransactionsService {
   constructor(private readonly supabase: SupabaseService) {}
 
-  // Lấy tổng điểm khả dụng
+  // Lấy tổng điểm khả dụng trực tiếp từ bảng profiles (nguồn chân lý được cập nhật bởi trigger)
   async getBalance(userId: string) {
     const { data, error } = await this.supabase.admin
-      .from("point_transactions")
-      .select("amount, type")
-      .eq("customer_id", userId)
-      .returns<Pick<PointTransactionRow, "amount" | "type">[]>()
+      .from("profiles")
+      .select("points")
+      .eq("id", userId)
+      .single()
 
-    if (error) throw new Error(error.message)
-
-    // earn/refund thì cộng vào, redeem thì trừ ra
-    const balance = data.reduce((total, tx) => {
-      if (tx.type === "earn" || tx.type === "refund") return total + tx.amount
-      if (tx.type === "redeem") return total - tx.amount
-      return total
-    }, 0)
-
-    return { balance }
+    if (error || !data) throw new Error(error?.message ?? "Profile not found")
+    return { balance: data.points || 0 }
   }
 
   // Hàm xử lý riêng cho việc Đổi điểm (Redeem) lúc thanh toán
@@ -65,12 +57,13 @@ export class PointTransactionsService {
     }
 
     // 4. Hợp lệ -> Thực hiện trừ điểm
+    // Lưu ý: Trường amount cho loại giao dịch 'redeem' trong DB trigger được lưu dưới dạng số âm
     const { data, error } = await this.supabase.admin
       .from("point_transactions")
       .insert({
-        customer_id: userId,
+        profile_id: userId,
         booking_id: bookingId,
-        amount: pointsToRedeem,
+        amount: -pointsToRedeem,
         type: "redeem",
         description: `Dùng ${pointsToRedeem} điểm giảm giá cho đơn hàng ${bookingId}`,
       })
@@ -86,7 +79,7 @@ export class PointTransactionsService {
     const { data, error } = await this.supabase.admin
       .from("point_transactions")
       .insert({
-        customer_id: userId,
+        profile_id: userId,
         booking_id: dto.bookingId ?? null,
         amount: dto.amount,
         type: dto.type,
@@ -104,7 +97,7 @@ export class PointTransactionsService {
     const { data, error } = await this.supabase.admin
       .from("point_transactions")
       .select("*")
-      .eq("customer_id", userId)
+      .eq("profile_id", userId)
       .order("created_at", { ascending: false })
 
     if (error) throw new Error(error.message)

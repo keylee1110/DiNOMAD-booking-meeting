@@ -67,7 +67,7 @@ export class ScannerService {
       const checkedInAt = new Date().toISOString()
       const { error } = await this.supabase.admin
         .from("bookings")
-        .update({ checked_in_at: checkedInAt })
+        .update({ checked_in_at: checkedInAt, status: "checked_in" })
         .eq("id", bookingId)
 
       if (error) {
@@ -75,7 +75,7 @@ export class ScannerService {
         throw new InternalServerErrorException(`Check-in failed: ${error.message}`)
       }
 
-      const resolved = await this.resolve({ ...booking, checked_in_at: checkedInAt }, supplierId)
+      const resolved = await this.resolve({ ...booking, checked_in_at: checkedInAt, status: "checked_in" }, supplierId)
       return this.toResponse(resolved)
     } catch (err) {
       if (err instanceof NotFoundException || err instanceof ForbiddenException || err instanceof BadRequestException || err instanceof InternalServerErrorException) throw err
