@@ -11,6 +11,7 @@ export type Amenity =
   | "coffee"
   | "water"
   | "parking"
+  | "printing"
 
 export type VibeTag =
   | "ultra_quiet"

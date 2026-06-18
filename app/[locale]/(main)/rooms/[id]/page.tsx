@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect, use } from "react"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { useTranslation } from "@/lib/i18n/context"
-import { getRoomById } from "@/lib/data/rooms"
+import { getRoomByIdApi } from "@/lib/api/rooms"
 import { getRoomReviews } from "@/lib/api/reviews"
 import type { ApiReview } from "@/lib/api/reviews"
 import { generateTimeSlots } from "@/lib/data/time-slots"
@@ -19,7 +19,8 @@ import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { Star, MapPin, Users, ChevronLeft, ChevronRight, ExternalLink, Minus, Plus, Heart } from "lucide-react"
-import type { TimeSlot } from "@/lib/types"
+import { Skeleton } from "@/components/ui/skeleton"
+import type { TimeSlot, Room } from "@/lib/types"
 import { notFound } from "next/navigation"
 import { cn } from "@/lib/utils"
 
@@ -30,7 +31,33 @@ export default function RoomDetailPage({ params }: { params: Promise<{ locale: s
   const { state, dispatch, wishlist, toggleWishlist } = useBooking()
   const isFavorited = wishlist ? wishlist.includes(id) : false
 
-  const room = getRoomById(id, locale)
+  const [room, setRoom] = useState<Room | null>(null)
+  const [roomLoading, setRoomLoading] = useState(true)
+
+  useEffect(() => {
+    getRoomByIdApi(id, locale).then((r) => {
+      setRoom(r)
+      setRoomLoading(false)
+    })
+  }, [id, locale])
+
+  if (roomLoading) {
+    return (
+      <div className="mx-auto max-w-7xl px-4 py-8">
+        <div className="grid gap-8 lg:grid-cols-[1fr_380px]">
+          <div className="space-y-6">
+            <Skeleton className="aspect-[16/9] w-full rounded-xl" />
+            <Skeleton className="h-8 w-2/3" />
+            <Skeleton className="h-4 w-1/3" />
+            <Skeleton className="h-32 w-full" />
+          </div>
+          <div className="space-y-4">
+            <Skeleton className="h-48 w-full rounded-xl" />
+          </div>
+        </div>
+      </div>
+    )
+  }
   if (!room) notFound()
 
   const [reviews, setReviews] = useState<ApiReview[]>([])

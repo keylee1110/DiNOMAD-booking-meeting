@@ -6,7 +6,9 @@ type RoomRow = {
   id: string
   venue_id: string
   name: string
+  name_vi: string | null
   description: string
+  description_vi: string | null
   capacity: number
   price_per_hour: number
   category: string | null
@@ -14,15 +16,18 @@ type RoomRow = {
   verified: boolean
   noise_level: number | null
   specs: Record<string, string>
+  specs_vi: Record<string, string>
   created_at: string
   updated_at: string
   room_amenities?: { amenity: string }[]
   room_vibe_tags?: { vibe_tag: string }[]
-  room_images?: { id: string; image_url: string; sort_order: number }[]
+  room_images?: { image_url: string; sort_order: number }[]
   venues?: {
     id: string
     name: string
+    name_vi: string | null
     address: string
+    address_vi: string | null
     district: string
     city: string
     lat: number | null
@@ -31,6 +36,12 @@ type RoomRow = {
     open_time: string | null
     close_time: string | null
   }
+}
+
+type RoomAggregation = {
+  room_id: string
+  avg_rating: number | null
+  review_count: number
 }
 
 export interface SearchRoomsQuery {
@@ -61,8 +72,8 @@ export class PublicRoomsService {
         `*,
         room_amenities(amenity),
         room_vibe_tags(vibe_tag),
-        room_images(id, image_url, sort_order),
-        venues!inner(id, name, address, district, city, lat, lng, image_url, open_time, close_time)
+        room_images(image_url, sort_order),
+        venues!inner(id, name, name_vi, address, address_vi, district, city, lat, lng, image_url, open_time, close_time)
         `,
       )
       .eq("status", "published")
@@ -124,7 +135,11 @@ export class PublicRoomsService {
     const start = (page - 1) * pageSize
     const paginated = filtered.slice(start, start + pageSize)
 
-    const rooms = paginated.map((r) => this.toPublicRoomResponse(r))
+    const roomIds = paginated.map((r) => r.id)
+    const aggregations = roomIds.length > 0 ? await this.fetchRoomAggregations(roomIds) : []
+    const aggMap = new Map(aggregations.map((a) => [a.room_id, a]))
+
+    const rooms = paginated.map((r) => this.toPublicRoomResponse(r, aggMap.get(r.id)))
 
     return { rooms, total, page, pageSize, totalPages }
   }
@@ -136,8 +151,8 @@ export class PublicRoomsService {
         `*,
         room_amenities(amenity),
         room_vibe_tags(vibe_tag),
-        room_images(id, image_url, sort_order),
-        venues!inner(id, name, address, district, city, lat, lng, image_url, open_time, close_time)
+        room_images(image_url, sort_order),
+        venues!inner(id, name, name_vi, address, address_vi, district, city, lat, lng, image_url, open_time, close_time)
         `,
       )
       .eq("id", id)
@@ -147,38 +162,84 @@ export class PublicRoomsService {
 
     if (error || !data) throw new NotFoundException("Room not found")
 
-    return this.toPublicRoomResponse(data as RoomRow)
+    const room = data as RoomRow
+    const aggregations = await this.fetchRoomAggregations([id])
+    const agg = aggregations[0]
+
+    return this.toPublicRoomResponse(room, agg)
   }
 
-  private toPublicRoomResponse(room: RoomRow) {
+  private async fetchRoomAggregations(roomIds: string[]): Promise<RoomAggregation[]> {
+    if (roomIds.length === 0) return []
+
+    const { data, error } = await this.supabase.admin
+      .from("reviews")
+      .select("room_id, rating")
+      .in("room_id", roomIds)
+
+    if (error) throw new Error(error.message)
+
+    const grouped = new Map<string, number[]>()
+    for (const row of data ?? []) {
+      const list = grouped.get(row.room_id) ?? []
+      list.push(row.rating)
+      grouped.set(row.room_id, list)
+    }
+
+    return roomIds.map((roomId) => {
+      const ratings = grouped.get(roomId) ?? []
+      const sum = ratings.reduce((s, r) => s + r, 0)
+      return {
+        room_id: roomId,
+        avg_rating: ratings.length > 0 ? Math.round((sum / ratings.length) * 10) / 10 : null,
+        review_count: ratings.length,
+      }
+    })
+  }
+
+  private toPublicRoomResponse(
+    room: RoomRow,
+    agg?: RoomAggregation,
+  ) {
     const venue = room.venues!
+    const images = (room.room_images ?? [])
+      .sort((a, b) => a.sort_order - b.sort_order)
+      .map((img) => img.image_url)
+    const capacity = room.capacity
     return {
       id: room.id,
       venueId: room.venue_id,
       venueName: venue.name,
-      venueAddress: venue.address,
-      district: venue.district,
-      city: venue.city,
-      lat: venue.lat,
-      lng: venue.lng,
-      venueImageUrl: venue.image_url,
-      openTime: venue.open_time,
-      closeTime: venue.close_time,
+      venueNameVi: venue.name_vi ?? undefined,
       name: room.name,
+      nameVi: room.name_vi ?? undefined,
       description: room.description,
-      capacity: room.capacity,
+      descriptionVi: room.description_vi ?? undefined,
+      district: venue.district,
+      address: venue.address,
+      addressVi: venue.address_vi ?? undefined,
+      capacity,
       pricePerHour: room.price_per_hour,
-      category: room.category,
-      verified: room.verified,
-      noiseLevel: room.noise_level,
-      specs: room.specs ?? {},
       amenities: (room.room_amenities ?? []).map((a) => a.amenity),
       vibeTags: (room.room_vibe_tags ?? []).map((v) => v.vibe_tag),
-      images: (room.room_images ?? [])
-        .sort((a, b) => a.sort_order - b.sort_order)
-        .map((img) => ({ id: img.id, imageUrl: img.image_url, sortOrder: img.sort_order })),
-      createdAt: room.created_at,
-      updatedAt: room.updated_at,
+      images,
+      rating: agg?.avg_rating ?? 0,
+      reviewCount: agg?.review_count ?? 0,
+      verified: room.verified,
+      noiseLevel: room.noise_level ?? undefined,
+      specs: (room.specs ?? {}) as Record<string, string>,
+      specsVi: (room.specs_vi ?? {}) as Record<string, string>,
+      category: room.category ?? undefined,
+      lat: venue.lat ?? 0,
+      lng: venue.lng ?? 0,
+      slotsLeftToday: this.computeSlotsLeft(venue.open_time, venue.close_time),
     }
+  }
+
+  private computeSlotsLeft(openTime: string | null, closeTime: string | null): number {
+    if (!openTime || !closeTime) return 10
+    const openHour = parseInt(openTime.split(":")[0], 10)
+    const closeHour = parseInt(closeTime.split(":")[0], 10)
+    return Math.max(0, (closeHour - openHour) * 2)
   }
 }
