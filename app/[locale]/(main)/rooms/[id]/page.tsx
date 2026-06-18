@@ -34,13 +34,35 @@ export default function RoomDetailPage({ params }: { params: Promise<{ locale: s
 
   const [room, setRoom] = useState<Room | null>(null)
   const [roomLoading, setRoomLoading] = useState(true)
+  const [reviews, setReviews] = useState<ApiReview[]>([])
+  const [reviewsLoading, setReviewsLoading] = useState(true)
+  const [currentImageIndex, setCurrentImageIndex] = useState(0)
+  const [selectedDate, setSelectedDate] = useState(getNextDays(1)[0])
+  const [selectedSlots, setSelectedSlots] = useState<TimeSlot[]>([])
+  const [holdExpired, setHoldExpired] = useState(false)
+  const [holdTimerKey, setHoldTimerKey] = useState(0)
+  const [splitPeople, setSplitPeople] = useState(2)
 
   useEffect(() => {
     getRoomByIdApi(id, locale).then((r) => {
-      setRoom(r ? getLocalizedRoom(r, locale) : null)
+      const loaded = r ? getLocalizedRoom(r, locale) : null
+      setRoom(loaded)
+      setSplitPeople(loaded?.capacity || 2)
       setRoomLoading(false)
     })
   }, [id, locale])
+
+  useEffect(() => {
+    getRoomReviews(id)
+      .then(setReviews)
+      .catch(() => {})
+      .finally(() => setReviewsLoading(false))
+  }, [id])
+
+  const slots = useMemo(() => {
+    if (!room) return []
+    return generateTimeSlots(selectedDate, room.id)
+  }, [selectedDate, room?.id])
 
   if (roomLoading) {
     return (
@@ -60,26 +82,6 @@ export default function RoomDetailPage({ params }: { params: Promise<{ locale: s
     )
   }
   if (!room) notFound()
-
-  const [reviews, setReviews] = useState<ApiReview[]>([])
-  const [reviewsLoading, setReviewsLoading] = useState(true)
-  const [currentImageIndex, setCurrentImageIndex] = useState(0)
-  const [selectedDate, setSelectedDate] = useState(getNextDays(1)[0])
-  const [selectedSlots, setSelectedSlots] = useState<TimeSlot[]>([])
-  const [holdExpired, setHoldExpired] = useState(false)
-  const [holdTimerKey, setHoldTimerKey] = useState(0)
-
-  // Split bill states
-  const [splitPeople, setSplitPeople] = useState(room?.capacity || 2)
-
-  useEffect(() => {
-    getRoomReviews(id)
-      .then(setReviews)
-      .catch(() => {})
-      .finally(() => setReviewsLoading(false))
-  }, [id])
-
-  const slots = useMemo(() => generateTimeSlots(selectedDate, room.id), [selectedDate, room.id])
 
   const handleToggleSlot = (slot: TimeSlot) => {
     setSelectedSlots((prev) => {
