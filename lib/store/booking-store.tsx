@@ -65,7 +65,7 @@ interface BookingContextType {
   dispatch: React.Dispatch<BookingAction>
   myBookings: Booking[]
   addBooking: (booking: Booking) => void
-  refreshBookings: () => void
+  refreshBookings: (passedUser?: any) => void
   wishlist: string[]
   toggleWishlist: (roomId: string) => Promise<void>
 }
@@ -81,13 +81,15 @@ export function BookingProvider({ children }: { children: ReactNode }) {
   const [wishlist, setWishlist] = useState<string[]>([])
   const supabase = createClient()
 
-  const refreshBookings = async () => {
-    let user = null
-    try {
-      const { data } = await supabase.auth.getUser()
-      user = data?.user
-    } catch (e) {
-      console.warn("Could not get supabase user:", e)
+  const refreshBookings = async (passedUser?: any) => {
+    let user = passedUser
+    if (!user) {
+      try {
+        const { data } = await supabase.auth.getUser()
+        user = data?.user
+      } catch (e) {
+        console.warn("Could not get supabase user:", e)
+      }
     }
 
     // Load local bookings as cache/fallback
@@ -247,6 +249,7 @@ export function BookingProvider({ children }: { children: ReactNode }) {
   }
 
   useEffect(() => {
+    // Defer non-critical initial data loads to after first paint
     const timer = setTimeout(() => {
       refreshBookings()
       if (typeof window !== "undefined") {
@@ -259,19 +262,19 @@ export function BookingProvider({ children }: { children: ReactNode }) {
           }
         }
       }
-    }, 0)
+    }, 100) // small delay so initial paint isn't blocked
     return () => clearTimeout(timer)
   }, [])
 
   // Sync wishlist and bookings with database on auth changes
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event: string, session: any) => {
       // Trigger a bookings list refresh
-      refreshBookings()
+      refreshBookings(session?.user)
 
       if (session?.user) {
         try {
-          const data = await apiGetWishlist()
+          const data = await apiGetWishlist(session.access_token)
           setWishlist(data.map(item => item.room_id))
           return
         } catch (e) {

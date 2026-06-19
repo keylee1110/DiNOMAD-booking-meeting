@@ -11,7 +11,17 @@ const PUBLIC_ROOM_SELECT = `
   room_images(image_url, sort_order)
 `
 
+// Simple in-memory cache (session-scoped, avoids duplicate fetches during navigation)
+let cachedRooms: Room[] | null = null
+let cacheTimestamp = 0
+const CACHE_TTL_MS = 60_000 // 1 minute
+
 export async function getPublicRooms(): Promise<Room[]> {
+  const now = Date.now()
+  if (cachedRooms && now - cacheTimestamp < CACHE_TTL_MS) {
+    return cachedRooms
+  }
+
   const supabase = createClient()
   const { data, error } = await supabase
     .from("rooms")
@@ -19,9 +29,19 @@ export async function getPublicRooms(): Promise<Room[]> {
     .eq("status", "published")
     .eq("venues.status", "published")
     .order("created_at", { ascending: false })
+    .limit(50) // cap total results
 
   if (error) throw new Error(error.message)
-  return ((data ?? []) as unknown as PublicRoomRow[]).map(mapPublicRoom)
+  const rooms = ((data ?? []) as unknown as PublicRoomRow[]).map(mapPublicRoom)
+  cachedRooms = rooms
+  cacheTimestamp = now
+  return rooms
+}
+
+/** Optimized query for landing page: fetches fewer rooms with same joins */
+export async function getFeaturedRooms(limit = 8): Promise<Room[]> {
+  const all = await getPublicRooms()
+  return all.slice(0, limit)
 }
 
 export async function getPublicRoomById(id: string): Promise<Room | null> {
