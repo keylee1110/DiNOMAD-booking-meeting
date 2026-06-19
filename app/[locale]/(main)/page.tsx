@@ -23,6 +23,7 @@ export default function LandingPage() {
   const [capacity, setCapacity] = useState("")
   const [activeTab, setActiveTab] = useState<"team_hub" | "solo_nook">("team_hub")
   const [availableRooms, setAvailableRooms] = useState<any[]>([])
+  const [roomsLoading, setRoomsLoading] = useState(true)
 
   useEffect(() => {
     getPublicRooms()
@@ -30,6 +31,7 @@ export default function LandingPage() {
         setAvailableRooms(publicRooms)
       })
       .catch((error) => console.warn("Could not load published partner rooms:", error))
+      .finally(() => setRoomsLoading(false))
   }, [])
 
   const featuredRooms = availableRooms
@@ -230,9 +232,28 @@ export default function LandingPage() {
           </div>
 
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4 animate-in fade-in slide-in-from-bottom-6 duration-1000 delay-100">
-            {featuredRooms.map((room) => (
-              <RoomCard key={room.id} room={room} />
-            ))}
+            {roomsLoading ? (
+              // Skeleton cards while loading
+              Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="rounded-2xl overflow-hidden border border-border/40 bg-card animate-pulse">
+                  <div className="aspect-[4/3] bg-muted/50" />
+                  <div className="p-4 space-y-3">
+                    <div className="h-5 w-3/4 rounded-lg bg-muted/60" />
+                    <div className="h-4 w-1/2 rounded-lg bg-muted/40" />
+                    <div className="h-4 w-2/3 rounded-lg bg-muted/30" />
+                    <div className="h-8 w-full rounded-lg bg-muted/30 mt-4" />
+                  </div>
+                </div>
+              ))
+            ) : featuredRooms.length > 0 ? (
+              featuredRooms.map((room) => (
+                <RoomCard key={room.id} room={room} />
+              ))
+            ) : (
+              <div className="col-span-full py-12 text-center text-muted-foreground">
+                <p className="text-sm font-medium">{t("landing.noRooms")}</p>
+              </div>
+            )}
           </div>
 
           <div className="mt-8 text-center md:hidden">

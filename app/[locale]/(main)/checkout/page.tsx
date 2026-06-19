@@ -247,40 +247,61 @@ export default function CheckoutPage({ params }: { params: Promise<{ locale: str
       const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(room.id)
       
       if (user && isUuid) {
-        const startTimeStr = `${state.selectedDate}T${timeRange.startTime}:00`
-        const endTimeStr = `${state.selectedDate}T${timeRange.endTime}:00`
+        // Build UTC-safe ISO timestamps: treat date+time as UTC+7 (Vietnam) explicitly
+        // This avoids issues where new Date(localString) may shift the time by timezone offset
+        const toVietnamUTC = (date: string, time: string) => {
+          const [h, m] = time.split(":").map(Number)
+          const [year, month, day] = date.split("-").map(Number)
+          // Vietnam is UTC+7; subtract 7 hours to get UTC
+          const utcDate = new Date(Date.UTC(year, month - 1, day, h - 7, m, 0, 0))
+          return utcDate.toISOString()
+        }
+
+        const startISO = toVietnamUTC(state.selectedDate, timeRange.startTime)
+        const endISO = toVietnamUTC(state.selectedDate, timeRange.endTime)
         
+        const insertPayload = {
+          id: newBookingId,
+          room_id: room.id,
+          customer_id: user.id,
+          booking_date: state.selectedDate,
+          start_time: startISO,
+          end_time: endISO,
+          status: "confirmed" as const,
+          price_per_hour: room.pricePerHour,
+          subtotal: fees.roomFee,
+          platform_fee: fees.platformFee,
+          total_amount: finalPayableTotal,
+          points_redeemed: pointsDiscount,
+          points_earned: pointsEarned,
+          booking_code: newBookingCode,
+          payment_status: paymentMode === "deposit" ? "deposited" : "fully_paid",
+        }
+
         const { data, error } = await supabase
           .from("bookings")
-          .insert({
-            id: newBookingId,
-            room_id: room.id,
-            customer_id: user.id,
-            booking_date: state.selectedDate,
-            start_time: new Date(startTimeStr).toISOString(),
-            end_time: new Date(endTimeStr).toISOString(),
-            status: "confirmed",
-            price_per_hour: room.pricePerHour,
-            subtotal: fees.roomFee,
-            platform_fee: fees.platformFee,
-            total_amount: finalPayableTotal,
-            points_redeemed: pointsDiscount,
-            points_earned: pointsEarned,
-            booking_code: newBookingCode,
-            payment_status: paymentMode === "deposit" ? "deposited" : "fully_paid"
-          })
+          .insert(insertPayload)
           .select()
           .single()
           
         if (data && !error) {
           dbBookingCode = data.booking_code || newBookingCode
+          console.info("[Booking] Saved to DB:", data.id, data.booking_code)
         } else if (error) {
-          console.warn("Supabase insert error, falling back to local storage:", error.message)
-          toast.error(locale === "vi" ? `Không thể lưu đơn đặt vào database: ${error.message}` : `Failed to save booking to database: ${error.message}`)
+          console.error("[Booking] Supabase insert error:", error.code, error.message, error.details, error.hint)
+          toast.error(
+            locale === "vi"
+              ? `Không thể lưu đơn đặt: ${error.message}${error.details ? ` (${error.details})` : ""}`
+              : `Failed to save booking: ${error.message}${error.details ? ` (${error.details})` : ""}`
+          )
         }
+      } else if (!user) {
+        console.info("[Booking] Guest user — saved to localStorage only.")
+      } else if (!isUuid) {
+        console.warn("[Booking] room.id is not a valid UUID, skipping DB insert:", room.id)
       }
     } catch (e: any) {
-      console.warn("Supabase insert exception, falling back to local storage:", e)
+      console.error("[Booking] Insert exception:", e)
       toast.error(locale === "vi" ? `Lỗi hệ thống khi lưu đơn đặt: ${e.message || e}` : `System error saving booking: ${e.message || e}`)
     }
 
