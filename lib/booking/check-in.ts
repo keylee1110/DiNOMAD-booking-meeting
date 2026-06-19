@@ -1,5 +1,5 @@
-export function selectCustomerRooms<T>(publicRooms: T[], demoRooms: T[]): T[] {
-  return publicRooms.length > 0 ? publicRooms : demoRooms
+export function selectCustomerRooms<T>(publicRooms: T[], _demoRooms: T[]): T[] {
+  return publicRooms
 }
 
 export function createAccessCode(): string {

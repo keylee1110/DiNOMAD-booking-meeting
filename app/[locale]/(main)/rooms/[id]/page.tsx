@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect, use } from "react"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { useTranslation } from "@/lib/i18n/context"
-import { getRoomById } from "@/lib/data/rooms"
+
 import { getPublicRoomById } from "@/lib/api/public-rooms"
 import { getRoomReviews } from "@/lib/api/reviews"
 import type { ApiReview } from "@/lib/api/reviews"
@@ -31,9 +31,8 @@ export default function RoomDetailPage({ params }: { params: Promise<{ locale: s
   const { state, dispatch, wishlist, toggleWishlist } = useBooking()
   const isFavorited = wishlist ? wishlist.includes(id) : false
 
-  const demoRoom = getRoomById(id, locale) ?? null
-  const [room, setRoom] = useState<Room | null>(demoRoom)
-  const [roomLoading, setRoomLoading] = useState(!demoRoom)
+  const [room, setRoom] = useState<Room | null>(null)
+  const [roomLoading, setRoomLoading] = useState(true)
   const [reviews, setReviews] = useState<ApiReview[]>([])
   const [reviewsLoading, setReviewsLoading] = useState(true)
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
@@ -43,11 +42,9 @@ export default function RoomDetailPage({ params }: { params: Promise<{ locale: s
   const [holdTimerKey, setHoldTimerKey] = useState(0)
 
   // Split bill states
-  const [splitPeople, setSplitPeople] = useState(demoRoom?.capacity || 2)
+  const [splitPeople, setSplitPeople] = useState(1)
 
   useEffect(() => {
-    if (demoRoom) return
-
     getPublicRoomById(id)
       .then((publicRoom) => {
         setRoom(publicRoom)
@@ -55,7 +52,7 @@ export default function RoomDetailPage({ params }: { params: Promise<{ locale: s
       })
       .catch((error) => console.warn("Could not load published room:", error))
       .finally(() => setRoomLoading(false))
-  }, [demoRoom, id])
+  }, [id])
 
   useEffect(() => {
     getRoomReviews(id)

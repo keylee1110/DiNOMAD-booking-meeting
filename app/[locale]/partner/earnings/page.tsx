@@ -3,8 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { useTranslation } from "@/lib/i18n/context"
 import { TrendingUp, TrendingDown, DollarSign, BarChart3, Clock, Loader2 } from "lucide-react"
-import { earningsData as mockChartData } from "@/lib/data/venues"
-import { bookings as mockBookings } from "@/lib/data/bookings"
+
 import { formatVND } from "@/lib/format"
 import { cn } from "@/lib/utils"
 import {
@@ -16,35 +15,15 @@ import {
 const COMMISSION_RATE = 0.10
 type Period = "daily" | "weekly" | "monthly"
 
-function buildMockResponse(): EarningsResponse {
-  const eligible = mockBookings.filter(
-    b => b.status === "confirmed" || b.status === "completed",
-  )
-  return {
-    summary: {
-      totalRevenue: mockChartData.reduce((s, d) => s + d.revenue, 0),
-      totalCommission: mockChartData.reduce((s, d) => s + d.commission, 0),
-      totalNet: mockChartData.reduce((s, d) => s + d.revenue - d.commission, 0),
-      pendingPayout: mockBookings
-        .filter(b => b.status === "confirmed")
-        .reduce((s, b) => s + (b.roomFee - b.platformFee), 0),
-    },
-    chartData: mockChartData.map(d => ({ date: d.date, revenue: d.revenue, commission: d.commission })),
-    bookings: eligible.sort((a, b) => b.date.localeCompare(a.date)).map(b => ({
-      id: b.id,
-      bookingCode: b.id,
-      roomName: b.roomName,
-      guestName: b.guestName,
-      date: b.date,
-      startTime: b.startTime,
-      endTime: b.endTime,
-      status: b.status,
-      subtotal: b.roomFee,
-      platformFee: b.platformFee,
-      net: b.roomFee - b.platformFee,
-      checkedInAt: null,
-    })),
-  }
+const emptyResponse: EarningsResponse = {
+  summary: {
+    totalRevenue: 0,
+    totalCommission: 0,
+    totalNet: 0,
+    pendingPayout: 0,
+  },
+  chartData: [],
+  bookings: [],
 }
 
 function getMonthRange(monthOffset = 0): { startDate: string; endDate: string } {
@@ -61,11 +40,7 @@ function getMonthRange(monthOffset = 0): { startDate: string; endDate: string } 
   return { startDate, endDate: lastDay.toISOString().slice(0, 10) }
 }
 
-const mockPayouts = [
-  { date: "2026-02-14", amount: 19400000, ref: "VCB-20260214-001", status: "paid" },
-  { date: "2026-01-31", amount: 17800000, ref: "VCB-20260131-003", status: "paid" },
-  { date: "2026-01-15", amount: 15200000, ref: "VCB-20260115-007", status: "paid" },
-]
+const mockPayouts: any[] = []
 
 export default function EarningsPage() {
   const { t } = useTranslation()
@@ -92,8 +67,8 @@ export default function EarningsPage() {
       })
       .catch(() => {
         if (cancelled) return
-        setEarnings(buildMockResponse())
-        setLastMonthRevenue(18200000)
+        setEarnings(emptyResponse)
+        setLastMonthRevenue(0)
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
@@ -102,7 +77,7 @@ export default function EarningsPage() {
     return () => { cancelled = true }
   }, [])
 
-  const data = earnings ?? buildMockResponse()
+  const data = earnings ?? emptyResponse
   const { totalRevenue, totalCommission, pendingPayout } = data.summary
 
   const revenueChange = lastMonthRevenue > 0

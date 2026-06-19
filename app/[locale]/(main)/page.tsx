@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useTranslation } from "@/lib/i18n/context"
-import { rooms, getLocalizedRoom } from "@/lib/data/rooms"
+import { getLocalizedRoom } from "@/lib/data/rooms"
 import { getPublicRooms } from "@/lib/api/public-rooms"
 import { selectCustomerRooms } from "@/lib/booking/check-in"
 import { RoomCard } from "@/components/room-card"
@@ -22,12 +22,12 @@ export default function LandingPage() {
   const [district, setDistrict] = useState("")
   const [capacity, setCapacity] = useState("")
   const [activeTab, setActiveTab] = useState<"team_hub" | "solo_nook">("team_hub")
-  const [availableRooms, setAvailableRooms] = useState(rooms)
+  const [availableRooms, setAvailableRooms] = useState<any[]>([])
 
   useEffect(() => {
     getPublicRooms()
       .then((publicRooms) => {
-        setAvailableRooms(selectCustomerRooms(publicRooms, rooms))
+        setAvailableRooms(publicRooms)
       })
       .catch((error) => console.warn("Could not load published partner rooms:", error))
   }, [])

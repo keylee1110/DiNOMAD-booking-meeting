@@ -9,7 +9,7 @@ import { ConfirmationView } from "../_components/confirmation-view"
 import { getPublicRoomById } from "@/lib/api/public-rooms"
 import type { Room } from "@/lib/types"
 
-import { rooms } from "@/lib/data/rooms"
+
 
 export default function CheckoutSuccessPage({
   params,
@@ -37,13 +37,7 @@ export default function CheckoutSuccessPage({
         return
       }
 
-      // Try finding in mock data first
-      const staticRoom = rooms.find(r => r.id === confirmedBooking.roomId)
-      if (staticRoom) {
-        setRoom(staticRoom)
-        setIsLoading(false)
-        return
-      }
+
 
       // Try state selection if matches
       if (state.selectedRoom && state.selectedRoom.id === confirmedBooking.roomId) {
