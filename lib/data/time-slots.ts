@@ -1,8 +1,32 @@
 import type { TimeSlot } from "@/lib/types"
 
+/** Vietnam timezone offset in hours (UTC+7) */
+const VN_OFFSET_H = 7
+
+/**
+ * Get current hour and minute in Vietnam time (UTC+7),
+ * regardless of the browser's local timezone.
+ */
+function getNowVietnam(): { date: string; hour: number; minute: number } {
+  const now = new Date()
+  const utcMs = now.getTime() + now.getTimezoneOffset() * 60_000
+  const vnMs = utcMs + VN_OFFSET_H * 3_600_000
+  const vn = new Date(vnMs)
+  const year = vn.getFullYear()
+  const month = String(vn.getMonth() + 1).padStart(2, "0")
+  const day = String(vn.getDate()).padStart(2, "0")
+  return {
+    date: `${year}-${month}-${day}`,
+    hour: vn.getHours(),
+    minute: vn.getMinutes(),
+  }
+}
+
 export function generateTimeSlots(date: string, roomId: string): TimeSlot[] {
   const slots: TimeSlot[] = []
   const bookedSlotSeed = hashCode(date + roomId)
+  const now = getNowVietnam()
+  const isToday = date === now.date
 
   for (let hour = 7; hour < 22; hour++) {
     const startHour = hour.toString().padStart(2, "0")
@@ -11,11 +35,17 @@ export function generateTimeSlots(date: string, roomId: string): TimeSlot[] {
     const slotIndex = hour - 7
     const isBooked = isSlotBooked(bookedSlotSeed, slotIndex)
 
+    // A slot is "past" if today is selected AND the slot's end time has already passed
+    // e.g. at 16:05, slots ending at or before 16:00 are past (i.e. startHour < currentHour)
+    // We use strict < so the CURRENT hour's slot is still bookable (e.g. at 15:55, 15:00 slot is still shown)
+    const isPast = isToday && hour < now.hour
+
     slots.push({
       id: `${date}-${startHour}00`,
       startTime: `${startHour}:00`,
       endTime: `${endHour}:00`,
-      available: !isBooked,
+      available: !isBooked && !isPast,
+      isPast,
       price: 0,
     })
   }
@@ -48,5 +78,5 @@ export function formatTime(time: string): string {
 
 export function getAvailableSlotsCount(date: string, roomId: string): number {
   const slots = generateTimeSlots(date, roomId)
-  return slots.filter((s) => s.available).length
+  return slots.filter((s) => s.available && !s.isPast).length
 }
