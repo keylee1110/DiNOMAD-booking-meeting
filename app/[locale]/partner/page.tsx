@@ -8,7 +8,7 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { bookings as mockBookings } from "@/lib/data/bookings"
+
 import { formatVND } from "@/lib/format"
 import type { Booking, CheckInRecord } from "@/lib/types"
 
@@ -30,7 +30,7 @@ export default function PartnerDashboard() {
   const TODAY = useMemo(() => new Date().toISOString().slice(0, 10), [])
 
   const allBookings = useMemo(() => {
-    const map = new Map([...mockBookings, ...localBookings].map(b => [b.id, b]))
+    const map = new Map(localBookings.map(b => [b.id, b]))
     return Array.from(map.values())
   }, [localBookings])
 

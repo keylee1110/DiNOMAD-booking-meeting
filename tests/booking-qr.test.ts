@@ -13,10 +13,10 @@ test("database rooms replace demo rooms when public rooms are available", () => 
   assert.deepEqual(selectCustomerRooms(publicRooms, demoRooms), publicRooms)
 })
 
-test("demo rooms remain available when public room loading fails", () => {
+test("demo rooms are not returned when public room loading fails", () => {
   const demoRooms = [{ id: "demo" }]
 
-  assert.deepEqual(selectCustomerRooms([], demoRooms), demoRooms)
+  assert.deepEqual(selectCustomerRooms([], demoRooms), [])
 })
 
 test("check-in QR contains both booking id and access code", () => {

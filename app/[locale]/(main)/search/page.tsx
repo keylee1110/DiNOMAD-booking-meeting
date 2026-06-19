@@ -1,9 +1,8 @@
 "use client"
 
-import { useState, useMemo, useCallback, useEffect } from "react"
+import { useState, useMemo, useCallback, useEffect, Suspense } from "react"
 import { useSearchParams } from "next/navigation"
 import { useTranslation } from "@/lib/i18n/context"
-import { rooms as demoRooms } from "@/lib/data/rooms"
 import { getPublicRooms } from "@/lib/api/public-rooms"
 import { selectCustomerRooms } from "@/lib/booking/check-in"
 import { RoomCard } from "@/components/room-card"
@@ -42,7 +41,7 @@ const vibeTagOptions: VibeTag[] = ["ultra_quiet", "discussion_friendly", "cold_a
 const categoryOptions = ["team_hub", "solo_nook"] as const
 const PAGE_SIZE = 6
 
-export default function SearchPage() {
+function SearchContent() {
   const { locale, t } = useTranslation()
   const searchParams = useSearchParams()
 
@@ -66,12 +65,12 @@ export default function SearchPage() {
   const [page, setPage] = useState(1)
   const [sortBy, setSortBy] = useState("rating")
   const [viewMode, setViewMode] = useState<"list" | "map">("list")
-  const [availableRooms, setAvailableRooms] = useState<Room[]>(demoRooms)
+  const [availableRooms, setAvailableRooms] = useState<Room[]>([])
 
   useEffect(() => {
     getPublicRooms()
       .then((publicRooms) => {
-        setAvailableRooms(selectCustomerRooms(publicRooms, demoRooms))
+        setAvailableRooms(publicRooms)
       })
       .catch((error) => console.warn("Could not load published partner rooms:", error))
   }, [])
@@ -586,5 +585,18 @@ export default function SearchPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function SearchPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex flex-col items-center justify-center min-h-[50vh] gap-4">
+        <div className="h-10 w-10 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+        <p className="text-sm font-semibold text-muted-foreground">Loading search results...</p>
+      </div>
+    }>
+      <SearchContent />
+    </Suspense>
   )
 }
