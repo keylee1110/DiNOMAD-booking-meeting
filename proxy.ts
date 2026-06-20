@@ -58,9 +58,12 @@ export async function proxy(request: NextRequest) {
   // Create redirect response
   const redirectResponse = NextResponse.redirect(newUrl)
 
-  // Copy all set cookies from Supabase updateSession response to the redirect response
+  // Copy all set cookies from Supabase updateSession response to the redirect
+  // response — preserving the full cookie OBJECT (path, maxAge, sameSite,
+  // httpOnly, secure). Copying only name+value drops these options and corrupts
+  // the auth cookie, logging the user out on the next request.
   response.cookies.getAll().forEach((cookie) => {
-    redirectResponse.cookies.set(cookie.name, cookie.value)
+    redirectResponse.cookies.set(cookie)
   })
 
   return redirectResponse
