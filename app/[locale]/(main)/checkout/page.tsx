@@ -14,6 +14,7 @@ import { Label } from "@/components/ui/label"
 import { QrCode as DinomadQrCode } from "@/components/qr-code"
 import { CreditCard, Smartphone, Check, Loader2, ShieldCheck, Clock, Sparkles } from "lucide-react"
 import { createClient } from "@/utils/supabase/client"
+import { createBooking } from "@/lib/api/bookings"
 import { toast } from "sonner"
 
 import { BookingSummary } from "./_components/booking-summary"
@@ -226,10 +227,8 @@ export default function CheckoutPage({ params }: { params: Promise<{ locale: str
     setSimulatedStatus("verifying")
     setIsPaying(true)
 
-    const newBookingId = generateBookingId()
-    dispatch({ type: "SET_BOOKING_ID", id: newBookingId })
-
-    // Generate unique code in frontend as backup and local storage sync
+    // Fallback id/code for guests (no DB row) — the DB generates real values for
+    // authenticated bookings, so these are only used for the localStorage cache.
     const generateFrontCode = () => {
       const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
       let code = "DN-"
@@ -238,75 +237,72 @@ export default function CheckoutPage({ params }: { params: Promise<{ locale: str
       }
       return code
     }
-    const newBookingCode = generateFrontCode()
-    let dbBookingCode = newBookingCode
+    const fallbackBookingId = generateBookingId()
+    const fallbackBookingCode = generateFrontCode()
 
-    // Sync to database if authenticated and room.id is a valid UUID
+    // These hold the canonical values used downstream. For authenticated users they
+    // are replaced by the backend's server-computed booking (id, code, amounts).
+    let finalBookingId = fallbackBookingId
+    let finalBookingCode = fallbackBookingCode
+
+    // Server-authoritative amounts. Default to the client estimate (guests / mock
+    // rooms); replaced by the backend response for authenticated bookings.
+    let savedTotal = finalPayableTotal
+    let savedRoomFee = fees.roomFee
+    let savedPlatformFee = fees.platformFee
+    let savedPaidAmount = amountToPayNow
+    let savedPointsRedeemed = pointsDiscount
+    let savedPointsEarned = pointsEarned
+
+    // Create via backend if authenticated and room.id is a valid UUID (real DB room).
+    // The backend recomputes all amounts/points and writes booking + payment.
     try {
       const { data: { user } } = await supabase.auth.getUser()
       const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(room.id)
-      
+
       if (user && isUuid) {
-        // Build UTC-safe ISO timestamps: treat date+time as UTC+7 (Vietnam) explicitly
-        // This avoids issues where new Date(localString) may shift the time by timezone offset
-        const toVietnamUTC = (date: string, time: string) => {
-          const [h, m] = time.split(":").map(Number)
-          const [year, month, day] = date.split("-").map(Number)
-          // Vietnam is UTC+7; subtract 7 hours to get UTC
-          const utcDate = new Date(Date.UTC(year, month - 1, day, h - 7, m, 0, 0))
-          return utcDate.toISOString()
-        }
+        const created = await createBooking({
+          roomId: room.id,
+          date: state.selectedDate,
+          startTime: timeRange.startTime,
+          endTime: timeRange.endTime,
+          paymentMode,
+          paymentMethod: state.paymentMethod,
+          redeemPoints,
+        })
 
-        const startISO = toVietnamUTC(state.selectedDate, timeRange.startTime)
-        const endISO = toVietnamUTC(state.selectedDate, timeRange.endTime)
-        
-        const insertPayload = {
-          id: newBookingId,
-          room_id: room.id,
-          customer_id: user.id,
-          booking_date: state.selectedDate,
-          start_time: startISO,
-          end_time: endISO,
-          status: "confirmed" as const,
-          price_per_hour: room.pricePerHour,
-          subtotal: fees.roomFee,
-          platform_fee: fees.platformFee,
-          total_amount: finalPayableTotal,
-          points_redeemed: pointsDiscount,
-          points_earned: pointsEarned,
-          booking_code: newBookingCode,
-          payment_status: paymentMode === "deposit" ? "deposited" : "fully_paid",
-        }
-
-        const { data, error } = await supabase
-          .from("bookings")
-          .insert(insertPayload)
-          .select()
-          .single()
-          
-        if (data && !error) {
-          dbBookingCode = data.booking_code || newBookingCode
-          console.info("[Booking] Saved to DB:", data.id, data.booking_code)
-        } else if (error) {
-          console.error("[Booking] Supabase insert error:", error.code, error.message, error.details, error.hint)
-          toast.error(
-            locale === "vi"
-              ? `Không thể lưu đơn đặt: ${error.message}${error.details ? ` (${error.details})` : ""}`
-              : `Failed to save booking: ${error.message}${error.details ? ` (${error.details})` : ""}`
-          )
-        }
+        finalBookingId = created.id
+        finalBookingCode = created.bookingCode
+        savedTotal = created.totalAmount
+        savedRoomFee = created.subtotal
+        savedPlatformFee = created.platformFee
+        savedPaidAmount = created.amountPaidNow
+        savedPointsRedeemed = created.pointsRedeemed
+        savedPointsEarned = created.pointsEarned
+        console.info("[Booking] Created via backend:", created.id, created.bookingCode)
       } else if (!user) {
         console.info("[Booking] Guest user — saved to localStorage only.")
       } else if (!isUuid) {
-        console.warn("[Booking] room.id is not a valid UUID, skipping DB insert:", room.id)
+        console.warn("[Booking] room.id is not a valid UUID, skipping backend call:", room.id)
       }
     } catch (e: any) {
-      console.error("[Booking] Insert exception:", e)
-      toast.error(locale === "vi" ? `Lỗi hệ thống khi lưu đơn đặt: ${e.message || e}` : `System error saving booking: ${e.message || e}`)
+      // Authenticated booking failed — surface the real error and stop.
+      // Do NOT pretend the booking succeeded.
+      console.error("[Booking] Backend create failed:", e)
+      toast.error(
+        locale === "vi"
+          ? `Không thể tạo đơn đặt: ${e?.message || e}`
+          : `Could not create booking: ${e?.message || e}`,
+      )
+      setIsPaying(false)
+      setSimulatedStatus("idle")
+      return
     }
 
+    dispatch({ type: "SET_BOOKING_ID", id: finalBookingId })
+
     const newBooking: Booking = {
-      id: newBookingId,
+      id: finalBookingId,
       roomId: room.id,
       roomName: room.name,
       venueName: room.venueName,
@@ -318,23 +314,23 @@ export default function CheckoutPage({ params }: { params: Promise<{ locale: str
       guestName: fullName.trim(),
       guestPhone: phone.trim(),
       guestEmail: email.trim() || undefined,
-      totalPrice: finalPayableTotal,
-      roomFee: fees.roomFee,
-      platformFee: fees.platformFee,
+      totalPrice: savedTotal,
+      roomFee: savedRoomFee,
+      platformFee: savedPlatformFee,
       status: "confirmed",
       paymentMethod: state.paymentMethod,
-      checkInQr: `DINOMAD-${newBookingId}`,
-      wifiPassword: `${room.id}-wifi-${newBookingId.slice(-3)}`,
+      checkInQr: `DINOMAD-${finalBookingId}`,
+      wifiPassword: `${room.id}-wifi-${finalBookingId.slice(-3)}`,
       createdAt: new Date().toISOString(),
-      
+
       // Dynamic payment metadata (deposited amount vs full payment)
-      paidAmount: amountToPayNow,
+      paidAmount: savedPaidAmount,
       paymentStatus: paymentMode === "deposit" ? "deposited" : "fully_paid",
-      
+
       // Points metadata
-      bookingCode: dbBookingCode,
-      pointsRedeemed: pointsDiscount,
-      pointsEarned: pointsEarned
+      bookingCode: finalBookingCode,
+      pointsRedeemed: savedPointsRedeemed,
+      pointsEarned: savedPointsEarned
     }
 
     // Defer API / Webhook loading spinner simulation
@@ -346,7 +342,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ locale: str
     setIsPaymentDialogOpen(false)
     addBooking(newBooking)
     dispatch({ type: "SET_CONFIRMED_BOOKING", booking: newBooking })
-    router.push(`/${locale}/checkout/success?id=${newBookingId}`)
+    router.push(`/${locale}/checkout/success?id=${finalBookingId}`)
   }
 
   if (!room || state.selectedSlots.length === 0) {

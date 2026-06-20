@@ -7,6 +7,7 @@ import { DatabaseModule } from "./database/database.module"
 import { AuthModule } from "./modules/auth/auth.module"
 import { HealthModule } from "./modules/health/health.module"
 import { RoomsModule } from "./modules/rooms/rooms.module"
+import { BookingsModule } from "./modules/bookings/bookings.module"
 import { SuppliersModule } from "./modules/suppliers/suppliers.module"
 import { UsersModule } from "./modules/users/users.module"
 import { ReviewsModule } from "./modules/reviews/reviews.module"
@@ -25,6 +26,7 @@ import { PointTransactionsModule } from "./modules/point-transactions/point-tran
     UsersModule,
     SuppliersModule,
     RoomsModule,
+    BookingsModule,
     ReviewsModule,
     WishlistModule,
     PointTransactionsModule,

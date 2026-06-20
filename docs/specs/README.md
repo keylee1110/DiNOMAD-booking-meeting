@@ -14,7 +14,9 @@ docs/specs/
 ├── feat-partner-dashboard.md          ✅ done
 ├── feat-partner-inventory-toggle.md   ✅ done
 ├── feat-partner-earnings.md           ✅ done
-└── feat-partner-room-venue-crud.md    ✅ done
+├── feat-partner-room-venue-crud.md    ✅ done
+├── feat-guest-booking-persistence.md  ✅ done (superseded by feat-guest-booking-api)
+└── feat-guest-booking-api.md          ✅ done
 ```
 
 ---
