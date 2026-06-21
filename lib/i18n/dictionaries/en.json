@@ -38,6 +38,7 @@
     "role": "Registration Role",
     "customer": "Customer (Book space)",
     "partner": "Partner (Rent out workspace)",
+    "admin": "Admin (Management)",
     "forgotPassword": "Forgot password?",
     "noAccount": "Don't have an account?",
     "haveAccount": "Already have an account?",

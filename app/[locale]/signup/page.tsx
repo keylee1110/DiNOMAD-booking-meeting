@@ -82,16 +82,23 @@ function SignupForm() {
 
       // If the user registered as a Partner/Supplier, automatically submit application
       if (role === "supplier" && user) {
-        const { error: rpcError } = await supabase.rpc("submit_supplier_application", {
-          legal_name: fullName,
-          display_name: `${fullName} Space`,
-          business_email: email,
-          business_phone: phone,
-          onboarding_note: "Auto-submitted during partner registration"
-        })
+        if (session) {
+          // Explicitly set session to populate headers for the RPC call
+          await supabase.auth.setSession(session)
 
-        if (rpcError) {
-          console.error("Partner creation RPC failed:", rpcError)
+          const { error: rpcError } = await supabase.rpc("submit_supplier_application", {
+            legal_name: fullName,
+            display_name: `${fullName} Space`,
+            business_email: email,
+            business_phone: phone,
+            onboarding_note: "Auto-submitted during partner registration"
+          })
+
+          if (rpcError) {
+            console.error("Partner creation RPC failed:", rpcError)
+          }
+        } else {
+          console.warn("No active session returned (Email verification might be enabled). Partner registration RPC skipped.")
         }
       }
 

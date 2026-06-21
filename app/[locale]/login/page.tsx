@@ -3,7 +3,7 @@
 import { useState, Suspense } from "react"
 import { useTranslation } from "@/lib/i18n/context"
 import { useRouter, useSearchParams } from "next/navigation"
-import { LogIn, ArrowRight, UserCircle, Briefcase, Lock, Mail, Loader2, Sparkles, ArrowLeft } from "lucide-react"
+import { LogIn, ArrowRight, UserCircle, Briefcase, Lock, Mail, Loader2, Sparkles, ArrowLeft, Shield } from "lucide-react"
 import Link from "next/link"
 import Image from "next/image"
 import { createClient } from "@/utils/supabase/client"
@@ -19,7 +19,7 @@ function LoginForm() {
   
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
-  const [role, setRole] = useState<"customer" | "supplier">("customer")
+  const [role, setRole] = useState<"customer" | "supplier" | "admin">("customer")
   const [isLoading, setIsLoading] = useState(false)
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -39,6 +39,46 @@ function LoginForm() {
         return
       }
 
+      // Fetch actual user role from Supabase auth metadata first, then fallback to profiles table
+      let actualRole = role
+      console.log("=== [DEBUG LOGIN] ===")
+      console.log("UI Selected Role:", role)
+      console.log("Auth User Metadata:", data.user?.user_metadata)
+      console.log("Auth User ID:", data.user?.id)
+
+      if (data.user?.user_metadata?.role) {
+        actualRole = data.user.user_metadata.role
+        console.log("Extracted Role from user_metadata:", actualRole)
+      }
+
+      try {
+        const { data: profileData, error: profileErr } = await supabase
+          .from("profiles")
+          .select("role")
+          .eq("id", data.user?.id || "")
+        
+        console.log("Profiles Query Response:", profileData)
+        if (profileErr) {
+          console.error("Profiles Query Error:", profileErr)
+        }
+        
+        if (profileData) {
+          const profile = Array.isArray(profileData) ? profileData[0] : profileData
+          if (profile?.role) {
+            actualRole = profile.role as any
+            console.log("Extracted Role from profiles table:", actualRole)
+          }
+        }
+      } catch (profileErr) {
+        console.error("Error fetching user profile:", profileErr)
+      }
+
+      console.log("Final Redirect Decision Role:", actualRole)
+
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("dinomad_demo_admin")
+      }
+
       toast.success(t("auth.loginSuccess") || "Logged in successfully!")
       
       // Successfully authenticated, refresh page/session and redirect
@@ -46,7 +86,16 @@ function LoginForm() {
       
       // Delay slightly to let toast be visible
       setTimeout(() => {
-        router.push(redirectTo)
+        let targetRedirect = searchParams.get("redirect_to")
+        
+        // If the redirect parameter points to home page, or is empty, or if the user is an admin
+        // we redirect them to the correct dashboard/page.
+        if (!targetRedirect || targetRedirect === `/${locale}` || targetRedirect === "/" || actualRole === "admin") {
+          targetRedirect = actualRole === "admin" ? `/${locale}/admin` : `/${locale}`
+        }
+
+        console.log("Redirecting to:", targetRedirect)
+        router.push(targetRedirect)
       }, 800)
       
     } catch (err: any) {
@@ -101,30 +150,42 @@ function LoginForm() {
       </div>
 
       {/* Role Selection Toggle */}
-      <div className="grid grid-cols-2 gap-2 mb-6 bg-muted/50 p-1 rounded-xl border border-border/40">
+      <div className="grid grid-cols-3 gap-2 mb-6 bg-muted/50 p-1 rounded-xl border border-border/40">
         <button
           type="button"
           onClick={() => setRole("customer")}
-          className={`flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-xs font-semibold transition-all ${
+          className={`flex items-center justify-center gap-1 py-2 px-2 rounded-lg text-xs font-semibold transition-all ${
             role === "customer"
               ? "bg-card text-foreground shadow-sm border border-border/20 scale-[1.01]"
               : "text-muted-foreground hover:text-foreground"
           }`}
         >
-          <UserCircle className="h-4 w-4" />
+          <UserCircle className="h-3.5 w-3.5" />
           <span>{t("auth.customer").split(" ")[0]}</span>
         </button>
         <button
           type="button"
           onClick={() => setRole("supplier")}
-          className={`flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-xs font-semibold transition-all ${
+          className={`flex items-center justify-center gap-1 py-2 px-2 rounded-lg text-xs font-semibold transition-all ${
             role === "supplier"
               ? "bg-card text-foreground shadow-sm border border-border/20 scale-[1.01]"
               : "text-muted-foreground hover:text-foreground"
           }`}
         >
-          <Briefcase className="h-4 w-4" />
+          <Briefcase className="h-3.5 w-3.5" />
           <span>{t("auth.partner").split(" ")[0]}</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setRole("admin")}
+          className={`flex items-center justify-center gap-1 py-2 px-2 rounded-lg text-xs font-semibold transition-all ${
+            role === "admin"
+              ? "bg-card text-foreground shadow-sm border border-border/20 scale-[1.01]"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          <Shield className="h-3.5 w-3.5" />
+          <span>{t("auth.admin").split(" ")[0]}</span>
         </button>
       </div>
 
