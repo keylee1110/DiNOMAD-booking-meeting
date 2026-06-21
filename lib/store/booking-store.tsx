@@ -268,25 +268,32 @@ export function BookingProvider({ children }: { children: ReactNode }) {
 
   // Sync wishlist and bookings with database on auth changes
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event: string, session: any) => {
-      // Trigger a bookings list refresh
-      refreshBookings(session?.user)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event: string, session: any) => {
+      // IMPORTANT: the callback runs while gotrue holds the auth lock. Calling any
+      // Supabase auth/DB method synchronously here (refreshBookings → getUser()/
+      // queries, getWishlist) deadlocks the lock — which freezes getSession()
+      // everywhere (nav buttons vanish, API calls hang). Defer the work so the
+      // callback returns and releases the lock first.
+      setTimeout(async () => {
+        // Trigger a bookings list refresh
+        refreshBookings(session?.user)
 
-      if (session?.user) {
-        try {
-          const data = await apiGetWishlist(session.access_token)
-          setWishlist(data.map(item => item.room_id))
-          return
-        } catch (e) {
-          console.warn("Failed to fetch wishlist from backend API, loading from localStorage:", e)
+        if (session?.user) {
+          try {
+            const data = await apiGetWishlist()
+            setWishlist(data.map(item => item.room_id))
+            return
+          } catch (e) {
+            console.warn("Failed to fetch wishlist from backend API, loading from localStorage:", e)
+          }
         }
-      }
-      
-      // Guest fallback
-      if (typeof window !== "undefined") {
-        const saved = localStorage.getItem("dinomad_wishlist")
-        setWishlist(saved ? JSON.parse(saved) : [])
-      }
+
+        // Guest fallback
+        if (typeof window !== "undefined") {
+          const saved = localStorage.getItem("dinomad_wishlist")
+          setWishlist(saved ? JSON.parse(saved) : [])
+        }
+      }, 0)
     })
     return () => subscription.unsubscribe()
   }, [])

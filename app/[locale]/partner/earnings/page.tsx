@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { useTranslation } from "@/lib/i18n/context"
-import { TrendingUp, TrendingDown, DollarSign, BarChart3, Clock, Loader2 } from "lucide-react"
+import { TrendingUp, TrendingDown, DollarSign, BarChart3, Clock, Loader2, AlertCircle } from "lucide-react"
 
 import { formatVND } from "@/lib/format"
 import { cn } from "@/lib/utils"
@@ -48,10 +48,12 @@ export default function EarningsPage() {
   const [earnings, setEarnings] = useState<EarningsResponse | null>(null)
   const [lastMonthRevenue, setLastMonthRevenue] = useState(0)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
     setLoading(true)
+    setError(null)
 
     const { startDate, endDate } = getMonthRange(0)
     const { startDate: prevStart, endDate: prevEnd } = getMonthRange(-1)
@@ -65,10 +67,12 @@ export default function EarningsPage() {
         setEarnings(current)
         setLastMonthRevenue(prev.summary.totalRevenue)
       })
-      .catch(() => {
+      .catch((e) => {
         if (cancelled) return
+        // Backend unreachable — show an honest error, never fabricated figures.
         setEarnings(emptyResponse)
         setLastMonthRevenue(0)
+        setError(e instanceof Error ? e.message : String(e))
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
@@ -147,6 +151,13 @@ export default function EarningsPage() {
           {t("partner.earningsSubtitle")}
         </p>
       </div>
+
+      {error && (
+        <div className="flex items-center gap-3 rounded-2xl border border-destructive/30 bg-destructive/5 px-5 py-4 text-sm text-destructive">
+          <AlertCircle className="h-5 w-5 shrink-0" />
+          <span className="font-medium">{t("partner.earningsLoadError")}</span>
+        </div>
+      )}
 
       {/* Stats grid */}
       <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
@@ -305,20 +316,26 @@ export default function EarningsPage() {
           </h2>
         </div>
         <div className="flex flex-col divide-y divide-border/30">
-          {mockPayouts.map((payout, i) => (
-            <div key={i} className="flex items-center justify-between px-5 py-4 hover:bg-muted/20 transition-colors">
-              <div className="flex flex-col gap-0.5">
-                <span className="text-xs font-semibold text-foreground">{payout.date}</span>
-                <span className="text-[11px] font-mono text-muted-foreground">{payout.ref}</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <span className="text-sm font-bold text-foreground">{formatVND(payout.amount)}</span>
-                <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-500/10 border border-emerald-500/20 rounded-full px-2.5 py-0.5 uppercase tracking-wide">
-                  {t("partner.payoutPaid")}
-                </span>
-              </div>
+          {mockPayouts.length === 0 ? (
+            <div className="flex h-20 items-center justify-center text-sm text-muted-foreground">
+              {t("partner.noPayouts")}
             </div>
-          ))}
+          ) : (
+            mockPayouts.map((payout, i) => (
+              <div key={i} className="flex items-center justify-between px-5 py-4 hover:bg-muted/20 transition-colors">
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-xs font-semibold text-foreground">{payout.date}</span>
+                  <span className="text-[11px] font-mono text-muted-foreground">{payout.ref}</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-sm font-bold text-foreground">{formatVND(payout.amount)}</span>
+                  <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-500/10 border border-emerald-500/20 rounded-full px-2.5 py-0.5 uppercase tracking-wide">
+                    {t("partner.payoutPaid")}
+                  </span>
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </div>
     </div>
