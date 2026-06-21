@@ -4,7 +4,7 @@ import {
   buildCheckInQrPayload,
   createAccessCode,
   selectCustomerRooms,
-} from "../lib/booking/check-in.ts"
+} from "../lib/booking/check-in"
 
 test("database rooms replace demo rooms when public rooms are available", () => {
   const demoRooms = [{ id: "demo" }]

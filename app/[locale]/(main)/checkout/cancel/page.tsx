@@ -2,14 +2,12 @@
 
 import { use } from "react"
 import { useRouter } from "next/navigation"
-import { useTranslation } from "@/lib/i18n/context"
 import { useBooking } from "@/lib/store/booking-store"
 import { Button } from "@/components/ui/button"
 import { XCircle, ArrowLeft, Home } from "lucide-react"
 
 export default function CheckoutCancelPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = use(params)
-  const { t } = useTranslation()
   const router = useRouter()
   const { state, dispatch } = useBooking()
 

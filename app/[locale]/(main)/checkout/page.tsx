@@ -1,17 +1,16 @@
 "use client"
 
-import { use, useEffect, useMemo, useRef, useState } from "react"
+import { use, useCallback, useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useTranslation } from "@/lib/i18n/context"
 import { useBooking } from "@/lib/store/booking-store"
-import type { Booking, PaymentMethod, TimeSlot } from "@/lib/types"
+import type { Booking, TimeSlot } from "@/lib/types"
 import { generateBookingId, formatVND } from "@/lib/format"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { QrCode as DinomadQrCode } from "@/components/qr-code"
 import { CreditCard, Smartphone, Check, Loader2, ShieldCheck, Clock, Sparkles } from "lucide-react"
 import { createClient } from "@/utils/supabase/client"
 import { toast } from "sonner"
@@ -76,10 +75,13 @@ export default function CheckoutPage({ params }: { params: Promise<{ locale: str
           setPhone(prev => prev || user.user_metadata?.phone || "")
           setEmail(prev => prev || user.email || "")
         }
+      } else {
+        toast.error(locale === "vi" ? "Vui lòng đăng nhập để thực hiện đặt phòng!" : "Please log in to make a booking!")
+        router.push(`/${locale}/login?redirect_to=/${locale}/checkout`)
       }
     }
     getProfileData()
-  }, [])
+  }, [locale, router, supabase])
 
   // Booking Flow & Payment Options (Agoda/Booking style)
   const [paymentMode, setPaymentMode] = useState<"deposit" | "full">("deposit")
@@ -126,6 +128,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ locale: str
   useEffect(() => {
     if (!isPaymentDialogOpen || !bookingId || !room) return
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const handlePaymentSuccess = async (updated: any) => {
       setSimulatedStatus("success")
       setIsPaying(true)
@@ -178,7 +181,8 @@ export default function CheckoutPage({ params }: { params: Promise<{ locale: str
           table: "bookings",
           filter: `id=eq.${bookingId}`,
         },
-        async (payload) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        async (payload: any) => {
           console.info("[Realtime] Booking updated:", payload.new)
           const updated = payload.new
           
@@ -264,6 +268,19 @@ export default function CheckoutPage({ params }: { params: Promise<{ locale: str
 
 
 
+  const handleCancelBookingInDb = useCallback(async (id: string) => {
+    if (!id) return
+    try {
+      console.info("[Booking] Cancelling booking in DB due to timeout/cancel:", id)
+      await supabase
+        .from("bookings")
+        .update({ status: "cancelled" })
+        .eq("id", id)
+    } catch (e) {
+      console.error("Failed to cancel booking in DB:", e)
+    }
+  }, [supabase])
+
   // Payment countdown effect
   useEffect(() => {
     if (!isPaymentDialogOpen) {
@@ -289,7 +306,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ locale: str
       })
     }, 1000)
     return () => clearInterval(timer)
-  }, [isPaymentDialogOpen, bookingId])
+  }, [isPaymentDialogOpen, bookingId, handleCancelBookingInDb])
 
   const formatTimer = (seconds: number) => {
     const m = Math.floor(seconds / 60).toString().padStart(2, "0")
@@ -312,7 +329,8 @@ export default function CheckoutPage({ params }: { params: Promise<{ locale: str
     fullName.trim().length >= 2 &&
     phone.replace(/\D/g, "").length >= 9 &&
     !softLockExpired &&
-    !isPaying
+    !isPaying &&
+    !isSavingBooking
 
   const handleCancel = () => {
     if (bookingId) {
@@ -432,19 +450,6 @@ export default function CheckoutPage({ params }: { params: Promise<{ locale: str
     setIsSavingBooking(false)
     setIsPaymentDialogOpen(true)
     setSimulatedStatus("idle")
-  }
-
-  const handleCancelBookingInDb = async (id: string) => {
-    if (!id) return
-    try {
-      console.info("[Booking] Cancelling booking in DB due to timeout/cancel:", id)
-      await supabase
-        .from("bookings")
-        .update({ status: "cancelled" })
-        .eq("id", id)
-    } catch (e) {
-      console.error("Failed to cancel booking in DB:", e)
-    }
   }
 
   if (!room || state.selectedSlots.length === 0) {
@@ -588,9 +593,6 @@ export default function CheckoutPage({ params }: { params: Promise<{ locale: str
               paymentMethod={state.paymentMethod}
               onPaymentMethodChange={(v) => dispatch({ type: "SET_PAYMENT_METHOD", method: v })}
               totalPrice={amountToPayNow} // Dynamically update selected payment cost
-              room={room}
-              selectedDate={state.selectedDate}
-              startTime={timeRange.startTime}
               isPaying={isPaying}
               locale={locale}
               bookingCode={bookingCode}

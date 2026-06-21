@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import { mapPublicRoom } from "../lib/data/public-room.ts"
+import { mapPublicRoom } from "../lib/data/public-room"
 
 test("maps a published Supabase room into the customer Room shape", () => {
   const room = mapPublicRoom({
