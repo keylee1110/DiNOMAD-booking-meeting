@@ -55,8 +55,6 @@ export class VenuesService {
   // ─── Ownership helpers ────────────────────────────────────────────────────
 
   async getSupplierIdForUser(userId: string): Promise<string> {
-    console.log('🔍 getSupplierIdForUser:', userId);
-
     const { data, error } = await this.supabase.admin
       .from("supplier_members")
       .select("supplier_id")
@@ -66,16 +64,13 @@ export class VenuesService {
       .single();
 
     if (error) {
-      console.error('❌ Supabase error in getSupplierIdForUser:', error);
       throw new ForbiddenException(`User is not a supplier: ${error.message}`);
     }
 
     if (!data) {
-      console.error('❌ No supplier_members record found for user:', userId);
       throw new ForbiddenException("You do not have a supplier account");
     }
 
-    console.log('✅ Found supplier_id:', data.supplier_id);
     return data.supplier_id as string;
   }
 

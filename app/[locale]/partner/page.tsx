@@ -1,130 +1,181 @@
 "use client"
 
-import { useState, useMemo, useEffect } from "react"
+import { useState, useMemo, useEffect, useCallback, useRef } from "react"
 import { useTranslation } from "@/lib/i18n/context"
 import {
   TrendingUp, AlertCircle, Check, QrCode, Search, Activity, ArrowRight,
-  ArrowUpRight, BarChart3, Clock, ArrowDownRight, Zap, CalendarCheck, UserCheck,
+  ArrowUpRight, BarChart3, Clock, ArrowDownRight, Zap, CalendarCheck,
+  UserCheck, RefreshCw, Loader2,
 } from "lucide-react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-
 import { formatVND } from "@/lib/format"
-import type { Booking, CheckInRecord } from "@/lib/types"
+import {
+  getPartnerDashboard,
+  type DashboardResponse,
+  type DashboardMetrics,
+  type DashboardPendingCheckIn,
+  type DashboardActivityItem,
+  type DashboardRevenuePoint,
+} from "@/lib/api/partner"
+
+const POLL_INTERVAL_MS = 30_000
+
+type MetricStatus = "up" | "down" | "neutral"
+
+const EMPTY_DASHBOARD: DashboardResponse = {
+  metrics: { checkInsToday: 0, bookingsToday: 0, revenueToday: 0, activeWalkIns: 0 },
+  pendingCheckIns: [],
+  activityFeed: [],
+  revenueChart: [],
+}
+
+// ─── Sparkline (pure SVG, no deps) ───────────────────────────────────────────
+function Sparkline({ data, color = "currentColor" }: { data: number[]; color?: string }) {
+  if (data.length < 2) return null
+  const max = Math.max(...data, 1)
+  const w = 60
+  const h = 24
+  const pts = data.map((v, i) => {
+    const x = (i / (data.length - 1)) * w
+    const y = h - (v / max) * h
+    return `${x},${y}`
+  }).join(" ")
+  return (
+    <svg width={w} height={h} className="opacity-60">
+      <polyline points={pts} fill="none" stroke={color} strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" />
+    </svg>
+  )
+}
 
 export default function PartnerDashboard() {
   const { t, locale } = useTranslation()
   const [showAlert, setShowAlert] = useState(true)
-  const [localBookings, setLocalBookings] = useState<Booking[]>([])
-  const [checkIns, setCheckIns] = useState<CheckInRecord[]>([])
-  const [hydrated, setHydrated] = useState(false)
+  const [dashboard, setDashboard] = useState<DashboardResponse>(EMPTY_DASHBOARD)
+  const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  useEffect(() => {
-    const saved: Booking[] = JSON.parse(localStorage.getItem("dinomad_bookings") || "[]")
-    const savedCheckIns: CheckInRecord[] = JSON.parse(localStorage.getItem("dinomad_checkins") || "[]")
-    setLocalBookings(saved)
-    setCheckIns(savedCheckIns)
-    setHydrated(true)
+  const fetchDashboard = useCallback(async (isManual = false) => {
+    if (isManual) setRefreshing(true)
+    try {
+      const data = await getPartnerDashboard()
+      setDashboard(data)
+      setError(null)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to load dashboard")
+    } finally {
+      setLoading(false)
+      setRefreshing(false)
+    }
   }, [])
 
-  const TODAY = useMemo(() => new Date().toISOString().slice(0, 10), [])
+  useEffect(() => {
+    fetchDashboard()
+    intervalRef.current = setInterval(() => fetchDashboard(), POLL_INTERVAL_MS)
+    return () => { if (intervalRef.current) clearInterval(intervalRef.current) }
+  }, [fetchDashboard])
 
-  const allBookings = useMemo(() => {
-    const map = new Map(localBookings.map(b => [b.id, b]))
-    return Array.from(map.values())
-  }, [localBookings])
+  const { metrics, pendingCheckIns, activityFeed, revenueChart } = dashboard
 
-  const checkedInIds = useMemo(() => {
-    const fromCheckIns = checkIns.map(c => c.bookingId)
-    const fromBookings = allBookings.filter(b => b.status === "checked_in").map(b => b.id)
-    return new Set([...fromCheckIns, ...fromBookings])
-  }, [checkIns, allBookings])
+  const revenueLast7 = useMemo(() => revenueChart.slice(-7).map(d => d.revenue), [revenueChart])
+  const chartMax = useMemo(() => Math.max(...revenueLast7, 1), [revenueLast7])
+  const totalWeekRevenue = useMemo(() => revenueLast7.reduce((s, v) => s + v, 0), [revenueLast7])
 
-  const checkInsTodayCount = useMemo(() => checkedInIds.size, [checkedInIds])
+  const dayLabels = locale === "vi"
+    ? ["T2", "T3", "T4", "T5", "T6", "T7", "CN"]
+    : ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 
-  const bookingsTodayCount = useMemo(
-    () => allBookings.filter(b => b.date === TODAY && (b.status === "confirmed" || b.status === "checked_in")).length,
-    [allBookings, TODAY]
-  )
-
-  const revenueTodayValue = useMemo(() => {
-    const sum = allBookings
-      .filter(b => b.date === TODAY && (b.status === "confirmed" || b.status === "checked_in"))
-      .reduce((acc, b) => acc + b.totalPrice, 0)
-    return sum > 0 ? formatVND(sum) : "0 ₫"
-  }, [allBookings, TODAY])
-
-  const pendingCheckIns = useMemo(
-    () =>
-      allBookings
-        .filter(b => b.date === TODAY && b.status === "confirmed" && !checkedInIds.has(b.id))
-        .sort((a, b) => a.startTime.localeCompare(b.startTime)),
-    [allBookings, TODAY, checkedInIds]
-  )
-
-  const upcomingToday = useMemo(() => pendingCheckIns.slice(0, 3), [pendingCheckIns])
-
-  const metrics = useMemo(() => [
+  const metricCards = useMemo(() => [
     {
       label: t("partner.checkInsToday"),
-      value: hydrated ? checkInsTodayCount.toString() : "—",
+      value: loading ? "—" : metrics.checkInsToday.toString(),
+      sparkData: revenueLast7, // reuse revenue trend as proxy for activity
       trend: "+0%",
-      status: "neutral",
+      status: "neutral" as MetricStatus,
     },
     {
       label: t("partner.bookingsToday"),
-      value: hydrated ? bookingsTodayCount.toString() : "—",
+      value: loading ? "—" : metrics.bookingsToday.toString(),
+      sparkData: revenueLast7,
       trend: "+0%",
-      status: "neutral",
+      status: "neutral" as MetricStatus,
     },
     {
       label: t("partner.revenueToday"),
-      value: hydrated ? revenueTodayValue : "—",
+      value: loading ? "—" : (metrics.revenueToday > 0 ? formatVND(metrics.revenueToday) : "0 ₫"),
+      sparkData: revenueLast7,
       trend: "+12%",
-      status: "up",
+      status: "up" as MetricStatus,
     },
     {
       label: t("partner.activeWalkIns"),
-      value: "3",
+      value: loading ? "—" : metrics.activeWalkIns.toString(),
+      sparkData: [],
       trend: "0%",
-      status: "neutral",
+      status: "neutral" as MetricStatus,
     },
-  ], [hydrated, checkInsTodayCount, bookingsTodayCount, revenueTodayValue, t])
-
-  const activityFeed = useMemo(() => {
-    const baseFeed = [
-      { id: 1, type: "check-in", text: "Khách check-in vào Solo Nook A", time: "10 phút trước" },
-      { id: 2, type: "booking", text: "Đặt phòng BK016 xác nhận cho Team Hub B", time: "25 phút trước" },
-      { id: 3, type: "check-out", text: "Khách check-out khỏi Team Hub A", time: "1 giờ trước" },
-      { id: 4, type: "system", text: "Đã đồng bộ toàn bộ phòng", time: "2 giờ trước" },
-    ]
-
-    const localFeedItems = [...checkIns].reverse().slice(0, 3).map((c, i) => ({
-      id: `checkin-${i}`,
-      type: "check-in",
-      text: `${c.guestName} đã check-in vào ${c.roomName}`,
-      time: new Date(c.checkedInAt).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }),
-    }))
-
-    return [...localFeedItems, ...baseFeed]
-  }, [checkIns])
+  ], [loading, metrics, revenueLast7, t])
 
   const actionItems = [
-    { id: "A1", title: "Chờ phê duyệt", desc: "Đặt phòng BK014 cần xác nhận thủ công.", urgency: "high", action: "Xem xét" },
-    { id: "A2", title: "Dọn dẹp phòng", desc: "Solo Nook C cần được đánh dấu đã vệ sinh.", urgency: "medium", action: "Đánh dấu sạch" },
+    { id: "A1", title: t("partner.actionPendingApproval"), desc: t("partner.actionPendingApprovalDesc"), urgency: "high", action: t("partner.actionReview") },
+    { id: "A2", title: t("partner.actionRoomCleaning"), desc: t("partner.actionRoomCleaningDesc"), urgency: "medium", action: t("partner.actionMarkClean") },
   ]
+
+  const feedIcon = (type: DashboardActivityItem["type"]) => {
+    if (type === "check-in") return <ArrowRight className="h-4 w-4 text-[#84cc16]" />
+    if (type === "check-out") return <Check className="h-4 w-4 text-muted-foreground" />
+    if (type === "no-show") return <AlertCircle className="h-4 w-4 text-red-400" />
+    if (type === "booking") return <AlertCircle className="h-4 w-4 text-blue-500" />
+    return <Clock className="h-4 w-4 text-muted-foreground" />
+  }
+
+  const feedLabel = (item: DashboardActivityItem) => {
+    if (item.type === "check-in") return `${t("partner.feedCheckedIn")} ${item.roomName}`
+    if (item.type === "check-out") return `${t("partner.feedCheckedOut")} ${item.roomName}`
+    if (item.type === "no-show") return `${t("partner.feedNoShow")} ${item.bookingCode}`
+    return `${t("partner.feedBookingConfirmed")} ${item.bookingCode} — ${item.roomName}`
+  }
+
+  if (loading) {
+    return (
+      <div className="flex h-64 items-center justify-center gap-3 text-muted-foreground">
+        <Loader2 className="h-5 w-5 animate-spin" />
+        <span className="text-sm font-medium">{t("partner.loadingDashboard")}</span>
+      </div>
+    )
+  }
 
   return (
     <div className="flex flex-col gap-8 md:gap-12 animate-in fade-in duration-500 max-w-7xl mx-auto w-full">
       {/* Header */}
-      <div className="flex flex-col gap-2">
-        <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-foreground">
-          {t("partner.dashboard")}
-        </h1>
-        <p className="border-l-2 border-primary/40 pl-4 text-sm md:text-base text-muted-foreground max-w-xl">
-          {t("partner.dashboardSubtitle")}
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+        <div className="flex flex-col gap-2">
+          <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-foreground">
+            {t("partner.dashboard")}
+          </h1>
+          <p className="border-l-2 border-primary/40 pl-4 text-sm md:text-base text-muted-foreground max-w-xl">
+            {t("partner.dashboardSubtitle")}
+          </p>
+        </div>
+        <button
+          onClick={() => fetchDashboard(true)}
+          disabled={refreshing}
+          className="flex items-center gap-2 text-xs font-semibold text-muted-foreground hover:text-foreground bg-muted/30 hover:bg-muted/60 border border-border/60 rounded-xl px-3 py-2 transition-all self-start"
+        >
+          <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} />
+          {t("partner.refresh")}
+        </button>
       </div>
+
+      {/* Error banner */}
+      {error && (
+        <div className="flex items-center gap-3 rounded-xl border border-destructive/30 bg-destructive/5 px-5 py-4 text-sm text-destructive">
+          <AlertCircle className="h-5 w-5 shrink-0" />
+          <span className="font-medium">{t("partner.dashboardLoadError")}</span>
+        </div>
+      )}
 
       {/* Alert */}
       {showAlert && (
@@ -133,7 +184,7 @@ export default function PartnerDashboard() {
           <div className="flex-1">
             <h3 className="font-semibold text-blue-800 tracking-tight text-sm md:text-base">{t("partner.newBookingAlert")}</h3>
             <p className="text-xs md:text-sm text-blue-700/90 mt-1">
-              Đặt phòng <strong className="font-semibold text-blue-900">BK015</strong> (Team Hub B) đã xác nhận lúc 18:00.
+              {t("partner.newBookingAlertDesc")}
             </p>
           </div>
           <button
@@ -147,20 +198,28 @@ export default function PartnerDashboard() {
 
       {/* Metrics grid */}
       <div className="grid gap-4 md:gap-6 grid-cols-2 md:grid-cols-4">
-        {metrics.map((m, i) => (
+        {metricCards.map((m, i) => (
           <div
             key={i}
             className="flex flex-col rounded-2xl border border-border/50 bg-card p-5 md:p-6 shadow-[0_4px_20px_-4px_rgba(41,35,30,0.04)] hover:-translate-y-0.5 transition-all duration-300"
           >
             <span className="text-xs font-semibold text-muted-foreground tracking-tight mb-2.5">{m.label}</span>
             <span className="text-2xl md:text-3xl font-bold tracking-tight text-foreground">{m.value}</span>
-            <div className={`flex items-center gap-1.5 mt-4 text-[10px] md:text-xs font-semibold self-start px-2.5 py-1 rounded-full border ${
-              m.status === "up" ? "text-green-700 bg-green-500/10 border-green-500/20" :
-              m.status === "down" ? "text-red-700 bg-red-500/10 border-red-500/20" :
-              "text-muted-foreground bg-muted border-border/40"
-            }`}>
-              {m.status === "up" ? <ArrowUpRight className="h-3.5 w-3.5" /> : m.status === "down" ? <ArrowDownRight className="h-3.5 w-3.5" /> : <TrendingUp className="h-3.5 w-3.5 opacity-50" />}
-              {m.trend}
+            <div className="flex items-center justify-between mt-4">
+              <div className={`flex items-center gap-1.5 text-[10px] md:text-xs font-semibold self-start px-2.5 py-1 rounded-full border ${
+                m.status === "up" ? "text-green-700 bg-green-500/10 border-green-500/20" :
+                m.status === "down" ? "text-red-700 bg-red-500/10 border-red-500/20" :
+                "text-muted-foreground bg-muted border-border/40"
+              }`}>
+                {m.status === "up" ? <ArrowUpRight className="h-3.5 w-3.5" /> : m.status === "down" ? <ArrowDownRight className="h-3.5 w-3.5" /> : <TrendingUp className="h-3.5 w-3.5 opacity-50" />}
+                {m.trend}
+              </div>
+              {m.sparkData.length >= 2 && (
+                <Sparkline
+                  data={m.sparkData}
+                  color={m.status === "up" ? "#16a34a" : m.status === "down" ? "#dc2626" : "#94a3b8"}
+                />
+              )}
             </div>
           </div>
         ))}
@@ -175,6 +234,11 @@ export default function PartnerDashboard() {
           <div className="rounded-2xl border border-border/50 bg-card p-6 md:p-8 shadow-[0_8px_30px_rgb(0,0,0,0.02)] flex flex-col gap-6">
             <h2 className="text-lg md:text-xl font-semibold tracking-tight flex items-center gap-3 border-b border-border/50 pb-4 text-foreground">
               <Zap className="h-5 w-5 text-orange-500 fill-orange-500" /> {t("partner.requiresAction")}
+              {actionItems.filter(a => a.urgency === "high").length > 0 && (
+                <span className="ml-auto flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white animate-bounce">
+                  {actionItems.filter(a => a.urgency === "high").length}
+                </span>
+              )}
             </h2>
             <div className="flex flex-col gap-4">
               {actionItems.map(action => (
@@ -211,33 +275,27 @@ export default function PartnerDashboard() {
               <h2 className="text-lg md:text-xl font-semibold tracking-tight flex items-center gap-3 text-foreground">
                 <UserCheck className="h-5 w-5 text-primary" /> {t("partner.pendingCheckIns")}
               </h2>
-              {hydrated && pendingCheckIns.length > 0 && (
+              {pendingCheckIns.length > 0 && (
                 <span className="text-xs font-semibold bg-primary/10 text-primary border border-primary/20 rounded-full px-2.5 py-0.5">
                   {pendingCheckIns.length}
                 </span>
               )}
             </div>
 
-            {!hydrated ? (
-              <div className="flex flex-col gap-3">
-                {[1, 2].map(i => (
-                  <div key={i} className="h-14 rounded-xl bg-muted/30 animate-pulse" />
-                ))}
-              </div>
-            ) : pendingCheckIns.length === 0 ? (
+            {pendingCheckIns.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-4">
                 {t("partner.noPendingCheckIns")}
               </p>
             ) : (
               <div className="flex flex-col gap-3">
-                {pendingCheckIns.map(b => (
+                {pendingCheckIns.map((b: DashboardPendingCheckIn) => (
                   <div
                     key={b.id}
                     className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-xl border border-border/60 bg-background/50 hover:bg-muted/20 transition-colors"
                   >
                     <div className="flex flex-col gap-1">
                       <div className="flex items-center gap-2">
-                        <span className="font-mono text-xs font-semibold text-muted-foreground">{b.id}</span>
+                        <span className="font-mono text-xs font-semibold text-muted-foreground">{b.bookingCode}</span>
                         <span className="text-xs font-semibold text-foreground">{b.guestName}</span>
                       </div>
                       <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -265,29 +323,38 @@ export default function PartnerDashboard() {
                 <BarChart3 className="h-5 w-5 text-primary" /> {t("partner.last7DaysRevenue")}
               </h2>
               <span className="text-sm md:text-base font-semibold text-primary bg-primary/10 px-3.5 py-1 rounded-full border border-primary/25">
-                15.8M ₫
+                {formatVND(totalWeekRevenue)}
               </span>
             </div>
-            <div className="flex items-end justify-between gap-2 h-48 mt-8 px-2 md:px-6">
-              {[40, 60, 30, 80, 50, 90, 75].map((height, i) => (
-                <div key={i} className="w-full flex justify-end flex-col items-center gap-2 group h-full relative">
-                  <div className="text-[10px] md:text-xs font-semibold opacity-0 group-hover:opacity-100 transition-opacity text-primary bg-background border border-primary/30 shadow-md rounded-md px-2 py-0.5 -translate-y-2.5 absolute z-10">
-                    {height * 10}k
-                  </div>
-                  <div
-                    className={`w-full max-w-[32px] md:max-w-[40px] rounded-t-lg transition-all duration-300 ease-out group-hover:-translate-y-0.5 ${
-                      i === 6 ? "bg-primary" : "bg-primary/15 hover:bg-primary/25"
-                    }`}
-                    style={{ height: `${height}%` }}
-                  />
-                  <div className="text-xs font-medium text-muted-foreground mt-1">
-                    {(locale === "vi"
-                      ? ["T2", "T3", "T4", "T5", "T6", "T7", "CN"]
-                      : ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"])[i]}
-                  </div>
-                </div>
-              ))}
-            </div>
+            {revenueLast7.length === 0 ? (
+              <div className="flex h-48 items-center justify-center text-sm text-muted-foreground">
+                {t("partner.noDataPeriod")}
+              </div>
+            ) : (
+              <div className="flex items-end justify-between gap-2 h-48 mt-8 px-2 md:px-6">
+                {revenueLast7.map((revenue, i) => {
+                  const heightPct = (revenue / chartMax) * 100
+                  const isLast = i === revenueLast7.length - 1
+                  const label = revenueChart.slice(-7)[i]
+                  const dow = label ? new Date(label.date + "T00:00:00").getDay() : i
+                  const dayLabel = dayLabels[dow === 0 ? 6 : dow - 1]
+                  return (
+                    <div key={i} className="w-full flex justify-end flex-col items-center gap-2 group h-full relative">
+                      <div className="text-[10px] md:text-xs font-semibold opacity-0 group-hover:opacity-100 transition-opacity text-primary bg-background border border-primary/30 shadow-md rounded-md px-2 py-0.5 -translate-y-2.5 absolute z-10">
+                        {formatVND(revenue)}
+                      </div>
+                      <div
+                        className={`w-full max-w-[32px] md:max-w-[40px] rounded-t-lg transition-all duration-300 ease-out group-hover:-translate-y-0.5 ${
+                          isLast ? "bg-primary" : "bg-primary/15 hover:bg-primary/25"
+                        }`}
+                        style={{ height: `${Math.max(heightPct, 2)}%` }}
+                      />
+                      <div className="text-xs font-medium text-muted-foreground mt-1">{dayLabel}</div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
           </div>
         </div>
 
@@ -310,24 +377,20 @@ export default function PartnerDashboard() {
             </Link>
           </div>
 
-          {/* Upcoming Bookings */}
+          {/* Upcoming / Pending Check-ins preview */}
           <div className="rounded-2xl border border-border/50 bg-card shadow-[0_4px_20px_-4px_rgba(41,35,30,0.04)] overflow-hidden">
             <div className="flex items-center justify-between border-b border-border/40 p-4 bg-muted/10">
               <h2 className="text-sm md:text-base font-semibold text-foreground tracking-tight flex items-center gap-2">
                 <CalendarCheck className="h-4 w-4 md:h-5 md:w-5 text-primary" /> {t("partner.upcomingBookings")}
               </h2>
             </div>
-            {!hydrated ? (
-              <div className="flex flex-col gap-2 p-4">
-                {[1, 2, 3].map(i => <div key={i} className="h-12 rounded-lg bg-muted/30 animate-pulse" />)}
-              </div>
-            ) : upcomingToday.length === 0 ? (
+            {pendingCheckIns.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center p-6">
                 {t("partner.noUpcomingBookings")}
               </p>
             ) : (
               <div className="flex flex-col divide-y divide-border/30">
-                {upcomingToday.map(b => (
+                {pendingCheckIns.slice(0, 3).map(b => (
                   <div key={b.id} className="flex flex-col gap-1 p-4 hover:bg-muted/20 transition-colors">
                     <span className="text-xs font-bold text-foreground">{b.guestName}</span>
                     <span className="text-[11px] text-muted-foreground">{b.roomName}</span>
@@ -351,31 +414,33 @@ export default function PartnerDashboard() {
               </span>
             </div>
             <div className="flex flex-col">
-              {activityFeed.map((item, i) => (
-                <div
-                  key={item.id}
-                  className={`flex gap-3 p-4 border-b border-border/30 transition-colors ${
-                    i === 0 ? "bg-primary/5 hover:bg-primary/10" : "bg-card hover:bg-muted/30"
-                  } ${i === activityFeed.length - 1 ? "border-b-0" : ""}`}
-                >
-                  <div className="pt-0.5 shrink-0">
-                    {item.type === "check-in" && <ArrowRight className="h-4 w-4 text-[#84cc16]" />}
-                    {item.type === "booking" && <AlertCircle className="h-4 w-4 text-blue-500" />}
-                    {item.type === "check-out" && <Check className="h-4 w-4 text-muted-foreground" />}
-                    {item.type === "system" && <Clock className="h-4 w-4 text-muted-foreground" />}
+              {activityFeed.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center p-6">{t("partner.noActivity")}</p>
+              ) : (
+                activityFeed.map((item, i) => (
+                  <div
+                    key={item.id}
+                    className={`flex gap-3 p-4 border-b border-border/30 transition-colors ${
+                      i === 0 ? "bg-primary/5 hover:bg-primary/10" : "bg-card hover:bg-muted/30"
+                    } ${i === activityFeed.length - 1 ? "border-b-0" : ""}`}
+                  >
+                    <div className="pt-0.5 shrink-0">{feedIcon(item.type)}</div>
+                    <div className="flex flex-col gap-1">
+                      <span className={`text-xs font-semibold leading-tight ${i === 0 ? "text-foreground font-bold" : "text-muted-foreground"}`}>
+                        {feedLabel(item)}
+                      </span>
+                      <span className="text-[10px] text-muted-foreground font-semibold">{item.date}</span>
+                    </div>
                   </div>
-                  <div className="flex flex-col gap-1">
-                    <span className={`text-xs font-semibold leading-tight ${i === 0 ? "text-foreground font-bold" : "text-muted-foreground"}`}>
-                      {item.text}
-                    </span>
-                    <span className="text-[10px] text-muted-foreground font-semibold">{item.time}</span>
-                  </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
-            <button className="text-xs font-semibold text-foreground bg-muted/20 hover:bg-muted/40 border-t border-border/40 transition-colors text-center py-3.5">
+            <Link
+              href={`/${locale}/partner/schedule`}
+              className="text-xs font-semibold text-foreground bg-muted/20 hover:bg-muted/40 border-t border-border/40 transition-colors text-center py-3.5 block"
+            >
               {t("partner.viewFullLogs")} →
-            </button>
+            </Link>
           </div>
         </div>
       </div>

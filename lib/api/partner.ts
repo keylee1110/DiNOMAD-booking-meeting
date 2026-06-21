@@ -324,3 +324,82 @@ export function scannerCheckIn(bookingId: string): Promise<ScannerBooking> {
 export function scannerNoShow(bookingId: string): Promise<ScannerBooking> {
   return apiFetch<ScannerBooking>(`/partner/scanner/${bookingId}/no-show`, { method: "PATCH" })
 }
+
+export function scannerCheckOut(bookingId: string): Promise<ScannerBooking> {
+  return apiFetch<ScannerBooking>(`/partner/scanner/${bookingId}/checkout`, { method: "PATCH" })
+}
+
+// ─── Dashboard ────────────────────────────────────────────────────────────────
+
+export interface DashboardMetrics {
+  checkInsToday: number
+  bookingsToday: number
+  revenueToday: number
+  activeWalkIns: number
+}
+
+export interface DashboardPendingCheckIn {
+  id: string
+  bookingCode: string
+  guestName: string
+  roomName: string
+  startTime: string
+  endTime: string
+  status: string
+}
+
+export interface DashboardActivityItem {
+  id: string
+  type: "check-in" | "check-out" | "booking" | "no-show" | "system"
+  roomName: string
+  bookingCode: string
+  date: string
+}
+
+export interface DashboardRevenuePoint {
+  date: string
+  revenue: number
+}
+
+export interface DashboardResponse {
+  metrics: DashboardMetrics
+  pendingCheckIns: DashboardPendingCheckIn[]
+  activityFeed: DashboardActivityItem[]
+  revenueChart: DashboardRevenuePoint[]
+}
+
+export function getPartnerDashboard(): Promise<DashboardResponse> {
+  return apiFetch<DashboardResponse>("/partner/dashboard")
+}
+
+// ─── Partner Bookings ─────────────────────────────────────────────────────────
+
+export interface PartnerBooking {
+  id: string
+  bookingCode: string
+  date: string
+  startTime: string
+  endTime: string
+  status: string
+  checkedInAt: string | null
+  roomName: string
+  guestName: string
+  subtotal: number
+  platformFee: number
+}
+
+export function getPartnerBookings(date: string, status?: string): Promise<PartnerBooking[]> {
+  const params = new URLSearchParams({ date })
+  if (status && status !== "all") params.set("status", status)
+  return apiFetch<PartnerBooking[]>(`/partner/bookings?${params.toString()}`)
+}
+
+export function updatePartnerBookingStatus(
+  bookingId: string,
+  status: string,
+): Promise<{ id: string; status: string; updated: boolean }> {
+  return apiFetch(`/partner/bookings/${bookingId}/status`, {
+    method: "PATCH",
+    body: JSON.stringify({ status }),
+  })
+}
