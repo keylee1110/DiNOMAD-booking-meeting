@@ -1,10 +1,10 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useMemo, useCallback, useEffect, Suspense } from "react"
 import { useSearchParams } from "next/navigation"
 import { useTranslation } from "@/lib/i18n/context"
-import { searchRoomsApi } from "@/lib/api/rooms"
-import { getLocalizedRoom } from "@/lib/data/rooms"
+import { getPublicRooms } from "@/lib/api/public-rooms"
+import { selectCustomerRooms } from "@/lib/booking/check-in"
 import { RoomCard } from "@/components/room-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -22,7 +22,16 @@ import dynamic from "next/dynamic"
 import { formatVND } from "@/lib/format"
 import type { Amenity, VibeTag, Room } from "@/lib/types"
 
-const MapView = dynamic(() => import("@/components/map-view"), { ssr: false })
+// Leaflet touches `window` at import time, so it can't be server-rendered.
+// Load the map only on the client.
+const RoomMap = dynamic(() => import("@/components/room-map").then(m => m.RoomMap), {
+  ssr: false,
+  loading: () => (
+    <div className="flex h-full w-full items-center justify-center bg-muted/20 text-sm text-muted-foreground">
+      …
+    </div>
+  ),
+})
 
 const districts = ["Thu Duc", "District 1", "District 7", "District 10", "Binh Thanh"]
 const amenityOptions: Amenity[] = ["wifi", "tv", "whiteboard", "ac", "hdmi", "projector", "power_outlets", "coffee", "water", "parking"]
@@ -30,7 +39,7 @@ const vibeTagOptions: VibeTag[] = ["ultra_quiet", "discussion_friendly", "cold_a
 const categoryOptions = ["team_hub", "solo_nook"] as const
 const PAGE_SIZE = 6
 
-export default function SearchPage() {
+function SearchContent() {
   const { locale, t } = useTranslation()
   const searchParams = useSearchParams()
 
@@ -54,49 +63,15 @@ export default function SearchPage() {
   const [page, setPage] = useState(1)
   const [sortBy, setSortBy] = useState("rating")
   const [viewMode, setViewMode] = useState<"list" | "map">("list")
-  const [results, setResults] = useState<Room[]>([])
-  const [total, setTotal] = useState(0)
-  const [totalPages, setTotalPages] = useState(1)
-  const [loading, setLoading] = useState(true)
-
-  const fetchResults = useCallback(async () => {
-    setLoading(true)
-    const result = await searchRoomsApi({
-      district: district || undefined,
-      minCapacity: minCapacity || undefined,
-      maxPrice: maxPrice[0],
-      amenities: selectedAmenities.length > 0 ? selectedAmenities : undefined,
-      vibeTags: selectedVibes.length > 0 ? selectedVibes : undefined,
-      query: query || undefined,
-      category: category || undefined,
-      verified: verifiedOnly || undefined,
-      noiseLevelMin: noiseLevelMin || undefined,
-      page,
-      pageSize: PAGE_SIZE,
-    }, locale)
-
-    let sorted = result.rooms
-    switch (sortBy) {
-      case "price_asc":
-        sorted.sort((a, b) => a.pricePerHour - b.pricePerHour)
-        break
-      case "price_desc":
-        sorted.sort((a, b) => b.pricePerHour - a.pricePerHour)
-        break
-      case "rating":
-        sorted.sort((a, b) => b.rating - a.rating)
-        break
-    }
-
-    setResults(sorted.map((r) => getLocalizedRoom(r, locale)))
-    setTotal(result.total)
-    setTotalPages(result.totalPages)
-    setLoading(false)
-  }, [query, district, maxPrice, minCapacity, selectedAmenities, selectedVibes, category, verifiedOnly, page, sortBy, locale])
+  const [availableRooms, setAvailableRooms] = useState<Room[]>([])
 
   useEffect(() => {
-    fetchResults()
-  }, [fetchResults])
+    getPublicRooms()
+      .then((publicRooms) => {
+        setAvailableRooms(publicRooms)
+      })
+      .catch((error) => console.warn("Could not load published partner rooms:", error))
+  }, [])
 
   const toggleAmenity = useCallback((amenity: string) => {
     setSelectedAmenities(prev =>
@@ -111,6 +86,84 @@ export default function SearchPage() {
     )
     setPage(1)
   }, [])
+
+  const { results, total, totalPages } = useMemo(() => {
+    let filtered = availableRooms.filter(room => {
+      // District filter
+      if (district && district !== "all") {
+        const filterDistrictLower = district.toLowerCase()
+        const roomDistrictLower = room.district.toLowerCase()
+        const matchesDistrict = (filterDistrictLower === "thu duc" && (roomDistrictLower === "thu duc" || roomDistrictLower.includes("thủ đức"))) ||
+          (filterDistrictLower === "district 1" && (roomDistrictLower === "district 1" || roomDistrictLower.includes("quận 1"))) ||
+          (filterDistrictLower === "district 7" && (roomDistrictLower === "district 7" || roomDistrictLower.includes("quận 7"))) ||
+          (filterDistrictLower === "district 10" && (roomDistrictLower === "district 10" || roomDistrictLower.includes("quận 10"))) ||
+          (filterDistrictLower === "binh thanh" && (roomDistrictLower === "binh thanh" || roomDistrictLower.includes("bình thạnh"))) ||
+          (roomDistrictLower === filterDistrictLower)
+
+        if (!matchesDistrict) return false
+      }
+
+      // Capacity filter
+      if (minCapacity && room.capacity < minCapacity) return false
+
+      // Price filter
+      if (maxPrice[0] && room.pricePerHour > maxPrice[0]) return false
+
+      // Amenities filter
+      if (selectedAmenities.length > 0) {
+        const hasAllAmenities = selectedAmenities.every(amenity => room.amenities.includes(amenity as Amenity))
+        if (!hasAllAmenities) return false
+      }
+
+      // Vibe Tags filter
+      if (selectedVibes.length > 0) {
+        const hasSomeVibes = selectedVibes.some(vibe => room.vibeTags.includes(vibe as VibeTag))
+        if (!hasSomeVibes) return false
+      }
+
+      // Category filter
+      if (category && room.category !== category) return false
+
+      // Verified filter
+      if (verifiedOnly && !room.verified) return false
+
+      // Noise Level filter
+      if (noiseLevelMin && (room.noiseLevel ?? 0) < noiseLevelMin) return false
+
+      // Query filter
+      if (query) {
+        const q = query.toLowerCase()
+        const matchesQuery = room.name.toLowerCase().includes(q) ||
+          room.venueName.toLowerCase().includes(q) ||
+          room.district.toLowerCase().includes(q) ||
+          room.description.toLowerCase().includes(q)
+
+        if (!matchesQuery) return false
+      }
+
+      return true
+    })
+
+    // Sort
+    switch (sortBy) {
+      case "price_asc":
+        filtered.sort((a, b) => a.pricePerHour - b.pricePerHour)
+        break
+      case "price_desc":
+        filtered.sort((a, b) => b.pricePerHour - a.pricePerHour)
+        break
+      case "rating":
+        filtered.sort((a, b) => b.rating - a.rating)
+        break
+    }
+
+    const total = filtered.length
+    const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
+    const start = (page - 1) * PAGE_SIZE
+    const paginated = filtered.slice(start, start + PAGE_SIZE)
+
+    return { results: paginated, total, totalPages }
+  }, [availableRooms, district, minCapacity, maxPrice, selectedAmenities, selectedVibes, category, verifiedOnly, noiseLevelMin, query, sortBy, page])
 
   const clearFilters = () => {
     setQuery("")
@@ -445,11 +498,7 @@ export default function SearchPage() {
         <div className="flex-1">
           {viewMode === "list" ? (
             <>
-              {loading ? (
-                <div className="flex items-center justify-center py-16">
-                  <div className="h-8 w-8 animate-spin rounded-full border-4 border-border border-t-primary" />
-                </div>
-              ) : results.length > 0 ? (
+              {results.length > 0 ? (
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   {results.map((room) => (
                     <RoomCard key={room.id} room={room} />
@@ -466,7 +515,7 @@ export default function SearchPage() {
               )}
 
               {/* Pagination */}
-              {!loading && totalPages > 1 && (
+              {totalPages > 1 && (
                 <div className="mt-8 flex items-center justify-center gap-2">
                   <Button
                     variant="outline"
@@ -501,19 +550,26 @@ export default function SearchPage() {
               )}
             </>
           ) : (
-            /* Map View — Leaflet */
+            /* Map View — Leaflet (client-only) */
             <div className="h-[600px] overflow-hidden rounded-xl border border-border">
-              {loading ? (
-                <div className="flex h-full items-center justify-center">
-                  <div className="h-8 w-8 animate-spin rounded-full border-4 border-border border-t-primary" />
-                </div>
-              ) : (
-                <MapView results={results} />
-              )}
+              <RoomMap rooms={results} />
             </div>
           )}
         </div>
       </div>
     </div>
+  )
+}
+
+export default function SearchPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex flex-col items-center justify-center min-h-[50vh] gap-4">
+        <div className="h-10 w-10 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+        <p className="text-sm font-semibold text-muted-foreground">Loading search results...</p>
+      </div>
+    }>
+      <SearchContent />
+    </Suspense>
   )
 }

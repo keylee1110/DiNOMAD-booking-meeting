@@ -69,6 +69,7 @@
     "coldAC": "Máy Lạnh Mát Mẻ",
     "featured": "Phòng Nổi Bật",
     "featuredSubtitle": "Không gian làm việc chất lượng đã xác minh gần các trường đại học",
+    "noRooms": "Chưa có phòng nào trong danh mục này",
     "nearYou": "Gần Bạn",
     "howItWorks": "Cách Hoạt Động",
     "step1Title": "Tìm Kiếm",
@@ -401,7 +402,8 @@
     "autoSync": "Tự đồng bộ",
     "viewFullLogs": "Xem tất cả nhật ký",
     "roomFeeLabel": "Phí phòng",
-    "verifyAnother": "Xác minh lượt đặt khác"
+    "verifyAnother": "Xác minh lượt đặt khác",
+    "earningsLoadError": "Không thể tải dữ liệu doanh thu. Vui lòng thử lại."
   },
   "amenities": {
     "wifi": "WiFi Tốc Độ Cao",

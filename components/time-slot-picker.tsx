@@ -6,7 +6,7 @@ import type { TimeSlot } from "@/lib/types"
 import { cn } from "@/lib/utils"
 import { formatTime } from "@/lib/data/time-slots"
 import { Button } from "@/components/ui/button"
-import { Calendar as CalendarIcon, ChevronDown } from "lucide-react"
+import { Calendar as CalendarIcon, ChevronDown, Clock } from "lucide-react"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 
@@ -36,6 +36,8 @@ export function TimeSlotPicker({ slots, selectedSlots, onToggleSlot, selectedDat
 
   // Parse YYYY-MM-DD string to local Date object
   const parsedDate = selectedDate ? new Date(selectedDate + "T00:00:00") : undefined
+
+  const hasPastSlots = slots.some((s) => s.isPast)
 
   return (
     <div className="flex flex-col gap-6">
@@ -93,6 +95,14 @@ export function TimeSlotPicker({ slots, selectedSlots, onToggleSlot, selectedDat
               <span className="inline-block h-3.5 w-3.5 rounded-full border border-border/60 bg-background" />
               {t("room.available")}
             </span>
+            {hasPastSlots && (
+              <span className="flex items-center gap-1.5">
+                <span className="inline-flex h-3.5 w-3.5 items-center justify-center rounded-full border border-border/40 bg-muted/40">
+                  <Clock className="h-2 w-2 text-muted-foreground/60" />
+                </span>
+                {locale === "vi" ? "Đã qua" : "Past"}
+              </span>
+            )}
             <span className="flex items-center gap-1.5">
               <span className="inline-block h-3.5 w-3.5 rounded-full border border-border/40 bg-muted/60 opacity-60 relative after:content-[''] after:absolute after:inset-0 after:bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI4IiBoZWlnaHQ9IjgiPjxwYXRoIGQ9Ik0wLDggTDgsMCBaIiBzdHJva2U9IiNkMWQ1ZGIiIHN0cm9rZS13aWR0aD0iMC41IiBvcGFjaXR5PSIwLjMiLz48L3N2Zz4=')] after:bg-repeat" />
               {t("room.booked")}
@@ -107,6 +117,9 @@ export function TimeSlotPicker({ slots, selectedSlots, onToggleSlot, selectedDat
         <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">
           {slots.map((slot) => {
             const isSelected = selectedSlots.some((s) => s.id === slot.id)
+            const isPast = slot.isPast === true
+            const isBooked = !slot.available && !isPast
+
             return (
               <Button
                 key={slot.id}
@@ -114,14 +127,30 @@ export function TimeSlotPicker({ slots, selectedSlots, onToggleSlot, selectedDat
                 size="sm"
                 disabled={!slot.available}
                 onClick={() => slot.available && onToggleSlot(slot)}
+                title={isPast ? (locale === "vi" ? "Khung giờ đã qua" : "This time slot has passed") : undefined}
                 className={cn(
-                  "h-12 px-2 py-2 text-sm font-semibold rounded-xl border transition-colors duration-150",
-                  !slot.available && "cursor-not-allowed bg-muted/30 border-border/40 text-muted-foreground/60 opacity-50 relative after:content-[''] after:absolute after:inset-0 after:bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI4IiBoZWlnaHQ9IjgiPjxwYXRoIGQ9Ik0wLDggTDgsMCBaIiBzdHJva2U9IiNkMWQ1ZGIiIHN0cm9rZS13aWR0aD0iMC41IiBvcGFjaXR5PSIwLjMiLz48L3N2Zz4=')] after:bg-repeat shadow-none",
+                  "h-12 px-2 py-2 text-sm font-semibold rounded-xl border transition-colors duration-150 flex flex-col gap-0.5",
+                  // Past slot: muted style with clock icon feel
+                  isPast && "cursor-not-allowed bg-muted/20 border-border/30 text-muted-foreground/40 opacity-50 shadow-none",
+                  // Booked slot: cross-hatch pattern
+                  isBooked && "cursor-not-allowed bg-muted/30 border-border/40 text-muted-foreground/60 opacity-50 relative after:content-[''] after:absolute after:inset-0 after:rounded-xl after:bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI4IiBoZWlnaHQ9IjgiPjxwYXRoIGQ9Ik0wLDggTDgsMCBaIiBzdHJva2U9IiNkMWQ1ZGIiIHN0cm9rZS13aWR0aD0iMC41IiBvcGFjaXR5PSIwLjMiLz48L3N2Zz4=')] after:bg-repeat shadow-none",
+                  // Available slot
                   slot.available && !isSelected && "border-border/60 bg-background text-foreground hover:border-primary/50 hover:bg-primary/5 shadow-sm active:scale-[0.98]",
+                  // Selected slot
                   isSelected && "border-transparent bg-primary text-primary-foreground shadow-sm active:scale-[0.98]"
                 )}
               >
-                {formatTime(slot.startTime)}
+                {isPast ? (
+                  <>
+                    <span className="line-through text-[11px] leading-none">{formatTime(slot.startTime)}</span>
+                    <span className="flex items-center gap-0.5 text-[9px] leading-none font-bold uppercase tracking-wider">
+                      <Clock className="h-2 w-2" />
+                      {locale === "vi" ? "Đã qua" : "Past"}
+                    </span>
+                  </>
+                ) : (
+                  formatTime(slot.startTime)
+                )}
               </Button>
             )
           })}
@@ -130,4 +159,3 @@ export function TimeSlotPicker({ slots, selectedSlots, onToggleSlot, selectedDat
     </div>
   )
 }
-

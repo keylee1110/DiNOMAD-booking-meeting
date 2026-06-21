@@ -87,6 +87,7 @@ export interface TimeSlot {
   endTime: string
   available: boolean
   price: number
+  isPast?: boolean
 }
 
 export interface Booking {

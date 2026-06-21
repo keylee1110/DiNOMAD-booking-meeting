@@ -3,7 +3,7 @@
 import { use, useEffect, useState } from "react"
 import { useTranslation } from "@/lib/i18n/context"
 import { useBooking } from "@/lib/store/booking-store"
-import { rooms } from "@/lib/data/rooms"
+import { getPublicRooms } from "@/lib/api/public-rooms"
 import { RoomCard } from "@/components/room-card"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -15,9 +15,18 @@ export default function WishlistPage({ params }: { params: Promise<{ locale: str
   const { locale } = use(params)
   const { t } = useTranslation()
   const { wishlist } = useBooking()
+  
+  const [favoriteRooms, setFavoriteRooms] = useState<Room[]>([])
+  const [isLoading, setIsLoading] = useState(true)
 
-  // Filter rooms by wishlist IDs synchronously during render
-  const favoriteRooms = rooms.filter((r) => wishlist.includes(r.id))
+  useEffect(() => {
+    getPublicRooms()
+      .then((publicRooms) => {
+        setFavoriteRooms(publicRooms.filter((r) => wishlist.includes(r.id)))
+      })
+      .catch((error) => console.warn("Could not load wishlist rooms:", error))
+      .finally(() => setIsLoading(false))
+  }, [wishlist])
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 md:py-12">
@@ -32,7 +41,12 @@ export default function WishlistPage({ params }: { params: Promise<{ locale: str
         </p>
       </div>
 
-      {favoriteRooms.length === 0 ? (
+      {isLoading ? (
+        <div className="flex flex-col items-center justify-center py-16 gap-4">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+          <p className="text-sm font-medium text-muted-foreground">{t("common.loading")}</p>
+        </div>
+      ) : favoriteRooms.length === 0 ? (
         <Card className="flex flex-col items-center justify-center p-12 text-center border-dashed rounded-3xl border-border/80 bg-card shadow-sm">
           <div className="h-16 w-16 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-500 flex items-center justify-center mb-4">
             <Heart className="h-7 w-7 fill-red-500/10" />

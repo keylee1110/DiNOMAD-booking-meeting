@@ -69,6 +69,7 @@
     "coldAC": "Cold AC",
     "featured": "Featured Rooms",
     "featuredSubtitle": "Verified spaces near university hubs",
+    "noRooms": "No rooms available in this category yet",
     "nearYou": "Near You",
     "howItWorks": "How It Works",
     "step1Title": "Search",
@@ -401,7 +402,8 @@
     "autoSync": "Auto-sync",
     "viewFullLogs": "View Full Logs",
     "roomFeeLabel": "Room fee",
-    "verifyAnother": "Verify Another Booking"
+    "verifyAnother": "Verify Another Booking",
+    "earningsLoadError": "Could not load earnings data. Please try again."
   },
   "amenities": {
     "wifi": "WiFi",

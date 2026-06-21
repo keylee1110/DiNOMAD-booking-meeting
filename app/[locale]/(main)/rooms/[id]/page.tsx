@@ -4,8 +4,8 @@ import { useState, useMemo, useEffect, use } from "react"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { useTranslation } from "@/lib/i18n/context"
-import { getRoomByIdApi } from "@/lib/api/rooms"
-import { getLocalizedRoom } from "@/lib/data/rooms"
+
+import { getPublicRoomById } from "@/lib/api/public-rooms"
 import { getRoomReviews } from "@/lib/api/reviews"
 import type { ApiReview } from "@/lib/api/reviews"
 import { generateTimeSlots } from "@/lib/data/time-slots"
@@ -20,8 +20,7 @@ import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { Star, MapPin, Users, ChevronLeft, ChevronRight, ExternalLink, Minus, Plus, Heart } from "lucide-react"
-import { Skeleton } from "@/components/ui/skeleton"
-import type { TimeSlot, Room } from "@/lib/types"
+import type { Room, TimeSlot } from "@/lib/types"
 import { notFound } from "next/navigation"
 import { cn } from "@/lib/utils"
 
@@ -41,16 +40,19 @@ export default function RoomDetailPage({ params }: { params: Promise<{ locale: s
   const [selectedSlots, setSelectedSlots] = useState<TimeSlot[]>([])
   const [holdExpired, setHoldExpired] = useState(false)
   const [holdTimerKey, setHoldTimerKey] = useState(0)
-  const [splitPeople, setSplitPeople] = useState(2)
+
+  // Split bill states
+  const [splitPeople, setSplitPeople] = useState(1)
 
   useEffect(() => {
-    getRoomByIdApi(id, locale).then((r) => {
-      const loaded = r ? getLocalizedRoom(r, locale) : null
-      setRoom(loaded)
-      setSplitPeople(loaded?.capacity || 2)
-      setRoomLoading(false)
-    })
-  }, [id, locale])
+    getPublicRoomById(id)
+      .then((publicRoom) => {
+        setRoom(publicRoom)
+        if (publicRoom) setSplitPeople(publicRoom.capacity)
+      })
+      .catch((error) => console.warn("Could not load published room:", error))
+      .finally(() => setRoomLoading(false))
+  }, [id])
 
   useEffect(() => {
     getRoomReviews(id)
@@ -59,29 +61,10 @@ export default function RoomDetailPage({ params }: { params: Promise<{ locale: s
       .finally(() => setReviewsLoading(false))
   }, [id])
 
-  const slots = useMemo(() => {
-    if (!room) return []
-    return generateTimeSlots(selectedDate, room.id)
-  }, [selectedDate, room?.id])
-
-  if (roomLoading) {
-    return (
-      <div className="mx-auto max-w-7xl px-4 py-8">
-        <div className="grid gap-8 lg:grid-cols-[1fr_380px]">
-          <div className="space-y-6">
-            <Skeleton className="aspect-[16/9] w-full rounded-xl" />
-            <Skeleton className="h-8 w-2/3" />
-            <Skeleton className="h-4 w-1/3" />
-            <Skeleton className="h-32 w-full" />
-          </div>
-          <div className="space-y-4">
-            <Skeleton className="h-48 w-full rounded-xl" />
-          </div>
-        </div>
-      </div>
-    )
-  }
-  if (!room) notFound()
+  const slots = useMemo(
+    () => room ? generateTimeSlots(selectedDate, room.id) : [],
+    [selectedDate, room],
+  )
 
   const handleToggleSlot = (slot: TimeSlot) => {
     setSelectedSlots((prev) => {
@@ -120,11 +103,12 @@ export default function RoomDetailPage({ params }: { params: Promise<{ locale: s
   }
 
   const duration = selectedSlots.length
-  const roomFee = room.pricePerHour * duration
+  const roomFee = (room?.pricePerHour ?? 0) * duration
   const platformFee = Math.round(roomFee * 0.1)
   const totalPrice = roomFee + platformFee
 
   const handleBookNow = () => {
+    if (!room) return
     dispatch({ type: "SET_ROOM", room })
     dispatch({ type: "SET_DATE", date: selectedDate })
     dispatch({ type: "SET_SLOTS", slots: selectedSlots })
@@ -132,11 +116,20 @@ export default function RoomDetailPage({ params }: { params: Promise<{ locale: s
     router.push(`/${locale}/checkout`)
   }
 
-  const nextImage = () => setCurrentImageIndex((i) => (i + 1) % room.images.length)
-  const prevImage = () => setCurrentImageIndex((i) => (i - 1 + room.images.length) % room.images.length)
+  const nextImage = () => {
+    if (room) setCurrentImageIndex((i) => (i + 1) % room.images.length)
+  }
+  const prevImage = () => {
+    if (room) setCurrentImageIndex((i) => (i - 1 + room.images.length) % room.images.length)
+  }
 
   // Split bill logic
   const splitAmount = Math.ceil(totalPrice / splitPeople)
+
+  if (roomLoading) {
+    return <div className="mx-auto max-w-7xl px-4 py-16 text-center text-muted-foreground">Loading room...</div>
+  }
+  if (!room) notFound()
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-6">
