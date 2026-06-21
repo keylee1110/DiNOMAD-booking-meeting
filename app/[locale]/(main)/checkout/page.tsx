@@ -85,25 +85,10 @@ export default function CheckoutPage({ params }: { params: Promise<{ locale: str
   const [paymentMode, setPaymentMode] = useState<"deposit" | "full">("deposit")
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false)
   const [simulatedStatus, setSimulatedStatus] = useState<"idle" | "verifying" | "success">("idle")
-  
-  // Visa Card Input Mocks
-  const [cardNumber, setCardNumber] = useState("4111 2222 3333 4444")
-  const [cardExpiry, setCardExpiry] = useState("12/28")
-  const [cardCvv, setCardCvv] = useState("123")
 
-  // Payment Countdown Timer
-  const [timeLeft, setTimeLeft] = useState(600) // 10 minutes
-  const softLockDurationSeconds = 10 * 60
-  const [countdownKey, setCountdownKey] = useState(0)
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (state.guestName) setFullName(state.guestName)
-      if (state.guestPhone) setPhone(state.guestPhone)
-      if (state.guestEmail) setEmail(state.guestEmail)
-    }, 0)
-    return () => clearTimeout(timer)
-  }, [state.guestName, state.guestPhone, state.guestEmail])
+  const [bookingId, setBookingId] = useState<string>("")
+  const [bookingCode, setBookingCode] = useState<string>("")
+  const [isSavingBooking, setIsSavingBooking] = useState(false)
 
   const room = state.selectedRoom
   const timeRange = useMemo(() => getTimeRange(state.selectedSlots), [state.selectedSlots])
@@ -137,6 +122,148 @@ export default function CheckoutPage({ params }: { params: Promise<{ locale: str
     return finalPayableTotal
   }, [paymentMode, fees, finalPayableTotal, pointsDiscount])
 
+  // Supabase Realtime Subscription for Payment updates
+  useEffect(() => {
+    if (!isPaymentDialogOpen || !bookingId || !room) return
+
+    const handlePaymentSuccess = async (updated: any) => {
+      setSimulatedStatus("success")
+      setIsPaying(true)
+      
+      const finalBooking: Booking = {
+        id: updated.id,
+        roomId: room.id,
+        roomName: room.name,
+        venueName: room.venueName,
+        venueAddress: room.address,
+        date: state.selectedDate,
+        startTime: timeRange.startTime,
+        endTime: timeRange.endTime,
+        duration: durationHours,
+        guestName: fullName.trim(),
+        guestPhone: phone.trim(),
+        guestEmail: email.trim() || undefined,
+        totalPrice: updated.total_amount,
+        roomFee: fees.roomFee,
+        platformFee: fees.platformFee,
+        status: "confirmed",
+        paymentMethod: state.paymentMethod,
+        checkInQr: `DINOMAD-${updated.id}`,
+        wifiPassword: `${room.id}-wifi-${updated.id.slice(-3)}`,
+        createdAt: updated.created_at,
+        paidAmount: updated.payment_status === "deposited" ? amountToPayNow : finalPayableTotal,
+        paymentStatus: updated.payment_status,
+        bookingCode: updated.booking_code,
+        pointsRedeemed: updated.points_redeemed,
+        pointsEarned: updated.points_earned,
+      }
+
+      addBooking(finalBooking)
+      dispatch({ type: "SET_CONFIRMED_BOOKING", booking: finalBooking })
+      
+      await new Promise((r) => setTimeout(r, 1500))
+      setIsPaying(false)
+      setIsPaymentDialogOpen(false)
+      router.push(`/${locale}/checkout/success?id=${updated.id}`)
+    }
+
+    // 1. Realtime listener
+    const channel = supabase
+      .channel(`booking-payment-${bookingId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "bookings",
+          filter: `id=eq.${bookingId}`,
+        },
+        async (payload) => {
+          console.info("[Realtime] Booking updated:", payload.new)
+          const updated = payload.new
+          
+          if (
+            updated.status === "confirmed" &&
+            (updated.payment_status === "deposited" || updated.payment_status === "fully_paid")
+          ) {
+            await handlePaymentSuccess(updated)
+          }
+        }
+      )
+      .subscribe()
+
+    // 2. Fallback Polling every 5 seconds
+    const pollInterval = setInterval(async () => {
+      try {
+        const { data: updated, error } = await supabase
+          .from("bookings")
+          .select("*")
+          .eq("id", bookingId)
+          .maybeSingle()
+        
+        if (!error && updated) {
+          if (
+            updated.status === "confirmed" &&
+            (updated.payment_status === "deposited" || updated.payment_status === "fully_paid")
+          ) {
+            console.info("[Polling] Booking payment detected successfully:", updated)
+            clearInterval(pollInterval)
+            await handlePaymentSuccess(updated)
+          }
+        }
+      } catch (e) {
+        console.error("[Polling] Error fetching booking status:", e)
+      }
+    }, 5000)
+
+    return () => {
+      clearInterval(pollInterval)
+      supabase.removeChannel(channel)
+    }
+  }, [
+    isPaymentDialogOpen,
+    bookingId,
+    room,
+    state.selectedDate,
+    timeRange,
+    durationHours,
+    fullName,
+    phone,
+    email,
+    fees,
+    amountToPayNow,
+    finalPayableTotal,
+    pointsDiscount,
+    pointsEarned,
+    addBooking,
+    dispatch,
+    locale,
+    router,
+    supabase,
+    state.paymentMethod
+  ])
+  
+  // Visa Card Input Mocks
+  const [cardNumber, setCardNumber] = useState("4111 2222 3333 4444")
+  const [cardExpiry, setCardExpiry] = useState("12/28")
+  const [cardCvv, setCardCvv] = useState("123")
+
+  // Payment Countdown Timer
+  const [timeLeft, setTimeLeft] = useState(600) // 10 minutes
+  const softLockDurationSeconds = 10 * 60
+  const [countdownKey, setCountdownKey] = useState(0)
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (state.guestName) setFullName(state.guestName)
+      if (state.guestPhone) setPhone(state.guestPhone)
+      if (state.guestEmail) setEmail(state.guestEmail)
+    }, 0)
+    return () => clearTimeout(timer)
+  }, [state.guestName, state.guestPhone, state.guestEmail])
+
+
+
   // Payment countdown effect
   useEffect(() => {
     if (!isPaymentDialogOpen) {
@@ -151,13 +278,18 @@ export default function CheckoutPage({ params }: { params: Promise<{ locale: str
           clearInterval(timer)
           setSoftLockExpired(true)
           setIsPaymentDialogOpen(false)
+          if (bookingId) {
+            handleCancelBookingInDb(bookingId)
+            setBookingId("")
+            setBookingCode("")
+          }
           return 0
         }
         return prev - 1
       })
     }, 1000)
     return () => clearInterval(timer)
-  }, [isPaymentDialogOpen])
+  }, [isPaymentDialogOpen, bookingId])
 
   const formatTimer = (seconds: number) => {
     const m = Math.floor(seconds / 60).toString().padStart(2, "0")
@@ -183,10 +315,13 @@ export default function CheckoutPage({ params }: { params: Promise<{ locale: str
     !isPaying
 
   const handleCancel = () => {
+    if (bookingId) {
+      handleCancelBookingInDb(bookingId)
+    }
     router.push(`/${locale}/checkout/cancel`)
   }
 
-  const handleProceedPayment = () => {
+  const handleProceedPayment = async () => {
     setErrors({})
 
     const nextErrors: FieldErrors = {}
@@ -214,22 +349,10 @@ export default function CheckoutPage({ params }: { params: Promise<{ locale: str
 
     if (!room || state.selectedSlots.length === 0 || softLockExpired) return
 
-    dispatch({ type: "SET_GUEST_INFO", name: fullName.trim(), phone: phone.trim(), email: email.trim() })
-    
-    // Open high-fidelity simulator modal instead of automatic routing
-    setIsPaymentDialogOpen(true)
-    setSimulatedStatus("idle")
-  }
-
-  const handleSimulatePaymentSuccess = async () => {
-    if (!room) return
-    setSimulatedStatus("verifying")
-    setIsPaying(true)
-
-    const newBookingId = generateBookingId()
-    dispatch({ type: "SET_BOOKING_ID", id: newBookingId })
+    setIsSavingBooking(true)
 
     // Generate unique code in frontend as backup and local storage sync
+    const newBookingId = bookingId || generateBookingId()
     const generateFrontCode = () => {
       const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
       let code = "DN-"
@@ -238,8 +361,12 @@ export default function CheckoutPage({ params }: { params: Promise<{ locale: str
       }
       return code
     }
-    const newBookingCode = generateFrontCode()
-    let dbBookingCode = newBookingCode
+    const newBookingCode = bookingCode || generateFrontCode()
+    
+    setBookingId(newBookingId)
+    setBookingCode(newBookingCode)
+    dispatch({ type: "SET_BOOKING_ID", id: newBookingId })
+    dispatch({ type: "SET_GUEST_INFO", name: fullName.trim(), phone: phone.trim(), email: email.trim() })
 
     // Sync to database if authenticated and room.id is a valid UUID
     try {
@@ -248,7 +375,6 @@ export default function CheckoutPage({ params }: { params: Promise<{ locale: str
       
       if (user && isUuid) {
         // Build UTC-safe ISO timestamps: treat date+time as UTC+7 (Vietnam) explicitly
-        // This avoids issues where new Date(localString) may shift the time by timezone offset
         const toVietnamUTC = (date: string, time: string) => {
           const [h, m] = time.split(":").map(Number)
           const [year, month, day] = date.split("-").map(Number)
@@ -267,7 +393,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ locale: str
           booking_date: state.selectedDate,
           start_time: startISO,
           end_time: endISO,
-          status: "confirmed" as const,
+          status: "pending" as const, // Real flow: pending status
           price_per_hour: room.pricePerHour,
           subtotal: fees.roomFee,
           platform_fee: fees.platformFee,
@@ -275,78 +401,50 @@ export default function CheckoutPage({ params }: { params: Promise<{ locale: str
           points_redeemed: pointsDiscount,
           points_earned: pointsEarned,
           booking_code: newBookingCode,
-          payment_status: paymentMode === "deposit" ? "deposited" : "fully_paid",
+          payment_status: "pending", // Real flow: pending payment
         }
 
-        const { data, error } = await supabase
+        const { error } = await supabase
           .from("bookings")
           .insert(insertPayload)
-          .select()
-          .single()
           
-        if (data && !error) {
-          dbBookingCode = data.booking_code || newBookingCode
-          console.info("[Booking] Saved to DB:", data.id, data.booking_code)
-        } else if (error) {
-          console.error("[Booking] Supabase insert error:", error.code, error.message, error.details, error.hint)
+        if (error) {
+          console.error("[Booking] Supabase insert error:", error.code, error.message, error.details)
           toast.error(
             locale === "vi"
-              ? `Không thể lưu đơn đặt: ${error.message}${error.details ? ` (${error.details})` : ""}`
-              : `Failed to save booking: ${error.message}${error.details ? ` (${error.details})` : ""}`
+              ? `Không thể tạo đơn đặt: ${error.message}`
+              : `Failed to create booking: ${error.message}`
           )
+          setIsSavingBooking(false)
+          return
         }
+        console.info("[Booking] Created pending booking in DB:", newBookingId, newBookingCode)
       } else if (!user) {
         console.info("[Booking] Guest user — saved to localStorage only.")
-      } else if (!isUuid) {
-        console.warn("[Booking] room.id is not a valid UUID, skipping DB insert:", room.id)
       }
     } catch (e: any) {
       console.error("[Booking] Insert exception:", e)
-      toast.error(locale === "vi" ? `Lỗi hệ thống khi lưu đơn đặt: ${e.message || e}` : `System error saving booking: ${e.message || e}`)
+      toast.error(locale === "vi" ? `Lỗi hệ thống khi tạo đơn đặt: ${e.message || e}` : `System error creating booking: ${e.message || e}`)
+      setIsSavingBooking(false)
+      return
     }
 
-    const newBooking: Booking = {
-      id: newBookingId,
-      roomId: room.id,
-      roomName: room.name,
-      venueName: room.venueName,
-      venueAddress: room.address,
-      date: state.selectedDate,
-      startTime: timeRange.startTime,
-      endTime: timeRange.endTime,
-      duration: durationHours,
-      guestName: fullName.trim(),
-      guestPhone: phone.trim(),
-      guestEmail: email.trim() || undefined,
-      totalPrice: finalPayableTotal,
-      roomFee: fees.roomFee,
-      platformFee: fees.platformFee,
-      status: "confirmed",
-      paymentMethod: state.paymentMethod,
-      checkInQr: `DINOMAD-${newBookingId}`,
-      wifiPassword: `${room.id}-wifi-${newBookingId.slice(-3)}`,
-      createdAt: new Date().toISOString(),
-      
-      // Dynamic payment metadata (deposited amount vs full payment)
-      paidAmount: amountToPayNow,
-      paymentStatus: paymentMode === "deposit" ? "deposited" : "fully_paid",
-      
-      // Points metadata
-      bookingCode: dbBookingCode,
-      pointsRedeemed: pointsDiscount,
-      pointsEarned: pointsEarned
-    }
+    setIsSavingBooking(false)
+    setIsPaymentDialogOpen(true)
+    setSimulatedStatus("idle")
+  }
 
-    // Defer API / Webhook loading spinner simulation
-    await new Promise((r) => setTimeout(r, 1500))
-    setSimulatedStatus("success")
-    
-    await new Promise((r) => setTimeout(r, 800))
-    setIsPaying(false)
-    setIsPaymentDialogOpen(false)
-    addBooking(newBooking)
-    dispatch({ type: "SET_CONFIRMED_BOOKING", booking: newBooking })
-    router.push(`/${locale}/checkout/success?id=${newBookingId}`)
+  const handleCancelBookingInDb = async (id: string) => {
+    if (!id) return
+    try {
+      console.info("[Booking] Cancelling booking in DB due to timeout/cancel:", id)
+      await supabase
+        .from("bookings")
+        .update({ status: "cancelled" })
+        .eq("id", id)
+    } catch (e) {
+      console.error("Failed to cancel booking in DB:", e)
+    }
   }
 
   if (!room || state.selectedSlots.length === 0) {
@@ -495,6 +593,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ locale: str
               startTime={timeRange.startTime}
               isPaying={isPaying}
               locale={locale}
+              bookingCode={bookingCode}
             />
           </div>
 
@@ -532,15 +631,29 @@ export default function CheckoutPage({ params }: { params: Promise<{ locale: str
       </div>
 
       {/* 5. High-Fidelity Payment Gateway Simulator Modal */}
-      <Dialog open={isPaymentDialogOpen} onOpenChange={(v) => !isPaying && setIsPaymentDialogOpen(v)}>
+      <Dialog open={isPaymentDialogOpen} onOpenChange={(v) => {
+        if (!isPaying) {
+          setIsPaymentDialogOpen(v)
+          if (!v) {
+            // Cancel booking in DB and reset states
+            if (bookingId) {
+              handleCancelBookingInDb(bookingId)
+              setBookingId("")
+              setBookingCode("")
+            }
+          }
+        }
+      }}>
         <DialogContent className="max-w-md rounded-2xl border border-border/60 bg-card p-6 shadow-xl">
           <DialogHeader className="pb-2 border-b border-border/40">
             <DialogTitle className="text-xl font-bold flex items-center gap-2">
-              <ShieldCheck className="h-6 w-6 text-primary" />
-              {locale === "vi" ? "Cổng Thanh toán Demo" : "Secure Payment Gateway (Demo)"}
+              <ShieldCheck className="h-6 w-6 text-primary animate-pulse" />
+              {locale === "vi" ? "Thanh toán Đơn đặt chỗ" : "Booking Checkout Payment"}
             </DialogTitle>
             <DialogDescription className="text-xs">
-              {locale === "vi" ? "Mô phỏng thanh toán trực tiếp qua ví & thẻ điện tử" : "Simulated direct checkout processing"}
+              {locale === "vi" 
+                ? "Vui lòng quét mã VietQR để hoàn tất giao dịch đặt phòng" 
+                : "Please scan the VietQR code to complete your booking transaction"}
             </DialogDescription>
           </DialogHeader>
 
@@ -548,8 +661,8 @@ export default function CheckoutPage({ params }: { params: Promise<{ locale: str
             <div className="py-12 flex flex-col items-center justify-center gap-4 text-center">
               <Loader2 className="h-12 w-12 text-primary animate-spin" />
               <div className="space-y-1">
-                <p className="font-bold text-foreground">{locale === "vi" ? "Đang xác thực giao dịch..." : "Verifying payment..."}</p>
-                <p className="text-xs text-muted-foreground">{locale === "vi" ? "Hệ thống đang kiểm tra số dư và ghi nhận hóa đơn." : "Securing bank details & writing to store."}</p>
+                <p className="font-bold text-foreground">{locale === "vi" ? "Đang xác thực giao dịch chuyển khoản..." : "Verifying bank transfer..."}</p>
+                <p className="text-xs text-muted-foreground">{locale === "vi" ? "Hệ thống đang ghi nhận thông tin và tạo hoá đơn chính thức." : "Recording transaction & generating official invoice."}</p>
               </div>
             </div>
           ) : simulatedStatus === "success" ? (
@@ -559,7 +672,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ locale: str
               </div>
               <div className="space-y-1">
                 <p className="font-black text-lg text-success">{locale === "vi" ? "Thanh Toán Thành Công!" : "Payment Confirmed!"}</p>
-                <p className="text-xs text-muted-foreground">{locale === "vi" ? "Vé check-in của bạn đang được phát hành." : "Issuing check-in ticket..."}</p>
+                <p className="text-xs text-muted-foreground">{locale === "vi" ? "Vé check-in của bạn đã được ghi nhận. Đang chuyển hướng..." : "Your check-in ticket has been issued. Redirecting..."}</p>
               </div>
             </div>
           ) : (
@@ -573,8 +686,8 @@ export default function CheckoutPage({ params }: { params: Promise<{ locale: str
                   </span>
                 </div>
                 <div className="flex justify-between text-xs">
-                  <span className="text-muted-foreground">{locale === "vi" ? "Mã giao dịch ảo:" : "Simulated ID:"}</span>
-                  <span className="font-mono font-semibold text-foreground">DINOMAD-TEMP-{(state.selectedRoom?.id || "RM").toUpperCase()}</span>
+                  <span className="text-muted-foreground">{locale === "vi" ? "Mã hoá đơn:" : "Invoice ID:"}</span>
+                  <span className="font-mono font-semibold text-foreground">{(bookingId || "RM").toUpperCase().slice(0, 18)}</span>
                 </div>
                 <div className="flex justify-between text-sm pt-1.5 border-t border-border/20">
                   <span className="font-semibold text-foreground">{locale === "vi" ? "Số tiền thanh toán:" : "Amount due now:"}</span>
@@ -590,17 +703,27 @@ export default function CheckoutPage({ params }: { params: Promise<{ locale: str
                     <span>{locale === "vi" ? "Hết hạn sau:" : "Expires in:"}</span>
                     <span className="text-primary font-black font-mono text-sm">{formatTimer(timeLeft)}</span>
                   </div>
-                  <DinomadQrCode
-                    data={`PAY-${room.id}-${state.selectedDate}-${timeRange.startTime}-${amountToPayNow}`}
-                    size={160}
-                    className="border border-border/30 rounded-xl p-2 bg-white"
-                  />
+                  
+                  {bookingCode ? (
+                    <img
+                      src={`https://qr.sepay.vn/img?acc=${process.env.NEXT_PUBLIC_SEPAY_BANK_ACC || "96247AVTD7"}&bank=${process.env.NEXT_PUBLIC_SEPAY_BANK_NAME || "BIDV"}&amount=${amountToPayNow}&des=${bookingCode.replace("-", "")}&template=compact`}
+                      alt="VietQR BIDV Payment QR"
+                      className="rounded-xl overflow-hidden w-[180px] h-[180px] object-contain border border-border/20 bg-white p-1.5 shadow-sm"
+                    />
+                  ) : (
+                    <div className="w-[180px] h-[180px] bg-muted animate-pulse rounded-xl flex items-center justify-center text-xs text-muted-foreground text-center p-3">
+                      {locale === "vi" ? "Đang tạo mã QR..." : "Generating QR..."}
+                    </div>
+                  )}
+
                   <div className="text-center space-y-1">
-                    <p className="text-xs font-bold text-foreground">{locale === "vi" ? "Quét mã QR Ngân hàng" : "Scan Bank VietQR Code"}</p>
+                    <p className="text-xs font-bold text-foreground">
+                      {locale === "vi" ? "Quét mã chuyển nhanh qua VietQR" : "Scan to Pay Fast via VietQR"}
+                    </p>
                     <p className="text-[10px] text-muted-foreground leading-relaxed">
                       {locale === "vi" 
-                        ? "Mở ứng dụng ngân hàng và quét mã để thanh toán demo nhanh." 
-                        : "Use any banking application to scan the dynamic mock QR code."}
+                        ? `Vui lòng chuyển đúng số tiền ${formatVND(amountToPayNow)} với nội dung là "${bookingCode.replace("-", "")}".` 
+                        : `Please transfer exactly ${formatVND(amountToPayNow)} with the description "${bookingCode.replace("-", "")}".`}
                     </p>
                   </div>
                 </div>
@@ -620,13 +743,13 @@ export default function CheckoutPage({ params }: { params: Promise<{ locale: str
                   <div className="text-center space-y-1 mt-2">
                     <p className="text-xs font-bold text-foreground">
                       {locale === "vi" 
-                        ? `Chờ xác nhận liên kết ứng dụng ${state.paymentMethod.toUpperCase()}` 
+                        ? `Chờ xác nhận giao dịch qua ví ${state.paymentMethod.toUpperCase()}` 
                         : `Awaiting ${state.paymentMethod.toUpperCase()} connection`}
                     </p>
                     <p className="text-[10px] text-muted-foreground leading-relaxed">
                       {locale === "vi" 
-                        ? `Vui lòng chuẩn bị mở ứng dụng ${state.paymentMethod.toUpperCase()} trên điện thoại.` 
-                        : `Please unlock your mobile phone and launch ${state.paymentMethod.toUpperCase()}.`}
+                        ? `Vui lòng quét QR hoặc thanh toán trên app di động của bạn.` 
+                        : `Please scan the payment QR or pay via the mobile app.`}
                     </p>
                   </div>
                 </div>
@@ -671,18 +794,32 @@ export default function CheckoutPage({ params }: { params: Promise<{ locale: str
                 </div>
               )}
 
-              {/* Simulation triggers */}
-              <div className="flex flex-col gap-2 pt-2 border-t border-border/30">
-                <Button 
-                  onClick={handleSimulatePaymentSuccess}
-                  className="w-full bg-success text-success-foreground hover:bg-success/90 font-bold rounded-xl h-11"
-                >
-                  {locale === "vi" ? "Xác nhận chuyển khoản / Giả lập thành công" : "Confirm payment / Simulate Success"}
-                </Button>
+              {/* Payment status banner & action buttons */}
+              <div className="flex flex-col gap-3 pt-2 border-t border-border/30">
+                <div className="flex items-center justify-center gap-2 rounded-xl bg-primary/5 border border-primary/20 p-3.5 text-xs text-primary animate-pulse">
+                  <Loader2 className="h-4 w-4 animate-spin shrink-0" />
+                  <span className="font-bold text-center">
+                    {locale === "vi" 
+                      ? "Đang chờ SePay tự động xác nhận chuyển khoản..." 
+                      : "Awaiting automatic bank transfer confirmation..."}
+                  </span>
+                </div>
+                <p className="text-[10px] text-center text-muted-foreground leading-relaxed max-w-sm mx-auto">
+                  {locale === "vi"
+                    ? "Hệ thống sẽ tự động chuyển hướng khi nhận được tiền. Vui lòng chuyển chính xác số tiền và nội dung."
+                    : "The system will automatically redirect when payment is received. Ensure exact amount and description."}
+                </p>
                 
                 <Button 
                   variant="outline" 
-                  onClick={() => setIsPaymentDialogOpen(false)}
+                  onClick={() => {
+                    setIsPaymentDialogOpen(false)
+                    if (bookingId) {
+                      handleCancelBookingInDb(bookingId)
+                      setBookingId("")
+                      setBookingCode("")
+                    }
+                  }}
                   className="w-full rounded-xl text-xs h-9 border-border text-muted-foreground hover:bg-muted"
                 >
                   {locale === "vi" ? "Hủy giao dịch" : "Cancel"}

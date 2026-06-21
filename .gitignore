@@ -20,3 +20,12 @@ backend/.env
 .env
 # Added by code-review-graph
 .code-review-graph/
+
+# AI Agent & IDE directories
+.gemini/
+.claude/
+.qoder/
+.kiro/
+.vscode/
+.opencode.json
+.mcp.json
