@@ -13,6 +13,7 @@ import { ReviewsModule } from "./modules/reviews/reviews.module"
 import { WishlistModule } from "./modules/wishlist/wishlist.module"
 import { PointTransactionsModule } from "./modules/point-transactions/point-transactions.module"
 import { PaymentsModule } from "./modules/payments/payments.module"
+import { BookingsModule } from "./modules/bookings/bookings.module"
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { PaymentsModule } from "./modules/payments/payments.module"
     WishlistModule,
     PointTransactionsModule,
     PaymentsModule,
+    BookingsModule,
   ],
 })
 export class AppModule {}
