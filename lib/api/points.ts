@@ -2,15 +2,18 @@ import { createClient } from "@/utils/supabase/client"
 
 const BASE = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:4000/api"
 
-async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
-  const supabase = createClient()
-  const sessionResult = await Promise.race([
-    supabase.auth.getSession(),
-    new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error("Auth session timed out")), 10000),
-    ),
-  ])
-  const token = sessionResult.data.session?.access_token
+async function apiFetch<T>(path: string, options?: RequestInit, passedToken?: string): Promise<T> {
+  let token = passedToken
+  if (!token) {
+    const supabase = createClient()
+    const sessionResult = await Promise.race([
+      supabase.auth.getSession(),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("Auth session timed out")), 2000),
+      ),
+    ])
+    token = sessionResult.data.session?.access_token
+  }
 
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), 20000)

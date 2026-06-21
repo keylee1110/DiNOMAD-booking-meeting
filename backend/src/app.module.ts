@@ -12,6 +12,8 @@ import { UsersModule } from "./modules/users/users.module"
 import { ReviewsModule } from "./modules/reviews/reviews.module"
 import { WishlistModule } from "./modules/wishlist/wishlist.module"
 import { PointTransactionsModule } from "./modules/point-transactions/point-transactions.module"
+import { PaymentsModule } from "./modules/payments/payments.module"
+
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -28,6 +30,7 @@ import { PointTransactionsModule } from "./modules/point-transactions/point-tran
     ReviewsModule,
     WishlistModule,
     PointTransactionsModule,
+    PaymentsModule,
   ],
 })
 export class AppModule {}

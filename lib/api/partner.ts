@@ -25,17 +25,20 @@ export async function uploadRoomImage(file: File, roomId: string): Promise<strin
 
 const BASE = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:4000/api"
 
-async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
-  const supabase = createClient()
+async function apiFetch<T>(path: string, options?: RequestInit, passedToken?: string): Promise<T> {
+  let token = passedToken
+  if (!token) {
+    const supabase = createClient()
 
-  // Timeout getSession() so a stale refresh token never blocks the UI forever
-  const sessionResult = await Promise.race([
-    supabase.auth.getSession(),
-    new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error("Auth session timed out — please sign in again")), 10000),
-    ),
-  ])
-  const token = sessionResult.data.session?.access_token
+    // Timeout getSession() so a stale refresh token never blocks the UI forever
+    const sessionResult = await Promise.race([
+      supabase.auth.getSession(),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("Auth session timed out — please sign in again")), 2000),
+      ),
+    ])
+    token = sessionResult.data.session?.access_token
+  }
 
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), 20000)
