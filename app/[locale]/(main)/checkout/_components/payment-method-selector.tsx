@@ -8,16 +8,13 @@ import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { formatVND } from "@/lib/format"
-import type { PaymentMethod, Room } from "@/lib/types"
+import type { PaymentMethod } from "@/lib/types"
 import { Copy, Check, Info, ShieldCheck } from "lucide-react"
 
 interface PaymentMethodSelectorProps {
   paymentMethod: PaymentMethod
   onPaymentMethodChange: (v: PaymentMethod) => void
   totalPrice: number
-  room: Room
-  selectedDate: string
-  startTime: string
   isPaying: boolean
   locale: string
   bookingCode?: string // Added bookingCode for SePay
@@ -27,9 +24,6 @@ export function PaymentMethodSelector({
   paymentMethod,
   onPaymentMethodChange,
   totalPrice,
-  room,
-  selectedDate,
-  startTime,
   isPaying,
   locale,
   bookingCode

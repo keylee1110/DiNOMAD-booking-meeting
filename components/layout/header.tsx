@@ -23,7 +23,7 @@ export function Header() {
 
   useEffect(() => {
     // Check initial user session
-    supabase.auth.getUser().then(({ data }) => {
+    supabase.auth.getUser().then(({ data }: any) => {
       setUser(data.user)
       if (data.user?.user_metadata?.role) {
         setUserRole(data.user.user_metadata.role)
@@ -32,7 +32,7 @@ export function Header() {
     })
 
     // Listen for auth state changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event: any, session: any) => {
       setUser(session?.user ?? null)
       if (session?.user?.user_metadata?.role) {
         setUserRole(session.user.user_metadata.role)
