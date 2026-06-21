@@ -402,8 +402,7 @@
     "autoSync": "Auto-sync",
     "viewFullLogs": "View Full Logs",
     "roomFeeLabel": "Room fee",
-    "verifyAnother": "Verify Another Booking",
-    "earningsLoadError": "Could not load earnings data. Please try again."
+    "verifyAnother": "Verify Another Booking"
   },
   "amenities": {
     "wifi": "WiFi",

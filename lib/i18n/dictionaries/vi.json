@@ -402,8 +402,7 @@
     "autoSync": "Tự đồng bộ",
     "viewFullLogs": "Xem tất cả nhật ký",
     "roomFeeLabel": "Phí phòng",
-    "verifyAnother": "Xác minh lượt đặt khác",
-    "earningsLoadError": "Không thể tải dữ liệu doanh thu. Vui lòng thử lại."
+    "verifyAnother": "Xác minh lượt đặt khác"
   },
   "amenities": {
     "wifi": "WiFi Tốc Độ Cao",

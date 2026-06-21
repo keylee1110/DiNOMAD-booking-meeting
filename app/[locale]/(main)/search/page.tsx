@@ -18,19 +18,21 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { SlidersHorizontal, List, Map, Search, CalendarIcon, ChevronLeft, ChevronRight } from "lucide-react"
-import dynamic from "next/dynamic"
+import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet"
+import L from "leaflet"
+import "leaflet/dist/leaflet.css"
 import { formatVND } from "@/lib/format"
 import type { Amenity, VibeTag, Room } from "@/lib/types"
 
-// Leaflet touches `window` at import time, so it can't be server-rendered.
-// Load the map only on the client.
-const RoomMap = dynamic(() => import("@/components/room-map").then(m => m.RoomMap), {
-  ssr: false,
-  loading: () => (
-    <div className="flex h-full w-full items-center justify-center bg-muted/20 text-sm text-muted-foreground">
-      …
-    </div>
-  ),
+// Fix Leaflet default icon paths for bundlers
+const defaultIcon = L.icon({
+  iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
+  iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
+  shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41],
 })
 
 const districts = ["Thu Duc", "District 1", "District 7", "District 10", "Binh Thanh"]
@@ -550,9 +552,34 @@ function SearchContent() {
               )}
             </>
           ) : (
-            /* Map View — Leaflet (client-only) */
+            /* Map View — Leaflet */
             <div className="h-[600px] overflow-hidden rounded-xl border border-border">
-              <RoomMap rooms={results} />
+              <MapContainer
+                center={[10.78, 106.70]}
+                zoom={12}
+                className="h-full w-full"
+                scrollWheelZoom={true}
+              >
+                <TileLayer
+                  attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                />
+                {results.map((room: Room) => (
+                  <Marker
+                    key={room.id}
+                    position={[room.lat, room.lng]}
+                    icon={defaultIcon}
+                  >
+                    <Popup>
+                      <div className="text-sm">
+                        <p className="font-semibold">{room.name}</p>
+                        <p className="text-xs text-muted-foreground">{room.venueName}</p>
+                        <p className="mt-1 font-bold text-primary">{formatVND(room.pricePerHour)}{t("common.perHour")}</p>
+                      </div>
+                    </Popup>
+                  </Marker>
+                ))}
+              </MapContainer>
             </div>
           )}
         </div>
