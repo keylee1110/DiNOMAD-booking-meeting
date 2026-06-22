@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react"
 import { useTranslation } from "@/lib/i18n/context"
 import {
   Building2, Plus, Image as ImageIcon, Check, MapPin, Users, Edit2,
-  ArrowLeft, Tags, AlignLeft, DollarSign, LayoutList, Navigation2,
+  ArrowLeft, Tags, AlignLeft, Banknote, LayoutList, Navigation2,
   Info, Trash2, Loader2, Globe, Upload, X, AlertTriangle,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -658,7 +658,7 @@ export default function VenuesPage() {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="flex flex-col gap-2">
                     <label className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5">
-                      <DollarSign className="h-3.5 w-3.5 text-primary" /> {t("partner.pricePerHrLabel")}
+                      <Banknote className="h-3.5 w-3.5 text-primary" /> {t("partner.pricePerHrLabel")}
                     </label>
                     <input
                       type="number"

@@ -1,12 +1,9 @@
 export function formatVND(amount: number): string {
-  return new Intl.NumberFormat("vi-VN").format(amount) + "\u00A0₫"
+  return new Intl.NumberFormat("vi-VN").format(amount) + "\u00A0vnđ"
 }
 
 export function formatVNDFull(amount: number): string {
-  return new Intl.NumberFormat("vi-VN", {
-    style: "currency",
-    currency: "VND",
-  }).format(amount)
+  return new Intl.NumberFormat("vi-VN").format(amount) + "\u00A0vnđ"
 }
 
 export function formatDate(dateStr: string, locale: string = "en"): string {
