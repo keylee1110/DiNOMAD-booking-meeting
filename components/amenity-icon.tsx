@@ -3,7 +3,7 @@
 import React from "react"
 import { useTranslation } from "@/lib/i18n/context"
 import type { Amenity } from "@/lib/types"
-import { Wifi, Tv, PenLine, Snowflake, Cable, Projector, Plug, Coffee, Droplets, Car } from "lucide-react"
+import { Wifi, Tv, PenLine, Snowflake, Cable, Projector, Plug, Coffee, Droplets, Car, Printer } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 const iconMap: Record<Amenity, React.ComponentType<{ className?: string }>> = {
@@ -17,6 +17,7 @@ const iconMap: Record<Amenity, React.ComponentType<{ className?: string }>> = {
   coffee: Coffee,
   water: Droplets,
   parking: Car,
+  printing: Printer,
 }
 
 interface AmenityIconProps {

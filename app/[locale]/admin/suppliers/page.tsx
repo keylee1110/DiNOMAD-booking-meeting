@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react"
 import { useTranslation } from "@/lib/i18n/context"
-import { Building2, CheckCircle2, Clock, Search, XCircle, Loader2, AlertTriangle, ChevronDown, Filter } from "lucide-react"
+import { Building2, CheckCircle2, Clock, Search, XCircle, Loader2, AlertTriangle } from "lucide-react"
 import { getSuppliers, approveSupplier, rejectSupplier } from "@/lib/api/admin"
 import type { Supplier } from "@/lib/types"
 import { toast } from "sonner"
@@ -18,10 +18,16 @@ export default function AdminSuppliersPage() {
 
   const loadSuppliers = useCallback(async () => {
     setLoading(true)
-    const data = await getSuppliers()
-    setSuppliers(data)
-    setLoading(false)
-  }, [])
+    try {
+      const data = await getSuppliers()
+      setSuppliers(data)
+    } catch (err) {
+      toast.error(t("admin.suppliers.actions.error"))
+    } finally {
+      setLoading(false)
+    }
+  }, [t])
+
 
   useEffect(() => {
     loadSuppliers()

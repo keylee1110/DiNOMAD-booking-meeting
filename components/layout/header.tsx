@@ -47,6 +47,9 @@ export function Header() {
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("dinomad_demo_admin")
+    }
     setMenuOpen(false)
     window.location.href = `/${locale}`
   }

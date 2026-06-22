@@ -4,7 +4,8 @@ import type { Locale, Dictionary } from "@/lib/types"
 import { I18nProvider } from "@/lib/i18n/context"
 import { AdminSidebar } from "./_components/admin-sidebar"
 import { AdminHeader } from "./_components/admin-header"
-import { notFound } from "next/navigation"
+import { notFound, redirect } from "next/navigation"
+import { createClient } from "@/utils/supabase/server"
 
 export const metadata: Metadata = {
   title: "DiNOMAD Admin",
@@ -22,6 +23,24 @@ export default async function AdminLayout({
 
   if (!isValidLocale(locale)) {
     notFound()
+  }
+
+  // Enforce server-side Admin auth and role check
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user) {
+    redirect(`/${locale}/login?redirect_to=${encodeURIComponent(`/${locale}/admin`)}`)
+  }
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single()
+
+  if (!profile || profile.role !== "admin") {
+    redirect(`/${locale}`)
   }
 
   const dictionary = (await getDictionary(locale as Locale)) as any

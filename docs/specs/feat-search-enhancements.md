@@ -26,17 +26,108 @@ The search page has basic filters (district, price, capacity, amenities) but is 
 - [x] AC 8: `searchRooms()` updated with new filter params and pagination support
 - [x] AC 9: Active filter badges show for all new filters
 - [x] AC 10: i18n keys added for all new filter labels
+- [x] AC 11: Backend public `GET /api/rooms` and `GET /api/rooms/:id` endpoints created with search + pagination
+- [x] AC 12: `lib/api.ts` shared apiFetch helper created
+- [x] AC 13: `lib/api/rooms.ts` API client with demo fallback to mock data
+- [x] AC 14: Search page uses async API with loading spinner
+- [x] AC 15: Room detail page uses async API with loading spinner
+- [x] AC 16: Leaflet map shows real room locations from API data
+
+---
+
+## Backend
+
+### New endpoints
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| `GET` | `/api/rooms` | Public | Search published rooms with filters + pagination |
+| `GET` | `/api/rooms/:id` | Public | Get published room detail with venue info |
+
+### Query params for `GET /api/rooms`
+
+| Param | Type | Description |
+|---|---|---|
+| `query` | `string` | Text search on name, description, venue name, district |
+| `district` | `string` | Filter by district (case-insensitive partial) |
+| `minCapacity` | `number` | Minimum capacity |
+| `maxPrice` | `number` | Maximum price per hour |
+| `amenities` | `string` | Comma-separated AND filter |
+| `vibeTags` | `string` | Comma-separated OR filter |
+| `category` | `string` | `team_hub` or `solo_nook` |
+| `verified` | `boolean` | Only verified rooms |
+| `noiseLevelMin` | `number` | Minimum noise level |
+| `page` | `number` | Page number (1-indexed, default 1) |
+| `pageSize` | `number` | Items per page (default 6) |
+
+### New files
+
+| File | Purpose |
+|---|---|
+| `backend/src/modules/rooms/public-rooms.controller.ts` | Public room search/detail controller |
+| `backend/src/modules/rooms/public-rooms.service.ts` | Room search/detail service with Supabase queries |
+
+### Modified files
+
+| File | Change |
+|---|---|
+| `backend/src/modules/rooms/rooms.module.ts` | Register `PublicRoomsController` + `PublicRoomsService` |
+
+### Response shape
+
+```typescript
+{
+  rooms: {
+    id: string
+    venueId: string
+    venueName: string
+    venueAddress: string
+    district: string
+    city: string
+    lat: number | null
+    lng: number | null
+    venueImageUrl: string | null
+    openTime: string
+    closeTime: string
+    name: string
+    description: string
+    capacity: number
+    pricePerHour: number
+    category: string | null
+    verified: boolean
+    noiseLevel: number | null
+    specs: Record<string, string>
+    amenities: string[]
+    vibeTags: string[]
+    images: { id: string; imageUrl: string; sortOrder: number }[]
+    createdAt: string
+    updatedAt: string
+  }[]
+  total: number
+  page: number
+  pageSize: number
+  totalPages: number
+}
+```
 
 ---
 
 ## Frontend
+
+### New files
+
+| File | Purpose |
+|---|---|
+| `lib/api.ts` | Shared `apiFetch` helper wrapping fetch with `NEXT_PUBLIC_BACKEND_URL` |
+| `lib/api/rooms.ts` | `searchRoomsApi()` and `getRoomByIdApi()` with demo fallback |
 
 ### Modified files
 
 | File | Change |
 |---|---|
 | `lib/data/rooms.ts` | Add `category`, `verified`, `noiseLevelMin`, `date`, `page`, `pageSize` to `searchRooms()` filters; return `{ rooms, total, page, pageSize, totalPages }` |
-| `app/[locale]/(main)/search/page.tsx` | Add all new filter UI controls, pagination, update state/effects |
+| `app/[locale]/(main)/search/page.tsx` | Replace `searchRooms` with `searchRoomsApi` async call, add loading state; add Leaflet map view |
+| `app/[locale]/(main)/rooms/[id]/page.tsx` | Replace `getRoomById` with `getRoomByIdApi` async call with loading state; import `Room` type |
 
 ### New filter params for `searchRooms()`
 

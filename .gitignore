@@ -12,15 +12,12 @@ backend/dist/
 backend/.env
 .DS_Store
 .vercel
-.pnpm-store/
 
 # Agent & Build info
 .agent/
 *.tsbuildinfo
 .env
-# Added by code-review-graph
-.code-review-graph/
-
+*.log
 # AI Agent & IDE directories
 .gemini/
 .claude/

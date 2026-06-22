@@ -6,6 +6,8 @@ import { EarningsController } from "./earnings.controller"
 import { EarningsService } from "./earnings.service"
 import { PartnerBookingsController } from "./partner-bookings.controller"
 import { PartnerBookingsService } from "./partner-bookings.service"
+import { PublicRoomsController } from "./public-rooms.controller"
+import { PublicRoomsService } from "./public-rooms.service"
 import { RoomsController } from "./rooms.controller"
 import { RoomsService } from "./rooms.service"
 import { ScannerController } from "./scanner.controller"
@@ -18,7 +20,7 @@ import { VenuesService } from "./venues.service"
   controllers: [
     VenuesController,
     RoomsController,
-    EarningsController,
+    PublicRoomsController, EarningsController,
     ScannerController,
     DashboardController,
     PartnerBookingsController,
@@ -26,7 +28,7 @@ import { VenuesService } from "./venues.service"
   providers: [
     VenuesService,
     RoomsService,
-    EarningsService,
+    PublicRoomsService, EarningsService,
     ScannerService,
     DashboardService,
     PartnerBookingsService,

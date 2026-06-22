@@ -49,7 +49,13 @@ async function apiFetch<T>(path: string, options?: RequestInit, passedToken?: st
   return (json.data ?? json) as T
 }
 
+// --- HYBRID DEMO MODE HELPERS ---
 const DEMO_KEY = "dinomad_demo_suppliers"
+
+function isDemoMode(): boolean {
+  if (typeof window === "undefined") return false
+  return localStorage.getItem("dinomad_demo_admin") === "true"
+}
 
 function getDemoSuppliers(): Supplier[] {
   if (typeof window === "undefined") return []
@@ -72,44 +78,30 @@ function saveDemoSuppliers(suppliers: Supplier[]) {
   }
 }
 
-async function isAuthenticated(): Promise<boolean> {
-  try {
-    const supabase = createClient()
-    const { data } = await supabase.auth.getSession()
-    return !!data.session
-  } catch {
-    return false
-  }
-}
+// --- ADMIN API ENDPOINTS ---
 
+/** Lấy toàn bộ danh sách suppliers (admin only) */
 export async function getSuppliers(): Promise<Supplier[]> {
-  if (!(await isAuthenticated())) return getDemoSuppliers()
-  try {
-    return await apiFetch<Supplier[]>("/suppliers")
-  } catch {
+  if (isDemoMode()) {
     return getDemoSuppliers()
   }
+  return apiFetch<Supplier[]>("/suppliers")
 }
 
+/** Lấy supplier theo ID */
 export async function getSupplierById(id: string): Promise<Supplier> {
-  if (!(await isAuthenticated())) {
+  if (isDemoMode()) {
     const list = getDemoSuppliers()
     const found = list.find((s) => s.id === id)
     if (!found) throw new Error("Supplier not found")
     return found
   }
-  try {
-    return await apiFetch<Supplier>(`/suppliers/${id}`)
-  } catch {
-    const list = getDemoSuppliers()
-    const found = list.find((s) => s.id === id)
-    if (!found) throw new Error("Supplier not found")
-    return found
-  }
+  return apiFetch<Supplier>(`/suppliers/${id}`)
 }
 
+/** Duyệt supplier — PATCH status → "approved" */
 export async function approveSupplier(id: string): Promise<Supplier> {
-  if (!(await isAuthenticated())) {
+  if (isDemoMode()) {
     const list = getDemoSuppliers()
     const idx = list.findIndex((s) => s.id === id)
     if (idx === -1) throw new Error("Supplier not found")
@@ -117,23 +109,15 @@ export async function approveSupplier(id: string): Promise<Supplier> {
     saveDemoSuppliers(list)
     return list[idx]
   }
-  try {
-    return await apiFetch<Supplier>(`/suppliers/${id}`, {
-      method: "PATCH",
-      body: JSON.stringify({ status: "approved" }),
-    })
-  } catch {
-    const list = getDemoSuppliers()
-    const idx = list.findIndex((s) => s.id === id)
-    if (idx === -1) throw new Error("Supplier not found")
-    list[idx] = { ...list[idx], status: "approved", approvedAt: new Date().toISOString(), approvedBy: "admin" }
-    saveDemoSuppliers(list)
-    return list[idx]
-  }
+  return apiFetch<Supplier>(`/suppliers/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify({ status: "approved" }),
+  })
 }
 
+/** Từ chối supplier — PATCH status → "rejected" */
 export async function rejectSupplier(id: string): Promise<Supplier> {
-  if (!(await isAuthenticated())) {
+  if (isDemoMode()) {
     const list = getDemoSuppliers()
     const idx = list.findIndex((s) => s.id === id)
     if (idx === -1) throw new Error("Supplier not found")
@@ -141,19 +125,10 @@ export async function rejectSupplier(id: string): Promise<Supplier> {
     saveDemoSuppliers(list)
     return list[idx]
   }
-  try {
-    return await apiFetch<Supplier>(`/suppliers/${id}`, {
-      method: "PATCH",
-      body: JSON.stringify({ status: "rejected" }),
-    })
-  } catch {
-    const list = getDemoSuppliers()
-    const idx = list.findIndex((s) => s.id === id)
-    if (idx === -1) throw new Error("Supplier not found")
-    list[idx] = { ...list[idx], status: "rejected" }
-    saveDemoSuppliers(list)
-    return list[idx]
-  }
+  return apiFetch<Supplier>(`/suppliers/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify({ status: "rejected" }),
+  })
 }
 
 export type { SupplierStatus }

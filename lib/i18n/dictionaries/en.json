@@ -38,6 +38,7 @@
     "role": "Registration Role",
     "customer": "Customer (Book space)",
     "partner": "Partner (Rent out workspace)",
+    "admin": "Admin (Management)",
     "forgotPassword": "Forgot password?",
     "noAccount": "Don't have an account?",
     "haveAccount": "Already have an account?",
@@ -469,7 +470,8 @@
     "power_outlets": "Power Outlets",
     "coffee": "Free Coffee",
     "water": "Free Water",
-    "parking": "Parking"
+    "parking": "Parking",
+    "printing": "Printing"
   },
   "vibes": {
     "ultra_quiet": "Ultra Quiet",
