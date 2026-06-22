@@ -75,6 +75,64 @@ function LoginForm() {
 
       console.log("Final Redirect Decision Role:", actualRole)
 
+      // 1. Enforce Admin role restriction
+      if (role === "admin" && actualRole !== "admin") {
+        toast.error(locale === "vi" 
+          ? "Tài khoản của bạn không có quyền truy cập trang quản trị." 
+          : "Your account does not have admin access privileges."
+        )
+        await supabase.auth.signOut()
+        setIsLoading(false)
+        return
+      }
+
+      // 2. Enforce Supplier role restriction
+      if (role === "supplier" && actualRole !== "supplier" && actualRole !== "admin") {
+        try {
+          const { data: memberData, error: memberErr } = await supabase
+            .from("supplier_members")
+            .select("supplier_id, suppliers(status)")
+            .eq("user_id", data.user?.id || "")
+            .eq("is_active", true)
+
+          console.log("Supplier member check response:", memberData, memberErr)
+          
+          if (memberData && memberData.length > 0) {
+            const supplier = (memberData[0] as any).suppliers
+            const status = supplier?.status
+
+            if (status === "pending") {
+              toast.error(locale === "vi" 
+                ? "Tài khoản đối tác của bạn đang chờ Admin phê duyệt." 
+                : "Your partner account is pending admin approval."
+              )
+              await supabase.auth.signOut()
+              setIsLoading(false)
+              return
+            } else if (status === "rejected") {
+              toast.error(locale === "vi"
+                ? "Đơn đăng ký đối tác của bạn đã bị từ chối. Vui lòng liên hệ Admin."
+                : "Your partner application was rejected. Please contact Admin."
+              )
+              await supabase.auth.signOut()
+              setIsLoading(false)
+              return
+            }
+          }
+          
+          // If no supplier record or not active member
+          toast.error(locale === "vi"
+            ? "Tài khoản này chưa đăng ký làm đối tác. Vui lòng đăng ký trước."
+            : "This account is not registered as a partner. Please register first."
+          )
+          await supabase.auth.signOut()
+          setIsLoading(false)
+          return
+        } catch (checkErr) {
+          console.error("Error checking supplier status:", checkErr)
+        }
+      }
+
       if (typeof window !== "undefined") {
         localStorage.removeItem("dinomad_demo_admin")
       }
@@ -88,10 +146,16 @@ function LoginForm() {
       setTimeout(() => {
         let targetRedirect = searchParams.get("redirect_to")
         
-        // If the redirect parameter points to home page, or is empty, or if the user is an admin
+        // If the redirect parameter points to home page, or is empty, or if the user is an admin or supplier
         // we redirect them to the correct dashboard/page.
-        if (!targetRedirect || targetRedirect === `/${locale}` || targetRedirect === "/" || actualRole === "admin") {
-          targetRedirect = actualRole === "admin" ? `/${locale}/admin` : `/${locale}`
+        if (!targetRedirect || targetRedirect === `/${locale}` || targetRedirect === "/" || actualRole === "admin" || actualRole === "supplier") {
+          if (actualRole === "admin") {
+            targetRedirect = `/${locale}/admin`
+          } else if (actualRole === "supplier") {
+            targetRedirect = `/${locale}/partner`
+          } else {
+            targetRedirect = `/${locale}`
+          }
         }
 
         console.log("Redirecting to:", targetRedirect)

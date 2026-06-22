@@ -1,20 +1,87 @@
 "use client"
-
+ 
+import { useState, useEffect } from "react"
 import { useTranslation } from "@/lib/i18n/context"
-import { LayoutDashboard, DoorOpen, QrCode, Bell, TrendingUp, Building2, LogOut } from "lucide-react"
+import { LayoutDashboard, DoorOpen, QrCode, Bell, TrendingUp, Building2, LogOut, Loader2 } from "lucide-react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import Image from "next/image"
 import { createClient } from "@/utils/supabase/client"
-
+import { toast } from "sonner"
+ 
 export default function PartnerLayout({ children }: { children: React.ReactNode }) {
   const { locale, t } = useTranslation()
   const pathname = usePathname()
+  const router = useRouter()
   const supabase = createClient()
+  const [isAuthorized, setIsAuthorized] = useState(false)
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        window.location.href = `/${locale}/login?redirect_to=${encodeURIComponent(pathname)}`
+        return
+      }
+
+      // Check role
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", user.id)
+        .single()
+
+      if (!profile || (profile.role !== "supplier" && profile.role !== "admin")) {
+        // Fetch supplier application status to show a helpful message
+        const { data: memberData } = await supabase
+          .from("supplier_members")
+          .select("supplier_id, suppliers(status)")
+          .eq("user_id", user.id)
+          .eq("is_active", true)
+
+        let msg = locale === "vi"
+          ? "Tài khoản của bạn chưa được duyệt làm Supplier."
+          : "Your account is not approved as a Supplier."
+
+        if (memberData && memberData.length > 0) {
+          const status = (memberData[0] as any).suppliers?.status
+          if (status === "pending") {
+            msg = locale === "vi" 
+              ? "Tài khoản đối tác của bạn đang chờ Admin phê duyệt." 
+              : "Your partner account is pending admin approval."
+          } else if (status === "rejected") {
+            msg = locale === "vi"
+              ? "Đơn đăng ký đối tác của bạn đã bị từ chối. Vui lòng liên hệ Admin."
+              : "Your partner application was rejected. Please contact Admin."
+          }
+        }
+
+        toast.error(msg)
+        window.location.href = `/${locale}`
+      } else {
+        setIsAuthorized(true)
+      }
+    }
+
+    checkAuth()
+  }, [locale, supabase, pathname])
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
     window.location.href = `/${locale}`
+  }
+
+  if (!isAuthorized) {
+    return (
+      <div className="flex h-screen w-screen items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p className="text-sm text-muted-foreground">
+            {locale === "vi" ? "Đang xác thực quyền truy cập..." : "Verifying access privileges..."}
+          </p>
+        </div>
+      </div>
+    )
   }
 
   const navItems = [
