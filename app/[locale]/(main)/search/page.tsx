@@ -21,7 +21,7 @@ import dynamic from "next/dynamic"
 import { formatVND } from "@/lib/format"
 import type { Amenity, VibeTag, Room } from "@/lib/types"
 
-const RoomMap = dynamic(() => import("@/components/room-map").then(m => m.RoomMap), {
+const RoomMap = dynamic(() => import("@/components/search-map"), {
   ssr: false,
   loading: () => (
     <div className="flex h-full w-full items-center justify-center bg-muted/20 text-sm text-muted-foreground">
@@ -609,34 +609,7 @@ function SearchContent() {
               )}
             </>
           ) : (
-            <div className="h-[600px] overflow-hidden rounded-xl border border-border">
-              <MapContainer
-                center={[10.78, 106.70]}
-                zoom={12}
-                className="h-full w-full"
-                scrollWheelZoom={true}
-              >
-                <TileLayer
-                  attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                />
-                {results.map((room: Room) => (
-                  <Marker
-                    key={room.id}
-                    position={[room.lat, room.lng]}
-                    icon={defaultIcon}
-                  >
-                    <Popup>
-                      <div className="text-sm">
-                        <p className="font-semibold">{room.name}</p>
-                        <p className="text-xs text-muted-foreground">{room.venueName}</p>
-                        <p className="mt-1 font-bold text-primary">{formatVND(room.pricePerHour)}{t("common.perHour")}</p>
-                      </div>
-                    </Popup>
-                  </Marker>
-                ))}
-              </MapContainer>
-            </div>
+            <RoomMap results={results} locale={locale} />
           )}
         </div>
       </div>

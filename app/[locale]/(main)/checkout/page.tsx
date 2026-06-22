@@ -291,6 +291,25 @@ export default function CheckoutPage({ params }: { params: Promise<{ locale: str
     }
   }, [])
 
+  // Cancels a pending booking via API (with Supabase fallback)
+  const handleCancelBookingInDb = useCallback(async (id: string) => {
+    if (!id) return
+    try {
+      console.info("[Booking] Cancelling booking in DB via API due to timeout/cancel:", id)
+      await cancelPendingBooking(id)
+    } catch (e) {
+      console.error("Failed to cancel booking via API:", e)
+      try {
+        await supabase
+          .from("bookings")
+          .update({ status: "cancelled" })
+          .eq("id", id)
+      } catch (err) {
+        console.error("Supabase fallback cancel failed:", err)
+      }
+    }
+  }, [supabase])
+
   // Create pending booking on page load/mount
   useEffect(() => {
     let active = true
@@ -438,26 +457,6 @@ export default function CheckoutPage({ params }: { params: Promise<{ locale: str
     locale,
     handleCancelBookingInDb
   ])
-
-
-
-  const handleCancelBookingInDb = useCallback(async (id: string) => {
-    if (!id) return
-    try {
-      console.info("[Booking] Cancelling booking in DB via API due to timeout/cancel:", id)
-      await cancelPendingBooking(id)
-    } catch (e) {
-      console.error("Failed to cancel booking via API:", e)
-      try {
-        await supabase
-          .from("bookings")
-          .update({ status: "cancelled" })
-          .eq("id", id)
-      } catch (err) {
-        console.error("Supabase fallback cancel failed:", err)
-      }
-    }
-  }, [supabase])
 
   // Payment countdown timer effect (runs continuously once booking is created)
   useEffect(() => {

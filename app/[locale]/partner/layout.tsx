@@ -28,7 +28,7 @@ export default function PartnerLayout({ children }: { children: React.ReactNode 
       .catch(() => { /* silently skip if backend unavailable */ })
 
     // Fetch supplier info for profile chip
-    supabase.auth.getSession().then(async ({ data }) => {
+    supabase.auth.getSession().then(async ({ data }: { data: { session: Awaited<ReturnType<typeof supabase.auth.getSession>>["data"]["session"] } }) => {
       if (!data.session) return
       const { data: members } = await supabase
         .from("supplier_members")

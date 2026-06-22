@@ -2,6 +2,8 @@
 
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet"
 import L from "leaflet"
+// TypeScript may complain about side-effect CSS imports without type declarations.
+// @ts-ignore: Implicitly have CSS module for Leaflet styles
 import "leaflet/dist/leaflet.css"
 import { formatVND } from "@/lib/format"
 import type { Room } from "@/lib/types"
