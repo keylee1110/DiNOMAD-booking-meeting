@@ -64,10 +64,10 @@ NestJS backend (localhost:3001)
 | `auth` | ✅ | Guards & token validation (no dedicated controller) |
 | `users` | ✅ | `GET /users/me`, `PATCH /users/me`, `GET /users` |
 | `suppliers` | ✅ | `GET/POST/PATCH /suppliers/*` |
-| `rooms` | ✅ | Venues, rooms, slots, scanner, earnings (`/partner/*`) |
-| `bookings` | ✅ | `POST /bookings` — server-authoritative create + payment row |
-| `payments` | ✅ (partial) | Row written by `POST /bookings` (simulated gateway; no PayOS yet) |
-| `partner` | ✅ | Implemented under the `rooms` module (`/partner/*`) |
+| `rooms` | 🔲 | To be created |
+| `bookings` | 🔲 | To be created |
+| `payments` | 🔲 | To be created |
+| `partner` | 🔲 | To be created |
 | `admin` | 🔲 (partial) | Only suppliers/users implemented |
 | `notifications` | 🔲 | To be created |
 

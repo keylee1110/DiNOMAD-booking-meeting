@@ -2,63 +2,34 @@ import { createClient } from "@/utils/supabase/client"
 
 const BASE = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:4000/api"
 
-export interface CreateBookingPayload {
-  roomId: string
-  date: string          // YYYY-MM-DD
-  startTime: string     // "HH:MM"
-  endTime: string       // "HH:MM"
-  paymentMode: "deposit" | "full"
-  paymentMethod: "vietqr" | "momo" | "zalopay" | "card"
-  redeemPoints?: boolean
-}
-
-export interface CreatedBooking {
-  id: string
-  bookingCode: string
-  date: string
-  startTime: string
-  endTime: string
-  status: string
-  subtotal: number
-  platformFee: number
-  totalAmount: number
-  pointsRedeemed: number
-  pointsEarned: number
-  amountPaidNow: number
-  paymentStatus: "deposited" | "fully_paid"
-  qrCodeToken: string | null
-  createdAt: string
-}
-
-/**
- * Create a booking via the backend. The server recomputes all amounts and points
- * (the client only sends intent), writes the booking + payment, and returns the
- * canonical record. Requires an authenticated session.
- */
-export async function createBooking(payload: CreateBookingPayload): Promise<CreatedBooking> {
+async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
   const supabase = createClient()
-  const { data: { session } } = await supabase.auth.getSession()
-  const token = session?.access_token
-  if (!token) throw new Error("Not authenticated")
+  const sessionResult = await Promise.race([
+    supabase.auth.getSession(),
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error("Auth session timed out")), 2000),
+    ),
+  ])
+  const token = sessionResult.data.session?.access_token
 
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), 20000)
 
   let res: Response
   try {
-    res = await fetch(`${BASE}/bookings`, {
-      method: "POST",
+    res = await fetch(`${BASE}${path}`, {
+      ...options,
       signal: controller.signal,
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(options?.headers ?? {}),
       },
-      body: JSON.stringify(payload),
     })
   } catch (err) {
     clearTimeout(timeoutId)
     const isAbort = err instanceof DOMException && err.name === "AbortError"
-    throw new Error(isAbort ? "Request timed out — backend may be unreachable" : String(err))
+    throw new Error(isAbort ? "Request timed out" : String(err))
   }
   clearTimeout(timeoutId)
 
@@ -70,5 +41,11 @@ export async function createBooking(payload: CreateBookingPayload): Promise<Crea
   }
 
   const json = await res.json()
-  return json.data as CreatedBooking
+  return (json.data ?? json) as T
+}
+
+export function cancelPendingBooking(bookingId: string): Promise<{ success: boolean; message: string }> {
+  return apiFetch<{ success: boolean; message: string }>(`/bookings/${bookingId}/cancel-pending`, {
+    method: "PATCH",
+  })
 }

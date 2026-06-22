@@ -18,3 +18,11 @@ backend/.env
 *.tsbuildinfo
 .env
 *.log
+# AI Agent & IDE directories
+.gemini/
+.claude/
+.qoder/
+.kiro/
+.vscode/
+.opencode.json
+.mcp.json

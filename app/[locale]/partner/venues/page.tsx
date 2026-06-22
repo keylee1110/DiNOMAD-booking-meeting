@@ -5,7 +5,7 @@ import { useTranslation } from "@/lib/i18n/context"
 import {
   Building2, Plus, Image as ImageIcon, Check, MapPin, Users, Edit2,
   ArrowLeft, Tags, AlignLeft, DollarSign, LayoutList, Navigation2,
-  Info, Trash2, Loader2, Globe, Upload, X,
+  Info, Trash2, Loader2, Globe, Upload, X, AlertTriangle,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { toast } from "sonner"
@@ -160,7 +160,28 @@ export default function VenuesPage() {
   const [toDeleteIds, setToDeleteIds] = useState<string[]>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // ── Derived: whether to show new-venue creation fields ────────────────────
+  // ── Dirty state guard ─────────────────────────────────────────────────────
+  const [isDirty, setIsDirty] = useState(false)
+  const originalSnapshot = useRef<string>("")
+
+  useEffect(() => {
+    if (editingId) {
+      const current = JSON.stringify(formData)
+      if (current !== originalSnapshot.current) setIsDirty(true)
+      else setIsDirty(false)
+    } else {
+      setIsDirty(false)
+    }
+  }, [formData, editingId])
+
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => {
+      if (isDirty) { e.preventDefault(); e.returnValue = "" }
+    }
+    window.addEventListener("beforeunload", handler)
+    return () => window.removeEventListener("beforeunload", handler)
+  }, [isDirty])
+
   // True when creating a new room AND no existing venue is selected
   const isCreatingNewVenue = formData.id === null && formData.venueId === null
   const hasExistingVenues = Object.keys(venueMap).length > 0
@@ -244,22 +265,23 @@ export default function VenuesPage() {
   const handleEdit = (room: RoomFormData) => {
     setEditingId(room.id ?? "new")
     setFormData({ ...room })
+    originalSnapshot.current = JSON.stringify({ ...room })
     resetImageState()
     setErrors({})
+    setIsDirty(false)
   }
 
   const handleAddNew = () => {
     setEditingId("new")
-    // Pre-select the first existing venue so the user doesn't re-type venue info
     const firstVenueId = Object.keys(venueMap)[0]
-    if (firstVenueId) {
-      const v = venueMap[firstVenueId]
-      setFormData({ ...EMPTY_FORM, venueId: v.id, venueName: v.name, address: v.address, district: v.district })
-    } else {
-      setFormData({ ...EMPTY_FORM })
-    }
+    const initial = firstVenueId
+      ? { ...EMPTY_FORM, venueId: venueMap[firstVenueId].id, venueName: venueMap[firstVenueId].name, address: venueMap[firstVenueId].address, district: venueMap[firstVenueId].district }
+      : { ...EMPTY_FORM }
+    setFormData(initial)
+    originalSnapshot.current = JSON.stringify(initial)
     resetImageState()
     setErrors({})
+    setIsDirty(false)
   }
 
   const handleCancel = () => {

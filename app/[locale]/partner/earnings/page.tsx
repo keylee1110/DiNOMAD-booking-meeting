@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { useTranslation } from "@/lib/i18n/context"
-import { TrendingUp, TrendingDown, DollarSign, BarChart3, Clock, Loader2, AlertCircle } from "lucide-react"
+import { TrendingUp, TrendingDown, DollarSign, BarChart3, Clock, Loader2, AlertCircle, Download } from "lucide-react"
 
 import { formatVND } from "@/lib/format"
 import { cn } from "@/lib/utils"
@@ -14,6 +14,23 @@ import {
 
 const COMMISSION_RATE = 0.10
 type Period = "daily" | "weekly" | "monthly"
+
+function getDateRange(period: Period): { startDate: string; endDate: string } {
+  const now = new Date()
+  const today = now.toISOString().slice(0, 10)
+  if (period === "daily") {
+    const d14 = new Date(now)
+    d14.setDate(d14.getDate() - 13)
+    return { startDate: d14.toISOString().slice(0, 10), endDate: today }
+  }
+  if (period === "weekly") {
+    const d56 = new Date(now)
+    d56.setDate(d56.getDate() - 55)
+    return { startDate: d56.toISOString().slice(0, 10), endDate: today }
+  }
+  // monthly: current calendar month
+  return getMonthRange(0)
+}
 
 const emptyResponse: EarningsResponse = {
   summary: {
@@ -48,14 +65,12 @@ export default function EarningsPage() {
   const [earnings, setEarnings] = useState<EarningsResponse | null>(null)
   const [lastMonthRevenue, setLastMonthRevenue] = useState(0)
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
     setLoading(true)
-    setError(null)
 
-    const { startDate, endDate } = getMonthRange(0)
+    const { startDate, endDate } = getDateRange(period)
     const { startDate: prevStart, endDate: prevEnd } = getMonthRange(-1)
 
     Promise.all([
@@ -67,12 +82,10 @@ export default function EarningsPage() {
         setEarnings(current)
         setLastMonthRevenue(prev.summary.totalRevenue)
       })
-      .catch((e) => {
+      .catch(() => {
         if (cancelled) return
-        // Backend unreachable — show an honest error, never fabricated figures.
         setEarnings(emptyResponse)
         setLastMonthRevenue(0)
-        setError(e instanceof Error ? e.message : String(e))
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
@@ -132,6 +145,37 @@ export default function EarningsPage() {
 
   const periods: Period[] = ["daily", "weekly", "monthly"]
 
+  // ─── CSV export ───────────────────────────────────────────────────────────
+  const handleExportCSV = () => {
+    if (data.bookings.length === 0) return
+    const periodLabel = period.charAt(0).toUpperCase() + period.slice(1)
+    const now = new Date()
+    const monthLabel = now.toLocaleString("en", { month: "long", year: "numeric" })
+    const filename = `dinomad-earnings-${monthLabel.replace(" ", "-")}.csv`
+
+    const header = ["Booking Code", "Room", "Guest", "Date", "Revenue", "Commission", "Net"].join(",")
+    const rows = data.bookings.map(b => {
+      const commission = Math.round(b.subtotal * COMMISSION_RATE)
+      return [
+        b.bookingCode,
+        `"${b.roomName}"`,
+        `"${b.guestName}"`,
+        b.date,
+        b.subtotal,
+        commission,
+        b.net,
+      ].join(",")
+    })
+    const csv = [header, ...rows].join("\n")
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = filename
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   if (loading) {
     return (
       <div className="flex h-64 items-center justify-center text-muted-foreground gap-3">
@@ -151,13 +195,6 @@ export default function EarningsPage() {
           {t("partner.earningsSubtitle")}
         </p>
       </div>
-
-      {error && (
-        <div className="flex items-center gap-3 rounded-2xl border border-destructive/30 bg-destructive/5 px-5 py-4 text-sm text-destructive">
-          <AlertCircle className="h-5 w-5 shrink-0" />
-          <span className="font-medium">{t("partner.earningsLoadError")}</span>
-        </div>
-      )}
 
       {/* Stats grid */}
       <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
@@ -245,9 +282,20 @@ export default function EarningsPage() {
           <h2 className="text-base md:text-lg font-semibold tracking-tight text-foreground">
             {t("partner.perBookingBreakdown")}
           </h2>
-          <span className="text-xs font-semibold text-muted-foreground bg-muted/40 border border-border/50 rounded-full px-2.5 py-1">
-            {data.bookings.length} {t("partner.bookingsCountLabel")}
-          </span>
+          <div className="flex items-center gap-3">
+            <span className="text-xs font-semibold text-muted-foreground bg-muted/40 border border-border/50 rounded-full px-2.5 py-1">
+              {data.bookings.length} {t("partner.bookingsCountLabel")}
+            </span>
+            {data.bookings.length > 0 && (
+              <button
+                onClick={handleExportCSV}
+                className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground hover:text-foreground bg-background border border-border/60 hover:border-border rounded-xl px-3 py-1.5 transition-all shadow-sm"
+              >
+                <Download className="h-3.5 w-3.5" />
+                CSV
+              </button>
+            )}
+          </div>
         </div>
 
         {data.bookings.length === 0 ? (
@@ -316,26 +364,20 @@ export default function EarningsPage() {
           </h2>
         </div>
         <div className="flex flex-col divide-y divide-border/30">
-          {mockPayouts.length === 0 ? (
-            <div className="flex h-20 items-center justify-center text-sm text-muted-foreground">
-              {t("partner.noPayouts")}
-            </div>
-          ) : (
-            mockPayouts.map((payout, i) => (
-              <div key={i} className="flex items-center justify-between px-5 py-4 hover:bg-muted/20 transition-colors">
-                <div className="flex flex-col gap-0.5">
-                  <span className="text-xs font-semibold text-foreground">{payout.date}</span>
-                  <span className="text-[11px] font-mono text-muted-foreground">{payout.ref}</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className="text-sm font-bold text-foreground">{formatVND(payout.amount)}</span>
-                  <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-500/10 border border-emerald-500/20 rounded-full px-2.5 py-0.5 uppercase tracking-wide">
-                    {t("partner.payoutPaid")}
-                  </span>
-                </div>
+          {mockPayouts.map((payout, i) => (
+            <div key={i} className="flex items-center justify-between px-5 py-4 hover:bg-muted/20 transition-colors">
+              <div className="flex flex-col gap-0.5">
+                <span className="text-xs font-semibold text-foreground">{payout.date}</span>
+                <span className="text-[11px] font-mono text-muted-foreground">{payout.ref}</span>
               </div>
-            ))
-          )}
+              <div className="flex items-center gap-3">
+                <span className="text-sm font-bold text-foreground">{formatVND(payout.amount)}</span>
+                <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-500/10 border border-emerald-500/20 rounded-full px-2.5 py-0.5 uppercase tracking-wide">
+                  {t("partner.payoutPaid")}
+                </span>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     </div>

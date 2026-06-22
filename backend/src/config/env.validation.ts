@@ -9,6 +9,7 @@ const envSchema = z.object({
   SUPABASE_ANON_KEY: z.string().min(1),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),
   DATABASE_URL: z.string().optional(),
+  SEPAY_WEBHOOK_API_KEY: z.string().optional(),
 })
 
 export function validateEnv(config: Record<string, unknown>) {

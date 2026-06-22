@@ -2,11 +2,13 @@
  
 import { useState, useEffect } from "react"
 import { useTranslation } from "@/lib/i18n/context"
-import { LayoutDashboard, DoorOpen, QrCode, Bell, TrendingUp, Building2, LogOut, Loader2 } from "lucide-react"
+import { LayoutDashboard, DoorOpen, QrCode, TrendingUp, Building2, LogOut, Bell, Loader2 } from "lucide-react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import Image from "next/image"
 import { createClient } from "@/utils/supabase/client"
+import { useEffect, useState } from "react"
+import { getPartnerDashboard } from "@/lib/api/partner"
 import { toast } from "sonner"
  
 export default function PartnerLayout({ children }: { children: React.ReactNode }) {
@@ -14,6 +16,36 @@ export default function PartnerLayout({ children }: { children: React.ReactNode 
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
+
+  const [actionCount, setActionCount] = useState(0)
+  const [supplierName, setSupplierName] = useState<string | null>(null)
+  const [supplierRole, setSupplierRole] = useState<string | null>(null)
+
+  useEffect(() => {
+    // Fetch dashboard metrics for notification badge
+    getPartnerDashboard()
+      .then(d => {
+        // Count pending check-ins as notification items
+        setActionCount(d.pendingCheckIns.length)
+      })
+      .catch(() => { /* silently skip if backend unavailable */ })
+
+    // Fetch supplier info for profile chip
+    supabase.auth.getSession().then(async ({ data }: { data: { session: Awaited<ReturnType<typeof supabase.auth.getSession>>["data"]["session"] } }) => {
+      if (!data.session) return
+      const { data: members } = await supabase
+        .from("supplier_members")
+        .select("role, suppliers(display_name)")
+        .eq("user_id", data.session.user.id)
+        .eq("is_active", true)
+        .limit(1)
+        .single() as any
+      if (members) {
+        setSupplierName(members.suppliers?.display_name ?? null)
+        setSupplierRole(members.role ?? null)
+      }
+    })
+  }, [])
   const [isAuthorized, setIsAuthorized] = useState(false)
 
   useEffect(() => {
@@ -100,17 +132,34 @@ export default function PartnerLayout({ children }: { children: React.ReactNode 
           <Image src="/logo.png" alt="DiNOMAD Logo" width={32} height={32} className="object-contain" />
           <div className="font-bold tracking-tight text-xl">DiNOMAD <span className="text-primary font-bold">Ops</span></div>
         </div>
-        <button
-          onClick={handleLogout}
-          className="flex h-10 w-10 items-center justify-center rounded-xl border border-transparent hover:bg-muted/80 transition-colors text-muted-foreground hover:text-destructive"
-          aria-label={t("partner.logout")}
-        >
-          <LogOut className="h-5 w-5" />
-        </button>
+        <div className="flex items-center gap-2">
+          {/* Bell with badge */}
+          <div className="relative">
+            <Link
+              href={`/${locale}/partner`}
+              className="flex h-10 w-10 items-center justify-center rounded-xl border border-transparent hover:bg-muted/80 transition-colors text-muted-foreground"
+            >
+              <Bell className="h-5 w-5" />
+            </Link>
+            {actionCount > 0 && (
+              <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-bold text-white animate-bounce">
+                {actionCount > 9 ? "9+" : actionCount}
+              </span>
+            )}
+          </div>
+          <button
+            onClick={handleLogout}
+            className="flex h-10 w-10 items-center justify-center rounded-xl border border-transparent hover:bg-muted/80 transition-colors text-muted-foreground hover:text-destructive"
+            aria-label={t("partner.logout")}
+          >
+            <LogOut className="h-5 w-5" />
+          </button>
+        </div>
       </header>
 
       {/* Sidebar (Desktop) / Bottom Nav (Mobile) */}
       <nav className="fixed bottom-0 z-50 flex w-full border-t border-border/40 bg-card md:relative md:w-64 md:flex-col md:border-r md:border-border/40 md:bg-background shrink-0 transition-transform">
+        {/* Desktop logo */}
         <div className="hidden h-[88px] items-center px-6 border-b border-border/40 md:flex shrink-0">
           <div className="flex items-center gap-3">
             <Image src="/logo.png" alt="DiNOMAD Logo" width={40} height={40} className="object-contain" />
@@ -120,28 +169,57 @@ export default function PartnerLayout({ children }: { children: React.ReactNode 
           </div>
         </div>
 
+        {/* Supplier profile chip (desktop only) */}
+        {supplierName && (
+          <div className="hidden md:flex items-center gap-3 px-6 py-3 border-b border-border/40 bg-muted/20">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/15 text-primary font-bold text-sm shrink-0">
+              {supplierName.charAt(0).toUpperCase()}
+            </div>
+            <div className="flex flex-col min-w-0">
+              <span className="text-xs font-semibold text-foreground truncate leading-tight">{supplierName}</span>
+              {supplierRole && (
+                <span className="text-[10px] font-semibold text-primary bg-primary/10 rounded-full px-1.5 py-px w-fit capitalize mt-0.5">
+                  {supplierRole}
+                </span>
+              )}
+            </div>
+          </div>
+        )}
+
         <div className="flex w-full flex-row justify-around p-2 md:flex-col md:justify-start md:gap-3 md:p-6 overflow-y-auto md:flex-1">
           {navItems.map((item) => {
-             const isActive = pathname === item.href
-             return (
-               <Link
-                 key={item.href}
-                 href={item.href}
-                 className={`flex flex-col md:flex-row items-center gap-1 md:gap-4 p-2.5 md:px-4 md:py-3.5 transition-all rounded-xl ${
-                   isActive
-                     ? 'bg-primary text-primary-foreground font-semibold shadow-sm'
-                     : 'text-muted-foreground hover:text-foreground font-semibold hover:bg-muted/40'
-                 }`}
-               >
-                 <item.icon className="h-5 w-5 md:h-[22px] md:w-[22px]" />
-                 <span className="text-[10px] md:text-[13px] uppercase tracking-wider">{item.label}</span>
-               </Link>
-             )
+            const isActive = pathname === item.href
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`flex flex-col md:flex-row items-center gap-1 md:gap-4 p-2.5 md:px-4 md:py-3.5 transition-all rounded-xl ${
+                  isActive
+                    ? "bg-primary text-primary-foreground font-semibold shadow-sm"
+                    : "text-muted-foreground hover:text-foreground font-semibold hover:bg-muted/40"
+                }`}
+              >
+                <item.icon className="h-5 w-5 md:h-[22px] md:w-[22px]" />
+                <span className="text-[10px] md:text-[13px] uppercase tracking-wider">{item.label}</span>
+              </Link>
+            )
           })}
         </div>
 
-        {/* Logout — desktop only (mobile has it in the header) */}
-        <div className="hidden md:block px-6 pb-6">
+        {/* Desktop bell + logout */}
+        <div className="hidden md:flex flex-col px-6 pb-6 gap-2">
+          <Link
+            href={`/${locale}/partner`}
+            className="relative flex w-full flex-row items-center gap-4 px-4 py-3.5 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted/40 font-semibold transition-all"
+          >
+            <Bell className="h-[22px] w-[22px]" />
+            <span className="text-[13px] uppercase tracking-wider">{t("partner.notifications")}</span>
+            {actionCount > 0 && (
+              <span className="ml-auto flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white animate-bounce">
+                {actionCount > 9 ? "9+" : actionCount}
+              </span>
+            )}
+          </Link>
           <button
             onClick={handleLogout}
             className="flex w-full flex-row items-center gap-4 px-4 py-3.5 rounded-xl text-muted-foreground hover:text-destructive hover:bg-destructive/10 font-semibold transition-all"

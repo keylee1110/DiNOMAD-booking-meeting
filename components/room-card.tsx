@@ -16,9 +16,10 @@ import { cn } from "@/lib/utils"
 interface RoomCardProps {
   room: Room
   compact?: boolean
+  date?: string // YYYY-MM-DD — pre-selects date on the room detail page
 }
 
-export function RoomCard({ room, compact = false }: RoomCardProps) {
+export function RoomCard({ room, compact = false, date }: RoomCardProps) {
   const { locale, t } = useTranslation()
   const { wishlist, toggleWishlist } = useBooking()
   const isFavorited = wishlist.includes(room.id)
@@ -30,7 +31,7 @@ export function RoomCard({ room, compact = false }: RoomCardProps) {
   }
 
   return (
-    <Link href={`/${locale}/rooms/${room.id}`}>
+    <Link href={`/${locale}/rooms/${room.id}${date ? `?date=${date}` : ""}`}>
       <Card className="group overflow-hidden rounded-2xl border border-border/50 bg-card p-0 transition-all duration-300 hover:-translate-y-1 hover:border-primary/40 hover:shadow-[0_8px_30px_-6px_rgba(41,35,30,0.08)] shadow-[0_4px_20px_-4px_rgba(41,35,30,0.04)]">
         <div className="relative aspect-[16/10] overflow-hidden border-b border-border/40">
           <Image

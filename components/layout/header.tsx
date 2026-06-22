@@ -22,20 +22,17 @@ export function Header() {
   const supabase = createClient()
 
   useEffect(() => {
-    // Read the session from the locally-persisted cookie (no network round-trip,
-    // never throws). This restores the logged-in nav immediately on reload.
-    supabase.auth.getSession().then(({ data }) => {
-      setUser(data.session?.user ?? null)
-      const role = data.session?.user?.user_metadata?.role
-      if (role) setUserRole(role)
-      setLoading(false)
-    }).catch(() => {
-      // Never leave the nav stuck in the loading state on an auth error.
+    // Check initial user session
+    supabase.auth.getUser().then(({ data }: any) => {
+      setUser(data.user)
+      if (data.user?.user_metadata?.role) {
+        setUserRole(data.user.user_metadata.role)
+      }
       setLoading(false)
     })
 
-    // Listen for auth state changes (login, logout, token refresh, INITIAL_SESSION)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    // Listen for auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event: any, session: any) => {
       setUser(session?.user ?? null)
       if (session?.user?.user_metadata?.role) {
         setUserRole(session.user.user_metadata.role)
