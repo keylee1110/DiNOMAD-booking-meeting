@@ -7,7 +7,6 @@ import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import Image from "next/image"
 import { createClient } from "@/utils/supabase/client"
-import { useEffect, useState } from "react"
 import { getPartnerDashboard } from "@/lib/api/partner"
 import { toast } from "sonner"
  
