@@ -41,14 +41,12 @@ export class ScannerService {
         .single<BookingRow>()
 
       if (error || !booking) {
-        console.error("lookup booking error:", error)
         throw new NotFoundException("Booking not found")
       }
 
       return this.toResponse(await this.resolve(booking, supplierId))
     } catch (err) {
       if (err instanceof NotFoundException || err instanceof ForbiddenException || err instanceof BadRequestException) throw err
-      console.error("lookup unexpected error:", err)
       throw new InternalServerErrorException(String(err))
     }
   }
@@ -71,7 +69,6 @@ export class ScannerService {
         .eq("id", bookingId)
 
       if (error) {
-        console.error("checkIn update error:", error)
         throw new InternalServerErrorException(`Check-in failed: ${error.message}`)
       }
 
@@ -79,7 +76,6 @@ export class ScannerService {
       return this.toResponse(resolved)
     } catch (err) {
       if (err instanceof NotFoundException || err instanceof ForbiddenException || err instanceof BadRequestException || err instanceof InternalServerErrorException) throw err
-      console.error("checkIn unexpected error:", err)
       throw new InternalServerErrorException(String(err))
     }
   }
@@ -100,7 +96,6 @@ export class ScannerService {
         .eq("id", bookingId)
 
       if (error) {
-        console.error("markNoShow update error:", error)
         throw new InternalServerErrorException(`No-show update failed: ${error.message}`)
       }
 
@@ -108,7 +103,32 @@ export class ScannerService {
       return this.toResponse(resolved)
     } catch (err) {
       if (err instanceof NotFoundException || err instanceof ForbiddenException || err instanceof BadRequestException || err instanceof InternalServerErrorException) throw err
-      console.error("markNoShow unexpected error:", err)
+      throw new InternalServerErrorException(String(err))
+    }
+  }
+
+  async checkOut(userId: string, bookingId: string) {
+    try {
+      const supplierId = await this.venuesService.getSupplierIdForUser(userId)
+      const booking = await this.fetchAndAuthorize(bookingId, supplierId)
+
+      if (booking.status === "cancelled") throw new BadRequestException("Booking is cancelled")
+      if (booking.status === "no_show")   throw new BadRequestException("Booking was marked no-show")
+      if (booking.status === "completed") throw new BadRequestException("Session already ended")
+      if (booking.status === "confirmed") throw new BadRequestException("Guest has not checked in yet")
+      if (booking.status === "pending")   throw new BadRequestException("Booking not yet confirmed")
+
+      const { error } = await this.supabase.admin
+        .from("bookings")
+        .update({ status: "completed" })
+        .eq("id", bookingId)
+
+      if (error) throw new InternalServerErrorException(`Check-out failed: ${error.message}`)
+
+      const resolved = await this.resolve({ ...booking, status: "completed" }, supplierId)
+      return this.toResponse(resolved)
+    } catch (err) {
+      if (err instanceof NotFoundException || err instanceof ForbiddenException || err instanceof BadRequestException || err instanceof InternalServerErrorException) throw err
       throw new InternalServerErrorException(String(err))
     }
   }
@@ -123,7 +143,6 @@ export class ScannerService {
       .single<BookingRow>()
 
     if (error || !booking) {
-      console.error("fetchAndAuthorize error:", error)
       throw new NotFoundException("Booking not found")
     }
 

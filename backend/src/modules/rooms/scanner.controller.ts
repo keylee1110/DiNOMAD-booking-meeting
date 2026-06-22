@@ -38,4 +38,13 @@ export class ScannerController {
   ) {
     return this.scannerService.markNoShow(user.id, bookingId)
   }
+
+  /** Mark booking as completed (checked out) */
+  @Patch(":bookingId/checkout")
+  checkOut(
+    @CurrentUser() user: AuthUser,
+    @Param("bookingId") bookingId: string,
+  ) {
+    return this.scannerService.checkOut(user.id, bookingId)
+  }
 }

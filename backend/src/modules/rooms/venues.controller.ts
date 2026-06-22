@@ -23,18 +23,7 @@ export class VenuesController {
 
   @Post()
   async create(@CurrentUser() user: AuthUser, @Body() dto: CreateVenueDto) {
-    console.log('📍 POST /partner/venues');
-    console.log('User:', user);
-    console.log('DTO:', dto);
-
-    try {
-      const result = await this.venuesService.create(user.id, dto);
-      console.log('✅ Venue created:', result);
-      return result;
-    } catch (error) {
-      console.error('❌ CREATE VENUE ERROR:', error);
-      throw error;
-    }
+    return this.venuesService.create(user.id, dto)
   }
 
 

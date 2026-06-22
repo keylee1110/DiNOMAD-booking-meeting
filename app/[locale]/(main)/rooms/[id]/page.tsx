@@ -1,8 +1,8 @@
 "use client"
 
-import { useState, useMemo, useEffect, use } from "react"
+import { useState, useMemo, useEffect, use, Suspense } from "react"
 import Image from "next/image"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { useTranslation } from "@/lib/i18n/context"
 
 import { getPublicRoomById } from "@/lib/api/public-rooms"
@@ -24,7 +24,7 @@ import type { Room, TimeSlot } from "@/lib/types"
 import { notFound } from "next/navigation"
 import { cn } from "@/lib/utils"
 
-export default function RoomDetailPage({ params }: { params: Promise<{ locale: string; id: string }> }) {
+function RoomDetailContent({ params }: { params: Promise<{ locale: string; id: string }> }) {
   const { locale, id } = use(params)
   const { t } = useTranslation()
   const router = useRouter()
@@ -36,7 +36,20 @@ export default function RoomDetailPage({ params }: { params: Promise<{ locale: s
   const [reviews, setReviews] = useState<ApiReview[]>([])
   const [reviewsLoading, setReviewsLoading] = useState(true)
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
-  const [selectedDate, setSelectedDate] = useState(getNextDays(1)[0])
+  const searchParams = useSearchParams()
+
+  // Pre-select the date the user picked on the search page.
+  // ?date=YYYY-MM-DD → use it; absent or invalid → fall back to tomorrow.
+  const initialDate = (() => {
+    const raw = searchParams.get("date")
+    if (raw && /^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+      const d = new Date(raw + "T00:00:00")
+      if (!isNaN(d.getTime())) return raw
+    }
+    return getNextDays(1)[0]
+  })()
+
+  const [selectedDate, setSelectedDate] = useState(initialDate)
   const [selectedSlots, setSelectedSlots] = useState<TimeSlot[]>([])
   const [holdExpired, setHoldExpired] = useState(false)
   const [holdTimerKey, setHoldTimerKey] = useState(0)
@@ -444,5 +457,17 @@ export default function RoomDetailPage({ params }: { params: Promise<{ locale: s
         </div>
       </div>
     </div>
+  )
+}
+
+export default function RoomDetailPage({ params }: { params: Promise<{ locale: string; id: string }> }) {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="h-10 w-10 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+      </div>
+    }>
+      <RoomDetailContent params={params} />
+    </Suspense>
   )
 }
