@@ -7,7 +7,7 @@ export class UpdateSlotsDto {
   @IsArray()
   @IsString({ each: true })
   @Matches(/^\d{2}:\d{2}$/, { each: true, message: "Each startTime must be HH:MM" })
-  startTimes!: string[]  // ["09:00", "09:30"]
+  startTimes!: string[]  // ["09:00", "10:00"]
 
   @IsIn(["available", "blocked"])
   status!: "available" | "blocked"

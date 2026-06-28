@@ -5,10 +5,9 @@ import Image from "next/image"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useTranslation } from "@/lib/i18n/context"
 
-import { getPublicRoomById } from "@/lib/api/public-rooms"
+import { getPublicRoomById, getRoomAvailability } from "@/lib/api/public-rooms"
 import { getRoomReviews } from "@/lib/api/reviews"
 import type { ApiReview } from "@/lib/api/reviews"
-import { generateTimeSlots } from "@/lib/data/time-slots"
 import { useBooking } from "@/lib/store/booking-store"
 import { formatVND, getNextDays, formatDate } from "@/lib/format"
 import { TimeSlotPicker } from "@/components/time-slot-picker"
@@ -74,10 +73,20 @@ function RoomDetailContent({ params }: { params: Promise<{ locale: string; id: s
       .finally(() => setReviewsLoading(false))
   }, [id])
 
-  const slots = useMemo(
-    () => room ? generateTimeSlots(selectedDate, room.id) : [],
-    [selectedDate, room],
-  )
+  const [slots, setSlots] = useState<TimeSlot[]>([])
+  const [slotsLoading, setSlotsLoading] = useState(false)
+
+  useEffect(() => {
+    if (!room) return
+    setSlotsLoading(true)
+    getRoomAvailability(room.id, selectedDate)
+      .then(setSlots)
+      .catch((error) => {
+        console.warn("Could not load room availability:", error)
+        setSlots([])
+      })
+      .finally(() => setSlotsLoading(false))
+  }, [selectedDate, room])
 
   const handleToggleSlot = (slot: TimeSlot) => {
     setSelectedSlots((prev) => {
@@ -376,13 +385,17 @@ function RoomDetailContent({ params }: { params: Promise<{ locale: string; id: s
                 : t("common.bookNow")}
             </h3>
 
-            <TimeSlotPicker
-              slots={slots}
-              selectedSlots={selectedSlots}
-              onToggleSlot={handleToggleSlot}
-              selectedDate={selectedDate}
-              onDateChange={handleDateChange}
-            />
+            {slotsLoading ? (
+              <p className="text-sm text-muted-foreground">{t("common.loading")}</p>
+            ) : (
+              <TimeSlotPicker
+                slots={slots}
+                selectedSlots={selectedSlots}
+                onToggleSlot={handleToggleSlot}
+                selectedDate={selectedDate}
+                onDateChange={handleDateChange}
+              />
+            )}
 
             {selectedSlots.length > 0 && (
               <div className="mt-4 rounded-xl bg-muted/30 p-3.5 border border-border/40">

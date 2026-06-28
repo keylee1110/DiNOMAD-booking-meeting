@@ -20,7 +20,8 @@ import { VenuesService } from "./venues.service"
   controllers: [
     VenuesController,
     RoomsController,
-    PublicRoomsController, EarningsController,
+    PublicRoomsController,
+    EarningsController,
     ScannerController,
     DashboardController,
     PartnerBookingsController,
@@ -28,7 +29,8 @@ import { VenuesService } from "./venues.service"
   providers: [
     VenuesService,
     RoomsService,
-    PublicRoomsService, EarningsService,
+    PublicRoomsService,
+    EarningsService,
     ScannerService,
     DashboardService,
     PartnerBookingsService,
@@ -36,4 +38,3 @@ import { VenuesService } from "./venues.service"
   exports: [VenuesService, RoomsService],
 })
 export class RoomsModule {}
-

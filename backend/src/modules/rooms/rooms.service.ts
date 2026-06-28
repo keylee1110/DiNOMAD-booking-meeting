@@ -5,6 +5,9 @@ import { UpdateRoomStatusDto } from "./dto/update-room-status.dto"
 import { UpdateSlotsDto } from "./dto/update-slots.dto"
 import { VenuesService } from "./venues.service"
 
+/** Booking/blocking granularity — whole-hour slots (e.g. 07:00, 08:00 ... 21:00). */
+const SLOT_MINUTES = 60
+
 type RoomRow = {
   id: string
   venue_id: string
@@ -113,7 +116,6 @@ export class RoomsService {
   }
 
   async getSlots(roomId: string, userId: string, date: string) {
-    // Fetch room + venue hours in one query
     const { data: room, error: roomErr } = await this.supabase.admin
       .from("rooms")
       .select("venue_id, venues(open_time, close_time)")
@@ -123,20 +125,41 @@ export class RoomsService {
     if (roomErr || !room) throw new NotFoundException("Room not found")
     await this.venuesService.verifyVenueOwnership(room.venue_id, userId)
 
+    return this.computeSlots(roomId, room.venues.open_time, room.venues.close_time, date)
+  }
+
+  /** Guest-facing slot lookup — no ownership check, only published rooms. */
+  async getPublicSlots(roomId: string, date: string) {
+    const { data: room, error: roomErr } = await this.supabase.admin
+      .from("rooms")
+      .select("status, venues(open_time, close_time, status)")
+      .eq("id", roomId)
+      .single<{ status: string; venues: { open_time: string; close_time: string; status: string } }>()
+
+    if (roomErr || !room || room.status !== "published" || room.venues.status !== "published") {
+      throw new NotFoundException("Room not found")
+    }
+
+    return this.computeSlots(roomId, room.venues.open_time, room.venues.close_time, date)
+  }
+
+  private async computeSlots(roomId: string, openTime: string, closeTime: string, date: string) {
     // Fetch only the exception rows (blocked slots) — O(blocks) not O(all slots)
     const { data: blocks, error: blocksErr } = await this.supabase.admin
       .from("room_blocks")
-      .select("id, start_time")
+      .select("id, start_time, end_time")
       .eq("room_id", roomId)
       .eq("date", date)
 
     if (blocksErr) throw new Error(blocksErr.message)
 
-    const blockMap = new Map(
-      (blocks ?? []).map(b => [(b.start_time as string).slice(0, 5), b.id as string])
-    )
+    const blockRanges = (blocks ?? []).map(b => ({
+      id: b.id as string,
+      start: this.timeToMinutes((b.start_time as string).slice(0, 5)),
+      end: this.timeToMinutes((b.end_time as string).slice(0, 5)),
+    }))
 
-    // Overlay confirmed/pending bookings so partners see booked slots as occupied
+    // Overlay confirmed/pending bookings so everyone sees booked slots as occupied
     // bookings.start_time is timestamptz; use a UTC-day range that covers venue hours (UTC+7)
     const startDayUtc = new Date(new Date(date + "T00:00:00Z").getTime() - 7 * 3600000).toISOString()
     const endDayUtc = new Date(new Date(date + "T00:00:00Z").getTime() + 17 * 3600000).toISOString()
@@ -148,22 +171,22 @@ export class RoomsService {
       .lt("start_time", endDayUtc)
       .neq("status", "cancelled")
 
-    // Expand each booking into 30-min slot keys (convert UTC → Vietnam UTC+7)
-    const bookedSlots = new Set<string>()
-    for (const bk of (activeBookings ?? [])) {
-      let cur = new Date(bk.start_time as string).getTime() + 7 * 3600000
-      const end = new Date(bk.end_time as string).getTime() + 7 * 3600000
-      while (cur < end) {
-        const d = new Date(cur)
-        bookedSlots.add(
-          `${String(d.getUTCHours()).padStart(2, "0")}:${String(d.getUTCMinutes()).padStart(2, "0")}`
-        )
-        cur += 1800000
+    // Convert each booking's UTC range into Vietnam-local minutes-since-midnight
+    const bookingRanges = (activeBookings ?? []).map(bk => {
+      const startVn = new Date(bk.start_time as string).getTime() + 7 * 3600000
+      const endVn = new Date(bk.end_time as string).getTime() + 7 * 3600000
+      const startD = new Date(startVn)
+      const endD = new Date(endVn)
+      return {
+        start: startD.getUTCHours() * 60 + startD.getUTCMinutes(),
+        end: endD.getUTCHours() * 60 + endD.getUTCMinutes(),
       }
-    }
+    })
 
     // Generate slots on-demand from venue hours — zero DB rows needed for available slots
-    return this.buildSlotList(room.venues.open_time, room.venues.close_time, blockMap, bookedSlots)
+    const nowVn = this.getNowVietnam()
+    const nowMinutes = date === nowVn.date ? nowVn.hour * 60 + nowVn.minute : null
+    return this.buildSlotList(openTime, closeTime, blockRanges, bookingRanges, nowMinutes)
   }
 
   async updateSlots(roomId: string, userId: string, dto: UpdateSlotsDto) {
@@ -182,7 +205,7 @@ export class RoomsService {
         room_id: roomId,
         date: dto.date,
         start_time: start,
-        end_time: this.addMinutes(start, 30),
+        end_time: this.addMinutes(start, SLOT_MINUTES),
         blocked_by: userId,
         reason: "manual",
       }))
@@ -209,8 +232,9 @@ export class RoomsService {
   private buildSlotList(
     openTime: string,
     closeTime: string,
-    blockMap: Map<string, string>,
-    bookedSlots: Set<string> = new Set(),
+    blockRanges: { id: string; start: number; end: number }[],
+    bookingRanges: { start: number; end: number }[] = [],
+    nowMinutes: number | null = null,
   ) {
     const slots: {
       id: string; startTime: string; endTime: string
@@ -221,22 +245,34 @@ export class RoomsService {
     const close  = this.timeToMinutes(closeTime)
 
     while (current < close) {
+      const slotEnd  = current + SLOT_MINUTES
       const start    = this.minutesToTime(current)
-      const end      = this.minutesToTime(current + 30)
-      const blockId  = blockMap.get(start)
-      const isBooked = bookedSlots.has(start)
+      const end      = this.minutesToTime(slotEnd)
+      // Overlap test: a block/booking touches this slot if it starts before the slot ends
+      // and ends after the slot starts.
+      const block    = blockRanges.find(b => b.start < slotEnd && b.end > current)
+      const isBooked = bookingRanges.some(b => b.start < slotEnd && b.end > current)
+      const isPast   = nowMinutes !== null && current < nowMinutes
       slots.push({
-        id:        blockId ? blockId : isBooked ? `booked-${start}` : `virtual-${start}`,
+        id:        block ? block.id : isBooked ? `booked-${start}` : `virtual-${start}`,
         startTime: start,
         endTime:   end,
-        status:    blockId ? "blocked" : isBooked ? "booked" : "available",
-        available: !blockId && !isBooked,
+        status:    isPast ? "past" : block ? "blocked" : isBooked ? "booked" : "available",
+        available: !isPast && !block && !isBooked,
         heldUntil: null,
       })
-      current += 30
+      current += SLOT_MINUTES
     }
 
     return slots
+  }
+
+  private getNowVietnam(): { date: string; hour: number; minute: number } {
+    const now = new Date()
+    const utcMs = now.getTime() + now.getTimezoneOffset() * 60_000
+    const vn = new Date(utcMs + 7 * 3_600_000)
+    const date = `${vn.getFullYear()}-${String(vn.getMonth() + 1).padStart(2, "0")}-${String(vn.getDate()).padStart(2, "0")}`
+    return { date, hour: vn.getHours(), minute: vn.getMinutes() }
   }
 
   private addMinutes(time: string, minutes: number): string {
