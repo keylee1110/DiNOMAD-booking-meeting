@@ -210,7 +210,9 @@
     "room": "Tên Phòng",
     "venue": "Địa Điểm",
     "dateTime": "Ngày & Khung Giờ",
-    "copied": "Đã sao chép vào bộ nhớ tạm!"
+    "copied": "Đã sao chép vào bộ nhớ tạm!",
+    "notAvailablePending": "Đơn này chưa thanh toán nên chưa có mã check-in.",
+    "notAvailableCancelled": "Đơn này đã bị hủy nên không còn mã check-in."
   },
   "partner": {
     "dashboard": "Bảng Điều Khiển",
@@ -270,6 +272,9 @@
     "cameraComingSoon": "Camera (Sắp Ra Mắt)",
     "scannerTitle": "Xác Minh Check-in",
     "scannerSubtitle": "Xác minh khách bằng Mã Đặt Phòng và Mã Truy Cập.",
+    "scannerPermissionDenied": "Vui lòng cấp quyền camera để quét mã QR.",
+    "scannerNoCamera": "Không tìm thấy camera phù hợp trên thiết bị này. Hãy nhập mã thủ công.",
+    "scannerStartFailed": "Không thể bật camera. Hãy nhập mã thủ công.",
     "roomStatusBusy": "Đang Bận",
     "roomStatusAvailable": "Còn Trống",
     "roomBlockReason": "Lý Do Khóa Phòng",
