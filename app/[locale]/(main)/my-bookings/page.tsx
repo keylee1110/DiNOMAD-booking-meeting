@@ -394,12 +394,14 @@ export default function MyBookingsPage() {
                         {locale === "vi" ? "Hoàn thành" : "Complete"}
                       </Button>
                     )}
-                    <Link href={`/${locale}/checkout/success?id=${booking.id}`} className="ml-auto">
-                      <Button variant="ghost" size="sm" className="h-8 text-xs font-bold uppercase tracking-wider gap-2">
-                        <QrIcon className="h-3 w-3" />
-                        {locale === "vi" ? "Xem mã QR" : "View QR Code"}
-                      </Button>
-                    </Link>
+                    {booking.status !== "pending" && booking.status !== "cancelled" && (
+                      <Link href={`/${locale}/checkout/success?id=${booking.id}`} className="ml-auto">
+                        <Button variant="ghost" size="sm" className="h-8 text-xs font-bold uppercase tracking-wider gap-2">
+                          <QrIcon className="h-3 w-3" />
+                          {locale === "vi" ? "Xem mã QR" : "View QR Code"}
+                        </Button>
+                      </Link>
+                    )}
                   </div>
                 </div>
               </div>
