@@ -26,6 +26,14 @@ function LoginForm() {
     e.preventDefault()
     setIsLoading(true)
     
+    // 1. Email format validation before submit
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(email)) {
+      toast.error(locale === "vi" ? "Email không đúng định dạng!" : "Invalid email format!")
+      setIsLoading(false)
+      return
+    }
+    
     try {
       const supabase = createClient()
       const { data, error } = await supabase.auth.signInWithPassword({
@@ -34,48 +42,41 @@ function LoginForm() {
       })
 
       if (error) {
-        toast.error(t("auth.loginError") || error.message)
+        if (error.message === "Invalid login credentials") {
+          toast.error(locale === "vi" 
+            ? "Mật khẩu không chính xác hoặc tài khoản không tồn tại." 
+            : "Invalid email or password."
+          )
+        } else if (error.message === "Email not confirmed") {
+          toast.error(locale === "vi"
+            ? "Tài khoản chưa được xác thực email. Vui lòng kiểm tra hộp thư của bạn."
+            : "Email not confirmed. Please check your inbox to verify."
+          )
+        } else {
+          toast.error(locale === "vi" ? "Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin." : error.message)
+        }
         setIsLoading(false)
         return
       }
 
-      // Fetch actual user role from Supabase auth metadata first, then fallback to profiles table
-      let actualRole = role
-      console.log("=== [DEBUG LOGIN] ===")
-      console.log("UI Selected Role:", role)
-      console.log("Auth User Metadata:", data.user?.user_metadata)
-      console.log("Auth User ID:", data.user?.id)
+      let actualRole: "customer" | "supplier" | "admin" = "customer"
 
-      if (data.user?.user_metadata?.role) {
-        actualRole = data.user.user_metadata.role
-        console.log("Extracted Role from user_metadata:", actualRole)
-      }
-
+      // Fetch actual role from public.profiles table
       try {
         const { data: profileData, error: profileErr } = await supabase
           .from("profiles")
           .select("role")
           .eq("id", data.user?.id || "")
+          .single()
         
-        console.log("Profiles Query Response:", profileData)
-        if (profileErr) {
-          console.error("Profiles Query Error:", profileErr)
-        }
-        
-        if (profileData) {
-          const profile = Array.isArray(profileData) ? profileData[0] : profileData
-          if (profile?.role) {
-            actualRole = profile.role as any
-            console.log("Extracted Role from profiles table:", actualRole)
-          }
+        if (profileData?.role) {
+          actualRole = profileData.role as any
         }
       } catch (profileErr) {
-        console.error("Error fetching user profile:", profileErr)
+        // Keep default "customer" role if profile query fails
       }
 
-      console.log("Final Redirect Decision Role:", actualRole)
-
-      // 1. Enforce Admin role restriction
+      // 2. Strict Role Enforcement (Two-Way Checks)
       if (role === "admin" && actualRole !== "admin") {
         toast.error(locale === "vi" 
           ? "Tài khoản của bạn không có quyền truy cập trang quản trị." 
@@ -86,16 +87,24 @@ function LoginForm() {
         return
       }
 
-      // 2. Enforce Supplier role restriction
-      if (role === "supplier" && actualRole !== "supplier" && actualRole !== "admin") {
+      if (role === "supplier") {
+        if (actualRole !== "supplier") {
+          toast.error(locale === "vi"
+            ? "Tài khoản này không phải là tài khoản Đối tác."
+            : "This account is not a Partner account."
+          )
+          await supabase.auth.signOut()
+          setIsLoading(false)
+          return
+        }
+
+        // Additional Partner application status check
         try {
-          const { data: memberData, error: memberErr } = await supabase
+          const { data: memberData } = await supabase
             .from("supplier_members")
             .select("supplier_id, suppliers(status)")
             .eq("user_id", data.user?.id || "")
             .eq("is_active", true)
-
-          console.log("Supplier member check response:", memberData, memberErr)
           
           if (memberData && memberData.length > 0) {
             const supplier = (memberData[0] as any).suppliers
@@ -118,37 +127,42 @@ function LoginForm() {
               setIsLoading(false)
               return
             }
+          } else {
+            toast.error(locale === "vi"
+              ? "Tài khoản này chưa đăng ký làm đối tác. Vui lòng đăng ký trước."
+              : "This account is not registered as a partner. Please register first."
+            )
+            await supabase.auth.signOut()
+            setIsLoading(false)
+            return
           }
-          
-          // If no supplier record or not active member
-          toast.error(locale === "vi"
-            ? "Tài khoản này chưa đăng ký làm đối tác. Vui lòng đăng ký trước."
-            : "This account is not registered as a partner. Please register first."
-          )
-          await supabase.auth.signOut()
-          setIsLoading(false)
-          return
         } catch (checkErr) {
-          console.error("Error checking supplier status:", checkErr)
+          // Allow login if verification throws unexpected DB errors
         }
+      }
+
+      if (role === "customer" && actualRole !== "customer") {
+        toast.error(locale === "vi"
+          ? `Tài khoản này là tài khoản ${actualRole === "admin" ? "Quản trị" : "Đối tác"}. Vui lòng chọn đúng vai trò để đăng nhập.`
+          : `This account is a ${actualRole === "admin" ? "Admin" : "Partner"} account. Please select the correct role to log in.`
+        )
+        await supabase.auth.signOut()
+        setIsLoading(false)
+        return
       }
 
       if (typeof window !== "undefined") {
         localStorage.removeItem("dinomad_demo_admin")
       }
 
-      toast.success(t("auth.loginSuccess") || "Logged in successfully!")
+      toast.success(locale === "vi" ? "Đăng nhập thành công!" : "Logged in successfully!")
       
-      // Successfully authenticated, refresh page/session and redirect
       router.refresh()
       
-      // Delay slightly to let toast be visible
       setTimeout(() => {
         let targetRedirect = searchParams.get("redirect_to")
         
-        // If the redirect parameter points to home page, or is empty, or if the user is an admin or supplier
-        // we redirect them to the correct dashboard/page.
-        if (!targetRedirect || targetRedirect === `/${locale}` || targetRedirect === "/" || actualRole === "admin" || actualRole === "supplier") {
+        if (!targetRedirect || targetRedirect === `/${locale}` || targetRedirect === "/") {
           if (actualRole === "admin") {
             targetRedirect = `/${locale}/admin`
           } else if (actualRole === "supplier") {
@@ -158,7 +172,6 @@ function LoginForm() {
           }
         }
 
-        console.log("Redirecting to:", targetRedirect)
         router.push(targetRedirect)
       }, 800)
       
@@ -166,7 +179,7 @@ function LoginForm() {
       if (err?.message === "Failed to fetch") {
         toast.error(locale === "vi" ? "Không thể kết nối đến máy chủ. Vui lòng thử lại sau." : "Cannot connect to server. Please try again.")
       } else {
-        toast.error(t("auth.loginError"))
+        toast.error(locale === "vi" ? "Đăng nhập thất bại. Vui lòng thử lại." : err?.message)
       }
       setIsLoading(false)
     }
@@ -176,10 +189,14 @@ function LoginForm() {
     setIsLoading(true)
     try {
       const supabase = createClient()
+      const callbackUrl = new URL(`${window.location.origin}/api/auth/callback`)
+      callbackUrl.searchParams.set("redirect_to", redirectTo)
+      callbackUrl.searchParams.set("mode", "login")
+      
       const { error } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
-          redirectTo: `${window.location.origin}/api/auth/callback?redirect_to=${encodeURIComponent(redirectTo)}`,
+          redirectTo: callbackUrl.toString(),
         }
       })
       if (error) {
