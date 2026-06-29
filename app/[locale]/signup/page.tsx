@@ -34,6 +34,52 @@ function SignupForm() {
     e.preventDefault()
     setIsLoading(true)
 
+    // Full Name trim & validation
+    if (!fullName.trim()) {
+      toast.error(
+        locale === "vi" 
+          ? "Họ và tên không được để trống!" 
+          : "Full name cannot be empty!"
+      )
+      setIsLoading(false)
+      return
+    }
+
+    // Phone validation (Vietnamese format)
+    const phoneRegex = /^(03|05|07|08|09)\d{8}$/
+    if (!phoneRegex.test(phone)) {
+      toast.error(
+        locale === "vi"
+          ? "Số điện thoại không hợp lệ! Vui lòng nhập số điện thoại Việt Nam (ví dụ: 0901234567)."
+          : "Invalid phone number! Please enter a valid Vietnamese phone number (e.g., 0901234567)."
+      )
+      setIsLoading(false)
+      return
+    }
+
+    // Email format validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(email)) {
+      toast.error(
+        locale === "vi"
+          ? "Email không đúng định dạng!"
+          : "Invalid email format!"
+      )
+      setIsLoading(false)
+      return
+    }
+
+    // Password length validation
+    if (password.length < 6) {
+      toast.error(
+        locale === "vi"
+          ? "Mật khẩu phải có tối thiểu 6 ký tự!"
+          : "Password must be at least 6 characters!"
+      )
+      setIsLoading(false)
+      return
+    }
+
     // Password matching validation
     if (password !== confirmPassword) {
       toast.error(
@@ -64,7 +110,7 @@ function SignupForm() {
         password,
         options: {
           data: {
-            full_name: fullName,
+            full_name: fullName.trim(),
             phone: phone,
             role: role,
           }
@@ -87,8 +133,8 @@ function SignupForm() {
           await supabase.auth.setSession(session)
 
           const { error: rpcError } = await supabase.rpc("submit_supplier_application", {
-            legal_name: fullName,
-            display_name: `${fullName} Space`,
+            legal_name: fullName.trim(),
+            display_name: `${fullName.trim()} Space`,
             business_email: email,
             business_phone: phone,
             onboarding_note: "Auto-submitted during partner registration"
@@ -145,10 +191,15 @@ function SignupForm() {
     setIsLoading(true)
     try {
       const supabase = createClient()
+      const callbackUrl = new URL(`${window.location.origin}/api/auth/callback`)
+      callbackUrl.searchParams.set("redirect_to", redirectTo)
+      callbackUrl.searchParams.set("mode", "signup")
+      callbackUrl.searchParams.set("role", role)
+      
       const { error } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
-          redirectTo: `${window.location.origin}/api/auth/callback?redirect_to=${encodeURIComponent(redirectTo)}`,
+          redirectTo: callbackUrl.toString(),
         }
       })
       if (error) {

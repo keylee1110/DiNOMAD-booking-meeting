@@ -2,7 +2,8 @@
 
 import Link from "next/link"
 import Image from "next/image"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
+import { createClient } from "@/utils/supabase/client"
 import {
   LayoutDashboard,
   Users,
@@ -55,6 +56,17 @@ const navItems = [
 
 export function AdminSidebar({ locale }: { locale: string }) {
   const pathname = usePathname()
+  const router = useRouter()
+  const supabase = createClient()
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut()
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("dinomad_demo_admin")
+    }
+    router.push(`/${locale}`)
+    router.refresh()
+  }
 
   return (
     <aside className="w-64 bg-card border-r border-border flex flex-col shrink-0">
@@ -106,7 +118,7 @@ export function AdminSidebar({ locale }: { locale: string }) {
             <p className="text-sm font-medium text-foreground truncate">Admin</p>
             <p className="text-xs text-muted-foreground truncate">admin@dinomad.vn</p>
           </div>
-          <button className="text-muted-foreground hover:text-destructive transition-colors shrink-0">
+          <button onClick={handleLogout} className="text-muted-foreground hover:text-destructive transition-colors shrink-0">
             <LogOut className="w-4 h-4" />
           </button>
         </div>

@@ -26,3 +26,7 @@ backend/.env
 .vscode/
 .opencode.json
 .mcp.json
+
+# Local package manager cache
+.pnpm-store/
+

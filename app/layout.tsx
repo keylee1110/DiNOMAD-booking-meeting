@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { Be_Vietnam_Pro, Geist_Mono } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
+import { Toaster } from "@/components/ui/sonner"
 import './globals.css'
 
 const beVietnamPro = Be_Vietnam_Pro({
@@ -46,8 +47,10 @@ export default function RootLayout({
     <html lang="vi" className={`${beVietnamPro.variable} ${geistMono.variable}`} suppressHydrationWarning>
       <body className="font-sans antialiased" suppressHydrationWarning>
         {children}
+        <Toaster />
         <Analytics />
       </body>
     </html>
   )
 }
+
