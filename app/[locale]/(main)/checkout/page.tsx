@@ -37,6 +37,22 @@ function validateEmail(email: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
 }
 
+function generateGuestBookingCode() {
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+  let code = "DN-"
+  for (let i = 0; i < 6; i++) {
+    code += chars.charAt(Math.floor(Math.random() * chars.length))
+  }
+  return code
+}
+
+function toVietnamUTC(dateStr: string, timeStr: string) {
+  const [h, m] = timeStr.split(":").map(Number)
+  const [year, month, day] = dateStr.split("-").map(Number)
+  const utcDate = new Date(Date.UTC(year, month - 1, day, h - 7, m, 0, 0))
+  return utcDate.toISOString()
+}
+
 export default function CheckoutPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = use(params)
   const { t } = useTranslation()
@@ -60,10 +76,15 @@ export default function CheckoutPage({ params }: { params: Promise<{ locale: str
   const bookingIdRef = useRef("")
   const isConfirmedRef = useRef(false)
 
+  // null = guest checkout (no account) — booking is created with guest_name/guest_phone instead of customer_id.
+  const [authUser, setAuthUser] = useState<{ id: string } | null>(null)
+  const [authChecked, setAuthChecked] = useState(false)
+
   useEffect(() => {
     async function getProfileData() {
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
+        setAuthUser({ id: user.id })
         const { data, error } = await supabase
           .from("profiles")
           .select("points, full_name, phone, email")
@@ -80,12 +101,14 @@ export default function CheckoutPage({ params }: { params: Promise<{ locale: str
           setEmail(prev => prev || user.email || "")
         }
       } else {
-        toast.error(locale === "vi" ? "Vui lòng đăng nhập để thực hiện đặt phòng!" : "Please log in to make a booking!")
-        router.push(`/${locale}/login?redirect_to=/${locale}/checkout`)
+        // Guest checkout — no redirect. They fill GuestInfoForm and the hold is
+        // created on "Proceed to Payment" instead of on page mount.
+        setAuthUser(null)
       }
+      setAuthChecked(true)
     }
     getProfileData()
-  }, [locale, router, supabase])
+  }, [supabase])
 
   // Booking Flow & Payment Options (Agoda/Booking style)
   const [paymentMode, setPaymentMode] = useState<"deposit" | "full">("deposit")
@@ -310,13 +333,14 @@ export default function CheckoutPage({ params }: { params: Promise<{ locale: str
     }
   }, [supabase])
 
-  // Create pending booking on page load/mount
+  // Create pending booking on page load/mount.
+  // Guests (no account) skip this — their hold is created in handleProceedPayment
+  // once they've filled in name/phone, since we have no identity to attach until then.
   useEffect(() => {
     let active = true
-    
+
     async function createPendingBooking() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user || !room || state.selectedSlots.length === 0 || bookingId) return
+      if (!authChecked || !room || state.selectedSlots.length === 0 || bookingId) return
 
       const cachedHoldStr = sessionStorage.getItem("dinomad_active_hold")
       if (cachedHoldStr) {
@@ -350,24 +374,13 @@ export default function CheckoutPage({ params }: { params: Promise<{ locale: str
         }
       }
 
+      // Guests have no identity to attach yet — they create their hold in
+      // handleProceedPayment once name/phone are filled in and validated.
+      if (!authUser) return
+
       setIsSavingBooking(true)
       const newId = generateBookingId()
-      const generateFrontCode = () => {
-        const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-        let code = "DN-"
-        for (let i = 0; i < 6; i++) {
-          code += chars.charAt(Math.floor(Math.random() * chars.length))
-        }
-        return code
-      }
-      const newCode = generateFrontCode()
-
-      const toVietnamUTC = (dateStr: string, timeStr: string) => {
-        const [h, m] = timeStr.split(":").map(Number)
-        const [year, month, day] = dateStr.split("-").map(Number)
-        const utcDate = new Date(Date.UTC(year, month - 1, day, h - 7, m, 0, 0))
-        return utcDate.toISOString()
-      }
+      const newCode = generateGuestBookingCode()
 
       const startISO = toVietnamUTC(state.selectedDate, timeRange.startTime)
       const endISO = toVietnamUTC(state.selectedDate, timeRange.endTime)
@@ -375,7 +388,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ locale: str
       const insertPayload = {
         id: newId,
         room_id: room.id,
-        customer_id: user.id,
+        customer_id: authUser.id,
         booking_date: state.selectedDate,
         start_time: startISO,
         end_time: endISO,
@@ -441,6 +454,8 @@ export default function CheckoutPage({ params }: { params: Promise<{ locale: str
       active = false
     }
   }, [
+    authChecked,
+    authUser,
     room,
     state.selectedDate,
     state.selectedSlots,
@@ -497,6 +512,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ locale: str
   }, [room?.id, state.selectedDate])
 
   const canProceed =
+    authChecked &&
     !!room &&
     state.selectedSlots.length > 0 &&
     fullName.trim().length >= 2 &&
@@ -510,7 +526,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ locale: str
       handleCancelBookingInDb(bookingId)
       sessionStorage.removeItem("dinomad_active_hold")
     }
-    router.push(`/${locale}/checkout/cancel`)
+    router.push(`/${locale}/checkout/cancel${room ? `?roomId=${room.id}` : ""}`)
   }
 
   const handleProceedPayment = async () => {
@@ -539,12 +555,80 @@ export default function CheckoutPage({ params }: { params: Promise<{ locale: str
       return
     }
 
-    if (!room || state.selectedSlots.length === 0 || softLockExpired || !bookingId) return
+    if (!room || state.selectedSlots.length === 0 || softLockExpired) return
+    if (authUser && !bookingId) return // logged-in hold still being created on mount
 
     setIsSavingBooking(true)
     dispatch({ type: "SET_GUEST_INFO", name: fullName.trim(), phone: phone.trim(), email: email.trim() })
 
     try {
+      // Guest checkout: no hold exists yet (it's only auto-created for logged-in users
+      // on mount) — create it now with the finalized, validated contact info.
+      if (!authUser && !bookingId) {
+        const newId = generateBookingId()
+        const newCode = generateGuestBookingCode()
+        const startISO = toVietnamUTC(state.selectedDate, timeRange.startTime)
+        const endISO = toVietnamUTC(state.selectedDate, timeRange.endTime)
+
+        const { error: insertError } = await supabase
+          .from("bookings")
+          .insert({
+            id: newId,
+            room_id: room.id,
+            customer_id: null,
+            guest_name: fullName.trim(),
+            guest_phone: phone.trim(),
+            guest_email: email.trim() || null,
+            booking_date: state.selectedDate,
+            start_time: startISO,
+            end_time: endISO,
+            status: "pending" as const,
+            price_per_hour: room.pricePerHour,
+            subtotal: fees.roomFee,
+            platform_fee: fees.platformFee,
+            total_amount: finalPayableTotal,
+            points_redeemed: pointsDiscount,
+            points_earned: pointsEarned,
+            booking_code: newCode,
+            payment_status: "pending",
+          })
+
+        if (insertError) {
+          console.error("[Booking] Guest soft-lock creation error:", insertError.message)
+          toast.error(
+            locale === "vi"
+              ? "Mục giờ này đã được đặt hoặc đang được giữ bởi người khác. Vui lòng chọn giờ khác!"
+              : "This time slot is already booked or held by another user. Please choose another time!"
+          )
+          setSoftLockExpired(true)
+          setIsSavingBooking(false)
+          return
+        }
+
+        sessionStorage.setItem(
+          "dinomad_active_hold",
+          JSON.stringify({
+            bookingId: newId,
+            bookingCode: newCode,
+            roomId: room.id,
+            date: state.selectedDate,
+            slots: state.selectedSlots,
+            createdAt: new Date().toISOString(),
+          })
+        )
+
+        setBookingId(newId)
+        setBookingCode(newCode)
+        setTimeLeft(300)
+        setCountdownKey(prev => prev + 1)
+        setSoftLockExpired(false)
+        dispatch({ type: "SET_BOOKING_ID", id: newId })
+        setIsPaymentDialogOpen(true)
+        setSimulatedStatus("idle")
+        setIsSavingBooking(false)
+        return
+      }
+
       const updatePayload = {
         total_amount: finalPayableTotal,
         points_redeemed: pointsDiscount,
@@ -556,7 +640,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ locale: str
         .from("bookings")
         .update(updatePayload)
         .eq("id", bookingId)
-          
+
       if (error) {
         console.error("[Booking] Supabase update error:", error.message)
         toast.error(
@@ -567,7 +651,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ locale: str
         setIsSavingBooking(false)
         return
       }
-      
+
       console.info("[Booking] Updated booking details and opening payment dialog:", bookingId)
       setIsPaymentDialogOpen(true)
       setSimulatedStatus("idle")
@@ -943,7 +1027,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ locale: str
                       setBookingId("")
                       setBookingCode("")
                     }
-                    router.push(`/${locale}/checkout/cancel`)
+                    router.push(`/${locale}/checkout/cancel${room ? `?roomId=${room.id}` : ""}`)
                   }}
                   className="w-full rounded-xl text-xs h-9 border-border text-muted-foreground hover:bg-muted"
                 >

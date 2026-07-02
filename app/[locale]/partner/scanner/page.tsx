@@ -55,7 +55,7 @@ export default function ScannerPage() {
   useEffect(() => {
     return () => {
       if (html5QrScanner) {
-        html5QrScanner.clear()
+        html5QrScanner.stop().catch(() => {}).finally(() => html5QrScanner.clear())
       }
     }
   }, [html5QrScanner])
@@ -177,9 +177,18 @@ export default function ScannerPage() {
       ).catch((err) => {
         console.error("Failed to start scanner:", err)
         setIsScanning(false)
+        setHtml5QrScanner(null)
+        const name = err?.name as string | undefined
+        if (name === "NotAllowedError") {
+          toast.error(t("partner.scannerPermissionDenied") || "Vui lòng cấp quyền camera để quét mã QR.")
+        } else if (name === "NotFoundError" || name === "OverconstrainedError") {
+          toast.error(t("partner.scannerNoCamera") || "Không tìm thấy camera phù hợp trên thiết bị này. Hãy nhập mã thủ công.")
+        } else {
+          toast.error(t("partner.scannerStartFailed") || "Không thể bật camera. Hãy nhập mã thủ công.")
+        }
       })
     })
-  }, [verifyBookingAndTransition])
+  }, [verifyBookingAndTransition, t])
 
   const stopScanning = useCallback(async () => {
     if (html5QrScanner) {

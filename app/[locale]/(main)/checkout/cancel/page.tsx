@@ -6,14 +6,26 @@ import { useBooking } from "@/lib/store/booking-store"
 import { Button } from "@/components/ui/button"
 import { XCircle, ArrowLeft, Home } from "lucide-react"
 
-export default function CheckoutCancelPage({ params }: { params: Promise<{ locale: string }> }) {
+export default function CheckoutCancelPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ locale: string }>
+  searchParams: Promise<{ roomId?: string }>
+}) {
   const { locale } = use(params)
+  const { roomId } = use(searchParams)
   const router = useRouter()
   const { state, dispatch } = useBooking()
 
+  // Prefer the roomId passed via query (survives a page reload, unlike in-memory
+  // booking state) so "try again" reliably lands on the room's detail page
+  // instead of falling back to the homepage.
+  const targetRoomId = roomId || state.selectedRoom?.id
+
   const handleTryAgain = () => {
-    if (state.selectedRoom) {
-      router.push(`/${locale}/checkout`)
+    if (targetRoomId) {
+      router.push(`/${locale}/rooms/${targetRoomId}`)
     } else {
       router.push(`/${locale}`)
     }
@@ -40,9 +52,9 @@ export default function CheckoutCancelPage({ params }: { params: Promise<{ local
 
       <div className="flex flex-col gap-3 sm:flex-row sm:justify-center">
         <Button onClick={handleTryAgain} size="lg" className="gap-2">
-          {state.selectedRoom ? <ArrowLeft className="h-4 w-4" /> : <Home className="h-4 w-4" />}
-          {state.selectedRoom
-            ? (locale === "vi" ? "Thử thanh toán lại" : "Try Payment Again")
+          {targetRoomId ? <ArrowLeft className="h-4 w-4" /> : <Home className="h-4 w-4" />}
+          {targetRoomId
+            ? (locale === "vi" ? "Quay lại trang phòng" : "Back to Room")
             : (locale === "vi" ? "Về trang chủ" : "Back to Home")}
         </Button>
         <Button onClick={handleGoHome} variant="outline" size="lg" className="gap-2">
