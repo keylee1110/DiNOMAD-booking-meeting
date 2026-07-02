@@ -1,5 +1,5 @@
 import type { Amenity, Room, VibeTag } from "@/lib/types"
-import { getSlotsLeftToday } from "@/lib/data/time-slots"
+import { computeSlotsLeftToday } from "@/lib/data/time-slots"
 
 export interface PublicRoomRow {
   id: string
@@ -18,11 +18,13 @@ export interface PublicRoomRow {
     district: string
     lat: number | null
     lng: number | null
+    open_time: string | null
+    close_time: string | null
   }
   room_amenities: { amenity: string }[]
   room_vibe_tags: { vibe_tag: string }[]
   room_images: { image_url: string; sort_order: number }[]
-  reviews: { rating: number }[]
+  reviews?: { rating: number }[]
 }
 
 export function mapPublicRoom(row: PublicRoomRow): Room {
@@ -30,9 +32,10 @@ export function mapPublicRoom(row: PublicRoomRow): Room {
     .sort((a, b) => a.sort_order - b.sort_order)
     .map(image => image.image_url)
 
-  const ratings = (row.reviews ?? []).map(review => review.rating)
-  const avgRating = ratings.length > 0
-    ? Math.round((ratings.reduce((sum, rating) => sum + rating, 0) / ratings.length) * 10) / 10
+  const reviews = row.reviews ?? []
+  const reviewCount = reviews.length
+  const rating = reviewCount > 0
+    ? Math.round((reviews.reduce((sum, r) => sum + r.rating, 0) / reviewCount) * 10) / 10
     : 0
 
   return {
@@ -48,10 +51,10 @@ export function mapPublicRoom(row: PublicRoomRow): Room {
     amenities: (row.room_amenities ?? []).map(item => item.amenity as Amenity),
     vibeTags: (row.room_vibe_tags ?? []).map(item => item.vibe_tag as VibeTag),
     images: images.length > 0 ? images : ["/placeholder.jpg"],
-    rating: avgRating,
-    reviewCount: ratings.length,
+    rating,
+    reviewCount,
     verified: row.verified,
-    slotsLeftToday: getSlotsLeftToday(row.id),
+    slotsLeftToday: computeSlotsLeftToday(row.venues.open_time, row.venues.close_time),
     noiseLevel: row.noise_level ?? undefined,
     lat: row.venues.lat ?? 10.7769,
     lng: row.venues.lng ?? 106.7009,

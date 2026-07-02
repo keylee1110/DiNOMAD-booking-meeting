@@ -1,9 +1,13 @@
 import { Controller, Get, Param, Query } from "@nestjs/common"
 import { PublicRoomsService } from "./public-rooms.service"
+import { RoomsService } from "./rooms.service"
 
 @Controller("rooms")
 export class PublicRoomsController {
-  constructor(private readonly publicRoomsService: PublicRoomsService) {}
+  constructor(
+    private readonly publicRoomsService: PublicRoomsService,
+    private readonly roomsService: RoomsService,
+  ) {}
 
   @Get()
   search(
@@ -37,5 +41,11 @@ export class PublicRoomsController {
   @Get(":id")
   getById(@Param("id") id: string) {
     return this.publicRoomsService.getById(id)
+  }
+
+  @Get(":roomId/slots")
+  getPublicSlots(@Param("roomId") roomId: string, @Query("date") date: string) {
+    const targetDate = date ?? new Date().toISOString().slice(0, 10)
+    return this.roomsService.getPublicSlots(roomId, targetDate)
   }
 }

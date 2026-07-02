@@ -5,10 +5,9 @@ import Image from "next/image"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useTranslation } from "@/lib/i18n/context"
 
-import { getPublicRoomById } from "@/lib/api/public-rooms"
+import { getPublicRoomById, getRoomAvailability } from "@/lib/api/public-rooms"
 import { getRoomReviews } from "@/lib/api/reviews"
 import type { ApiReview } from "@/lib/api/reviews"
-import { generateTimeSlots } from "@/lib/data/time-slots"
 import { useBooking } from "@/lib/store/booking-store"
 import { formatVND, getNextDays, formatDate } from "@/lib/format"
 import { TimeSlotPicker } from "@/components/time-slot-picker"
@@ -17,6 +16,7 @@ import { VerifiedBadge } from "@/components/verified-badge"
 import { CountdownTimer } from "@/components/countdown-timer"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { Star, MapPin, Users, ChevronLeft, ChevronRight, ExternalLink, Minus, Plus, Heart } from "lucide-react"
@@ -54,14 +54,14 @@ function RoomDetailContent({ params }: { params: Promise<{ locale: string; id: s
   const [holdExpired, setHoldExpired] = useState(false)
   const [holdTimerKey, setHoldTimerKey] = useState(0)
 
-  // Split bill states
-  const [splitPeople, setSplitPeople] = useState(1)
+  // Split bill states — start at the minimum (2) so users type or step up to
+  // their group size instead of minus-clicking down from full room capacity.
+  const [splitPeople, setSplitPeople] = useState(2)
 
   useEffect(() => {
     getPublicRoomById(id)
       .then((publicRoom) => {
         setRoom(publicRoom)
-        if (publicRoom) setSplitPeople(publicRoom.capacity)
       })
       .catch((error) => console.warn("Could not load published room:", error))
       .finally(() => setRoomLoading(false))
@@ -74,10 +74,20 @@ function RoomDetailContent({ params }: { params: Promise<{ locale: string; id: s
       .finally(() => setReviewsLoading(false))
   }, [id])
 
-  const slots = useMemo(
-    () => room ? generateTimeSlots(selectedDate, room.id) : [],
-    [selectedDate, room],
-  )
+  const [slots, setSlots] = useState<TimeSlot[]>([])
+  const [slotsLoading, setSlotsLoading] = useState(false)
+
+  useEffect(() => {
+    if (!room) return
+    setSlotsLoading(true)
+    getRoomAvailability(room.id, selectedDate)
+      .then(setSlots)
+      .catch((error) => {
+        console.warn("Could not load room availability:", error)
+        setSlots([])
+      })
+      .finally(() => setSlotsLoading(false))
+  }, [selectedDate, room])
 
   const handleToggleSlot = (slot: TimeSlot) => {
     setSelectedSlots((prev) => {
@@ -376,13 +386,17 @@ function RoomDetailContent({ params }: { params: Promise<{ locale: string; id: s
                 : t("common.bookNow")}
             </h3>
 
-            <TimeSlotPicker
-              slots={slots}
-              selectedSlots={selectedSlots}
-              onToggleSlot={handleToggleSlot}
-              selectedDate={selectedDate}
-              onDateChange={handleDateChange}
-            />
+            {slotsLoading ? (
+              <p className="text-sm text-muted-foreground">{t("common.loading")}</p>
+            ) : (
+              <TimeSlotPicker
+                slots={slots}
+                selectedSlots={selectedSlots}
+                onToggleSlot={handleToggleSlot}
+                selectedDate={selectedDate}
+                onDateChange={handleDateChange}
+              />
+            )}
 
             {selectedSlots.length > 0 && (
               <div className="mt-4 rounded-xl bg-muted/30 p-3.5 border border-border/40">
@@ -421,7 +435,18 @@ function RoomDetailContent({ params }: { params: Promise<{ locale: string; id: s
                         >
                           <Minus className="h-3 w-3" />
                         </Button>
-                        <span className="text-xs font-semibold w-6 text-center">{splitPeople}</span>
+                        <Input
+                          type="number"
+                          min={2}
+                          max={50}
+                          value={splitPeople}
+                          onChange={(e) => {
+                            const v = parseInt(e.target.value, 10)
+                            if (!Number.isNaN(v)) setSplitPeople(Math.min(50, Math.max(2, v)))
+                          }}
+                          className="h-6 w-12 rounded-lg border-0 bg-transparent px-1 text-center text-xs font-semibold shadow-none focus-visible:ring-1 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                          aria-label={locale === "vi" ? "Số người chia tiền" : "Number of people to split"}
+                        />
                         <Button
                           variant="ghost"
                           size="icon"
