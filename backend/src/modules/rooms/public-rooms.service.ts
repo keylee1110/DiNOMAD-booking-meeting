@@ -236,10 +236,14 @@ export class PublicRoomsService {
     }
   }
 
+  // Slots are 1-hour blocks, so slots left today = remaining open hours
+  // counted from the current hour in Vietnam time (UTC+7)
   private computeSlotsLeft(openTime: string | null, closeTime: string | null): number {
     if (!openTime || !closeTime) return 10
     const openHour = parseInt(openTime.split(":")[0], 10)
     const closeHour = parseInt(closeTime.split(":")[0], 10)
-    return Math.max(0, (closeHour - openHour) * 2)
+    const now = new Date()
+    const vnHour = (now.getUTCHours() + 7) % 24
+    return Math.max(0, closeHour - Math.max(openHour, vnHour))
   }
 }

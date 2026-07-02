@@ -80,3 +80,8 @@ export function getAvailableSlotsCount(date: string, roomId: string): number {
   const slots = generateTimeSlots(date, roomId)
   return slots.filter((s) => s.available && !s.isPast).length
 }
+
+/** Remaining bookable slots for today (Vietnam time) — matches the room page slot grid */
+export function getSlotsLeftToday(roomId: string): number {
+  return getAvailableSlotsCount(getNowVietnam().date, roomId)
+}

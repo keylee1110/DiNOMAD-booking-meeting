@@ -8,7 +8,8 @@ const PUBLIC_ROOM_SELECT = `
   venues!inner(name, address, district, lat, lng, status),
   room_amenities(amenity),
   room_vibe_tags(vibe_tag),
-  room_images(image_url, sort_order)
+  room_images(image_url, sort_order),
+  reviews(rating)
 `
 
 // Simple in-memory cache (session-scoped, avoids duplicate fetches during navigation)
