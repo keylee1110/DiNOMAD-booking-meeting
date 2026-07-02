@@ -526,7 +526,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ locale: str
       handleCancelBookingInDb(bookingId)
       sessionStorage.removeItem("dinomad_active_hold")
     }
-    router.push(`/${locale}/checkout/cancel`)
+    router.push(`/${locale}/checkout/cancel${room ? `?roomId=${room.id}` : ""}`)
   }
 
   const handleProceedPayment = async () => {
@@ -1027,7 +1027,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ locale: str
                       setBookingId("")
                       setBookingCode("")
                     }
-                    router.push(`/${locale}/checkout/cancel`)
+                    router.push(`/${locale}/checkout/cancel${room ? `?roomId=${room.id}` : ""}`)
                   }}
                   className="w-full rounded-xl text-xs h-9 border-border text-muted-foreground hover:bg-muted"
                 >

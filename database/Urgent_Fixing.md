@@ -4,14 +4,14 @@
 
 | Task | Cần làm |
 | ----- | ----- |
-| Social login | Fix Google/Facebook login chưa chạy được. Trong note mới cũng có nhắc 2 nút này “chưa xài được”. |
-| Login validation | Sai password phải có toast báo lỗi. Sai format email phải validate trước khi submit. |
-| Register validation | Validate phone, email, password tối thiểu 6 ký tự, confirm password, checkbox điều khoản. |
-| Register social | Google/Facebook ở trang đăng ký cũng chưa dùng được. |
-| Verify email | User register xong chưa verify mail thì không cho login là đúng, nhưng phải hiện thông báo rõ. |
-| Profile | Avatar chưa load được, update profile thành công phải có toast. |
-| Role login | Xem lại role customer/supplier/admin vì chọn role đang hơi rối, login supplier ở ô customer vẫn vào supplier. |
-| Logout | Fix nút đăng xuất Admin chưa bấm được. |
+| ~~Social login~~ | ✅ Done — `signInWithOAuth` wired ở cả login/signup, `app/api/auth/callback/route.ts` xử lý code exchange + role redirect. File: `app/[locale]/login/page.tsx:188-214`, `app/[locale]/signup/page.tsx:190-213`. Chỉ còn phụ thuộc config Google/Facebook client ID trên Supabase dashboard (ngoài repo). |
+| ~~Login validation~~ | ✅ Done — kèm theo trong đợt merge auth mới, toast lỗi + validate email/password đã có ở `login/page.tsx`. |
+| ~~Register validation~~ | ✅ Done — full name, SĐT (regex VN), email, password ≥6 ký tự, confirm password, checkbox điều khoản đều có toast lỗi riêng. File: `app/[locale]/signup/page.tsx:38-102`. |
+| ~~Register social~~ | ✅ Done — cùng cơ chế OAuth với login, xem `signup/page.tsx:190-213`. |
+| Verify email | Chưa xác nhận lại — cần test thủ công flow "chưa verify thì không login được" có thông báo rõ hay không. |
+| Profile | Chưa xác nhận lại — cần test avatar load + toast update profile. |
+| ~~Role login~~ | ✅ Done — sau khi `signInWithPassword`, code fetch role thật từ `profiles` và enforce 2 chiều (chọn admin nhưng role thật không phải admin → signOut + toast, tương tự supplier/customer). File: `app/[locale]/login/page.tsx:62-152`. Còn sót nút "Demo Admin Access" (dead UI, không phải lỗ hổng vì `admin/layout.tsx` vẫn chặn session giả) — nên dọn sau. |
+| ~~Logout~~ | ✅ Done — `handleLogout` await `supabase.auth.signOut()` đúng, wired vào onClick. File: `app/[locale]/admin/_components/admin-sidebar.tsx:62-69,121`. |
 | Forgot password | Có thể làm optional nếu còn thời gian. |
 
 **Người phụ trách:** Dev Auth / Backend-integrated Frontend.
@@ -26,16 +26,16 @@
 
 | Task | Cần làm |
 | ----- | ----- |
-| Rating room card | Detail có đánh giá nhưng card ngoài vẫn hiện 0, sao vàng chưa đúng. |
+| ~~Rating room card~~ | ✅ Done — root cause: `mapPublicRoom()` (`lib/data/public-room.ts`) hardcode `rating: 0, reviewCount: 0` cho mọi room, dùng chung bởi cả search/card path lẫn detail path — không hề query bảng `reviews`. Đã thêm `reviews(rating)` vào `PUBLIC_ROOM_SELECT` (`lib/api/public-rooms.ts`) và tính trung bình thật trong `mapPublicRoom()`. RLS `reviews` đã cho phép `anon` select nên không cần đổi policy. File: `lib/data/public-room.ts`, `lib/api/public-rooms.ts`. |
 | District/address | Đổi hiển thị địa chỉ/district sang tiếng Việt hoặc format dễ hiểu hơn, vì note mới có ghi “để tiếng Việt \+ phần chia địa chính mới”. |
-| Split payment | Cho nhập số người trực tiếp, không bắt user bấm trừ từ 30 người. |
+| ~~Split payment~~ | ✅ Done — ô "Chia tiền" giờ là input số gõ trực tiếp (clamp 2–50), vẫn giữ nút +/−. Đồng thời bỏ dòng auto-set số người = sức chứa phòng (nguyên nhân "bấm trừ từ 30 người") — mặc định giờ là 2. File: `app/[locale]/(main)/rooms/[id]/page.tsx`. |
 | ~~Order status~~ | ✅ Done — nút "Xem mã QR" trong my-bookings giờ ẩn với đơn pending/cancelled. Quan trọng hơn: trang `checkout/success` (nơi thực sự hiện QR/mã check-in) trước đây hiện mã bất kể status — đã thêm chặn cứng tại đó nên dù vào bằng cách nào (link, gõ URL trực tiếp) cũng không lộ mã cho đơn chưa trả tiền/đã hủy. File: `app/[locale]/(main)/checkout/success/page.tsx`, `app/[locale]/(main)/my-bookings/page.tsx`. |
 | Back to homepage | Ở đơn đặt có chỗ bấm bị back về homepage không đúng, cần back về trang thông tin / detail của phòng. |
 | Reload orders | Nút “Làm mới” ở đơn đặt cần reload đúng dữ liệu. |
 | ~~Time slot~~ | ✅ Done — slot picker trang chi tiết phòng trước đây dùng dữ liệu giả (hash giả lập "đã đặt", chia theo giờ chứ không phải 30 phút), hoàn toàn không biết booking thật trong Supabase → nguy cơ đặt trùng (double-booking) thật. Đã thêm endpoint công khai `GET /api/rooms/:roomId/slots` (file mới `backend/src/modules/rooms/public-rooms.controller.ts`, dùng lại logic `RoomsService.computeSlots` đang chạy cho phía partner) và nối frontend gọi `getRoomAvailability()` (`lib/api/public-rooms.ts`) thay cho `generateTimeSlots()` mock. Slot quá giờ (theo giờ VN, chính xác tới phút) giờ bị đánh dấu `past` và không chọn được. File liên quan: `app/[locale]/(main)/rooms/[id]/page.tsx`, `backend/src/modules/rooms/rooms.service.ts`. |
 | Hold slot | Khi có người giữ chỗ, phải có thông báo rõ bên trái, không để user hiểu nhầm. |
 | Room detail info | Phần “Thông số kỹ thuật” chưa hiểu thông tin, cần đổi label hoặc trình bày rõ hơn. |
-| Supplier create room | Trang “không gian” tạo phòng supplier đang lỗi. |
+| ~~Supplier create room~~ | ✅ Done (re-tested sau rebase) — flow tạo venue/room supplier hoạt động đúng, validate + auth guard + DTO khớp nhau. File: `app/[locale]/partner/venues/page.tsx`, `backend/src/modules/rooms/venues.controller.ts`, `venues.service.ts`. Còn sót vài `console.log`/`console.error` debug trong `venues.service.ts` `create()` — dọn sau, không phải bug. |
 | ~~Supplier QR scanner~~ | ✅ Done — camera lỗi quyền/không có camera giờ hiện toast báo lỗi rõ ràng (trước đó im lặng không làm gì). Sửa thêm cleanup `stop()` trước `clear()` tránh camera chạy ngầm. File: `app/[locale]/partner/scanner/page.tsx`. |
 | Manager CRUD API | Role manager còn nhiều trang chưa gọi API CRUD. |
 | Mock data | Xác nhận và thay các phần còn mock data như “10’ giữ chỗ”, điểm thưởng, thống kê đặt phòng nếu cần. |

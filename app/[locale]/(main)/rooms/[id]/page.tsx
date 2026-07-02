@@ -16,6 +16,7 @@ import { VerifiedBadge } from "@/components/verified-badge"
 import { CountdownTimer } from "@/components/countdown-timer"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { Star, MapPin, Users, ChevronLeft, ChevronRight, ExternalLink, Minus, Plus, Heart } from "lucide-react"
@@ -53,14 +54,14 @@ function RoomDetailContent({ params }: { params: Promise<{ locale: string; id: s
   const [holdExpired, setHoldExpired] = useState(false)
   const [holdTimerKey, setHoldTimerKey] = useState(0)
 
-  // Split bill states
-  const [splitPeople, setSplitPeople] = useState(1)
+  // Split bill states — start at the minimum (2) so users type or step up to
+  // their group size instead of minus-clicking down from full room capacity.
+  const [splitPeople, setSplitPeople] = useState(2)
 
   useEffect(() => {
     getPublicRoomById(id)
       .then((publicRoom) => {
         setRoom(publicRoom)
-        if (publicRoom) setSplitPeople(publicRoom.capacity)
       })
       .catch((error) => console.warn("Could not load published room:", error))
       .finally(() => setRoomLoading(false))
@@ -434,7 +435,18 @@ function RoomDetailContent({ params }: { params: Promise<{ locale: string; id: s
                         >
                           <Minus className="h-3 w-3" />
                         </Button>
-                        <span className="text-xs font-semibold w-6 text-center">{splitPeople}</span>
+                        <Input
+                          type="number"
+                          min={2}
+                          max={50}
+                          value={splitPeople}
+                          onChange={(e) => {
+                            const v = parseInt(e.target.value, 10)
+                            if (!Number.isNaN(v)) setSplitPeople(Math.min(50, Math.max(2, v)))
+                          }}
+                          className="h-6 w-12 rounded-lg border-0 bg-transparent px-1 text-center text-xs font-semibold shadow-none focus-visible:ring-1 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                          aria-label={locale === "vi" ? "Số người chia tiền" : "Number of people to split"}
+                        />
                         <Button
                           variant="ghost"
                           size="icon"

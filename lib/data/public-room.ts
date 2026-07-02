@@ -21,12 +21,19 @@ export interface PublicRoomRow {
   room_amenities: { amenity: string }[]
   room_vibe_tags: { vibe_tag: string }[]
   room_images: { image_url: string; sort_order: number }[]
+  reviews?: { rating: number }[]
 }
 
 export function mapPublicRoom(row: PublicRoomRow): Room {
   const images = [...(row.room_images ?? [])]
     .sort((a, b) => a.sort_order - b.sort_order)
     .map(image => image.image_url)
+
+  const reviews = row.reviews ?? []
+  const reviewCount = reviews.length
+  const rating = reviewCount > 0
+    ? Math.round((reviews.reduce((sum, r) => sum + r.rating, 0) / reviewCount) * 10) / 10
+    : 0
 
   return {
     id: row.id,
@@ -41,8 +48,8 @@ export function mapPublicRoom(row: PublicRoomRow): Room {
     amenities: (row.room_amenities ?? []).map(item => item.amenity as Amenity),
     vibeTags: (row.room_vibe_tags ?? []).map(item => item.vibe_tag as VibeTag),
     images: images.length > 0 ? images : ["/placeholder.jpg"],
-    rating: 0,
-    reviewCount: 0,
+    rating,
+    reviewCount,
     verified: row.verified,
     slotsLeftToday: 0,
     noiseLevel: row.noise_level ?? undefined,
