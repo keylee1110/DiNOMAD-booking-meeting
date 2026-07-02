@@ -16,7 +16,7 @@ interface ApiSlot {
 const PUBLIC_ROOM_SELECT = `
   id, venue_id, name, description, capacity, price_per_hour,
   category, verified, noise_level, specs,
-  venues!inner(name, address, district, lat, lng, status),
+  venues!inner(name, address, district, lat, lng, status, open_time, close_time),
   room_amenities(amenity),
   room_vibe_tags(vibe_tag),
   room_images(image_url, sort_order),

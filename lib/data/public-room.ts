@@ -1,4 +1,5 @@
 import type { Amenity, Room, VibeTag } from "@/lib/types"
+import { computeSlotsLeftToday } from "@/lib/data/time-slots"
 
 export interface PublicRoomRow {
   id: string
@@ -17,6 +18,8 @@ export interface PublicRoomRow {
     district: string
     lat: number | null
     lng: number | null
+    open_time: string | null
+    close_time: string | null
   }
   room_amenities: { amenity: string }[]
   room_vibe_tags: { vibe_tag: string }[]
@@ -51,7 +54,7 @@ export function mapPublicRoom(row: PublicRoomRow): Room {
     rating,
     reviewCount,
     verified: row.verified,
-    slotsLeftToday: 0,
+    slotsLeftToday: computeSlotsLeftToday(row.venues.open_time, row.venues.close_time),
     noiseLevel: row.noise_level ?? undefined,
     lat: row.venues.lat ?? 10.7769,
     lng: row.venues.lng ?? 106.7009,
