@@ -353,12 +353,17 @@ function RoomDetailContent({ params }: { params: Promise<{ locale: string; id: s
                 </p>
                 <CountdownTimer
                   key={holdTimerKey}
-                  durationSeconds={600}
+                  durationSeconds={5 * 60}
                   onExpire={() => setHoldExpired(true)}
                   className="mt-1 border-amber-500/20 bg-transparent text-amber-700 dark:text-amber-400 text-base px-0 py-0 gap-1.5"
                 />
               </div>
-              <Button variant="outline" size="sm" className="text-xs h-8 border-amber-500/20 text-amber-700 hover:bg-amber-500/10 hover:text-amber-800 bg-transparent rounded-xl">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => { setHoldTimerKey(k => k + 1); setHoldExpired(false) }}
+                className="text-xs h-8 border-amber-500/20 text-amber-700 hover:bg-amber-500/10 hover:text-amber-800 bg-transparent rounded-xl"
+              >
                 {locale === "vi" ? "Cần thêm thời gian?" : "Need more time?"}
               </Button>
             </div>
