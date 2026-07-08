@@ -105,7 +105,6 @@ export class VenuesService {
 
   async findMine(userId: string) {
     const supplierId = await this.getSupplierIdForUser(userId)
-    console.error("Finding venues for supplier", supplierId)
 
     const { data, error } = await this.supabase.admin
       .from("venues")
@@ -131,51 +130,31 @@ export class VenuesService {
   }
 
   async create(userId: string, dto: CreateVenueDto) {
-    console.log('📍 VenuesService.create()');
-    console.log('userId:', userId);
-    console.log('dto:', dto);
+    const supplierId = await this.getSupplierIdForUser(userId)
 
-    try {
-      console.log('🔍 Getting supplierId for user...');
-      const supplierId = await this.getSupplierIdForUser(userId);
-      console.log('✅ supplierId:', supplierId);
+    const { data, error } = await this.supabase.admin
+      .from("venues")
+      .insert({
+        supplier_id: supplierId,
+        name: dto.name,
+        description: dto.description ?? null,
+        address: dto.address,
+        district: dto.district,
+        city: dto.city ?? "Ho Chi Minh City",
+        phone: dto.phone ?? null,
+        lat: dto.lat ?? null,
+        lng: dto.lng ?? null,
+        status: "draft",
+        open_time: dto.openTime ?? "07:00",
+        close_time: dto.closeTime ?? "22:00",
+      })
+      .select("*")
+      .single<VenueRow>()
 
-      console.log('🔍 Inserting venue into database...');
-      const { data, error } = await this.supabase.admin
-        .from("venues")
-        .insert({
-          supplier_id: supplierId,
-          name: dto.name,
-          description: dto.description ?? null,
-          address: dto.address,
-          district: dto.district,
-          city: dto.city ?? "Ho Chi Minh City",
-          phone: dto.phone ?? null,
-          lat: dto.lat ?? null,
-          lng: dto.lng ?? null,
-          status: "draft",
-          open_time: dto.openTime ?? "07:00",
-          close_time: dto.closeTime ?? "22:00",
-        })
-        .select("*")
-        .single<VenueRow>();
+    if (error) throw new Error(`Database error: ${error.message}`)
+    if (!data) throw new Error("Failed to create venue - no data returned")
 
-      if (error) {
-        console.error('❌ Supabase insert error:', error);
-        throw new Error(`Database error: ${error.message}`);
-      }
-
-      if (!data) {
-        console.error('❌ No data returned from insert');
-        throw new Error("Failed to create venue - no data returned");
-      }
-
-      console.log('✅ Venue created successfully:', data);
-      return this.toVenueResponse(data);
-    } catch (err) {
-      console.error('❌ ERROR in create():', err);
-      throw err;
-    }
+    return this.toVenueResponse(data)
   }
 
   async update(venueId: string, userId: string, dto: UpdateVenueDto) {

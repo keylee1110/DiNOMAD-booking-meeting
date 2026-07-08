@@ -64,8 +64,9 @@ interface BookingContextType {
   state: BookingFlowState
   dispatch: React.Dispatch<BookingAction>
   myBookings: Booking[]
+  bookingsLoaded: boolean
   addBooking: (booking: Booking) => void
-  refreshBookings: (passedUser?: any) => void
+  refreshBookings: (passedUser?: any) => Promise<void>
   wishlist: string[]
   toggleWishlist: (roomId: string) => Promise<void>
 }
@@ -78,6 +79,7 @@ const BookingContext = createContext<BookingContextType | null>(null)
 export function BookingProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(bookingReducer, initialState)
   const [myBookings, setMyBookings] = useState<Booking[]>([])
+  const [bookingsLoaded, setBookingsLoaded] = useState(false)
   const [wishlist, setWishlist] = useState<string[]>([])
   const supabase = createClient()
 
@@ -180,6 +182,7 @@ export function BookingProvider({ children }: { children: ReactNode }) {
       // Guest: Load from localStorage
       loadLocalBookings()
     }
+    setBookingsLoaded(true)
   }
 
   const loadLocalBookings = () => {
@@ -292,7 +295,7 @@ export function BookingProvider({ children }: { children: ReactNode }) {
   }, [])
 
   return (
-    <BookingContext.Provider value={{ state, dispatch, myBookings, addBooking, refreshBookings, wishlist, toggleWishlist }}>
+    <BookingContext.Provider value={{ state, dispatch, myBookings, bookingsLoaded, addBooking, refreshBookings, wishlist, toggleWishlist }}>
       {children}
     </BookingContext.Provider>
   )

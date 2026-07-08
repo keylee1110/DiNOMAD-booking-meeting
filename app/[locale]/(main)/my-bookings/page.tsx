@@ -5,7 +5,7 @@ import { useBooking } from "@/lib/store/booking-store"
 import { useTranslation } from "@/lib/i18n/context"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Calendar, Clock, MapPin, Receipt, Wifi, QrCode as QrIcon, Star, MessageSquare, Sparkles, CheckCircle2 } from "lucide-react"
+import { Calendar, Clock, MapPin, Receipt, Wifi, QrCode as QrIcon, Star, MessageSquare, Sparkles, CheckCircle2, RefreshCw, ExternalLink } from "lucide-react"
 import { formatVNDFull } from "@/lib/format"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
@@ -32,6 +32,18 @@ export default function MyBookingsPage() {
   const { locale, t } = useTranslation()
   const supabase = createClient()
   const [activeFilter, setActiveFilter] = useState<FilterStatus>("all")
+  const [isRefreshing, setIsRefreshing] = useState(false)
+
+  const handleRefresh = async () => {
+    if (isRefreshing) return
+    setIsRefreshing(true)
+    try {
+      await refreshBookings()
+      toast.success(t("common.refreshed"))
+    } finally {
+      setIsRefreshing(false)
+    }
+  }
 
   const canCompleteBooking = (booking: Booking) => {
     if (booking.status !== "confirmed") return false
@@ -194,13 +206,15 @@ export default function MyBookingsPage() {
               : "View your booking history and check-in codes."}
           </p>
         </div>
-        <Button 
-          variant="outline" 
-          size="sm" 
-          onClick={() => refreshBookings()}
-          className="w-fit"
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleRefresh}
+          disabled={isRefreshing}
+          className="w-fit gap-1.5"
         >
-          {locale === "vi" ? "Làm mới" : "Refresh"}
+          <RefreshCw className={cn("h-3.5 w-3.5", isRefreshing && "animate-spin")} />
+          {isRefreshing ? t("common.refreshing") : t("common.refresh")}
         </Button>
       </div>
 
@@ -274,7 +288,13 @@ export default function MyBookingsPage() {
                         ID: {booking.id.slice(0, 8)}...
                       </div>
                     )}
-                    <h3 className="font-bold text-lg leading-tight">{booking.roomName}</h3>
+                    <Link
+                      href={`/${locale}/rooms/${booking.roomId}`}
+                      className="group/room inline-flex items-start gap-1 font-bold text-lg leading-tight hover:text-primary hover:underline transition-colors"
+                    >
+                      {booking.roomName}
+                      <ExternalLink className="h-3.5 w-3.5 mt-1 shrink-0 opacity-0 group-hover/room:opacity-100 transition-opacity" />
+                    </Link>
                     <p className="text-sm text-primary font-medium mt-1">{booking.venueName}</p>
                   </div>
                   
