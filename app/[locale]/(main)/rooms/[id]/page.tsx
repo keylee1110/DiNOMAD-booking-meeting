@@ -9,7 +9,7 @@ import { getPublicRoomById, getRoomAvailability } from "@/lib/api/public-rooms"
 import { getRoomReviews } from "@/lib/api/reviews"
 import type { ApiReview } from "@/lib/api/reviews"
 import { useBooking } from "@/lib/store/booking-store"
-import { formatVND, getNextDays, formatDate } from "@/lib/format"
+import { formatVND, getNextDays, formatDate, formatDistrict } from "@/lib/format"
 import { TimeSlotPicker } from "@/components/time-slot-picker"
 import { AmenityIcon } from "@/components/amenity-icon"
 import { VerifiedBadge } from "@/components/verified-badge"
@@ -217,7 +217,7 @@ function RoomDetailContent({ params }: { params: Promise<{ locale: string; id: s
                 </div>
                 <p className="flex items-center gap-1 text-muted-foreground">
                   <MapPin className="h-4 w-4" />
-                  {room.venueName} &middot; {room.district}
+                  {room.venueName} &middot; {formatDistrict(room.district, locale)}
                 </p>
               </div>
               <div className="flex items-center gap-2">

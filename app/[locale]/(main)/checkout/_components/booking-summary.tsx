@@ -9,7 +9,7 @@ import { CountdownTimer } from "@/components/countdown-timer"
 import { PriceDisplay } from "@/components/price-display"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { MapPin, Clock, Loader2 } from "lucide-react"
-import { formatVND, formatDate } from "@/lib/format"
+import { formatVND, formatDate, formatDistrict } from "@/lib/format"
 import { formatTime } from "@/lib/data/time-slots"
 import type { Room, TimeSlot } from "@/lib/types"
 
@@ -77,7 +77,7 @@ export function BookingSummary({
                 <MapPin className="h-4 w-4" />
                 {room.venueName}
                 <span className="text-muted-foreground">·</span>
-                {room.district}
+                {formatDistrict(room.district, locale)}
               </p>
             </div>
             {room.verified && (

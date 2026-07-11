@@ -2,13 +2,14 @@ import { Injectable, NotFoundException } from "@nestjs/common"
 import { SupabaseService } from "../../database/supabase.service"
 import { VenuesService } from "./venues.service"
 
+// NOTE: the *_vi translation columns were dropped by migration
+// 20260608143000_remove_vi_columns.sql — do not reference them here,
+// selecting a dropped column makes PostgREST reject the whole query.
 type RoomRow = {
   id: string
   venue_id: string
   name: string
-  name_vi: string | null
   description: string
-  description_vi: string | null
   capacity: number
   price_per_hour: number
   category: string | null
@@ -16,7 +17,6 @@ type RoomRow = {
   verified: boolean
   noise_level: number | null
   specs: Record<string, string>
-  specs_vi: Record<string, string>
   created_at: string
   updated_at: string
   room_amenities?: { amenity: string }[]
@@ -25,9 +25,7 @@ type RoomRow = {
   venues?: {
     id: string
     name: string
-    name_vi: string | null
     address: string
-    address_vi: string | null
     district: string
     city: string
     lat: number | null
@@ -73,7 +71,7 @@ export class PublicRoomsService {
         room_amenities(amenity),
         room_vibe_tags(vibe_tag),
         room_images(image_url, sort_order),
-        venues!inner(id, name, name_vi, address, address_vi, district, city, lat, lng, image_url, open_time, close_time)
+        venues!inner(id, name, address, district, city, lat, lng, image_url, open_time, close_time)
         `,
       )
       .eq("status", "published")
@@ -152,7 +150,7 @@ export class PublicRoomsService {
         room_amenities(amenity),
         room_vibe_tags(vibe_tag),
         room_images(image_url, sort_order),
-        venues!inner(id, name, name_vi, address, address_vi, district, city, lat, lng, image_url, open_time, close_time)
+        venues!inner(id, name, address, district, city, lat, lng, image_url, open_time, close_time)
         `,
       )
       .eq("id", id)
@@ -210,14 +208,10 @@ export class PublicRoomsService {
       id: room.id,
       venueId: room.venue_id,
       venueName: venue.name,
-      venueNameVi: venue.name_vi ?? undefined,
       name: room.name,
-      nameVi: room.name_vi ?? undefined,
       description: room.description,
-      descriptionVi: room.description_vi ?? undefined,
       district: venue.district,
       address: venue.address,
-      addressVi: venue.address_vi ?? undefined,
       capacity,
       pricePerHour: room.price_per_hour,
       amenities: (room.room_amenities ?? []).map((a) => a.amenity),
@@ -228,7 +222,6 @@ export class PublicRoomsService {
       verified: room.verified,
       noiseLevel: room.noise_level ?? undefined,
       specs: (room.specs ?? {}) as Record<string, string>,
-      specsVi: (room.specs_vi ?? {}) as Record<string, string>,
       category: room.category ?? undefined,
       lat: venue.lat ?? 0,
       lng: venue.lng ?? 0,

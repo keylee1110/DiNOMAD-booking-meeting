@@ -4,7 +4,7 @@ import Image from "next/image"
 import Link from "next/link"
 import { useTranslation } from "@/lib/i18n/context"
 import type { Room } from "@/lib/types"
-import { formatVND } from "@/lib/format"
+import { formatVND, formatDistrict } from "@/lib/format"
 import { VerifiedBadge } from "@/components/verified-badge"
 import { AmenityIcon } from "@/components/amenity-icon"
 import { Star, Users, MessageSquare, AudioLines, Heart } from "lucide-react"
@@ -72,7 +72,7 @@ export function RoomCard({ room, compact = false, date }: RoomCardProps) {
           <div className="mb-2 flex items-start justify-between gap-2">
             <div className="min-w-0">
               <h3 className="truncate text-lg font-semibold tracking-tight text-card-foreground">{room.name}</h3>
-              <p className="truncate text-sm font-medium text-muted-foreground">{room.venueName} &middot; {room.district}</p>
+              <p className="truncate text-sm font-medium text-muted-foreground">{room.venueName} &middot; {formatDistrict(room.district, locale)}</p>
             </div>
             <div className="flex shrink-0 items-center gap-1 border border-border/60 bg-background px-2.5 py-0.5 rounded-lg shadow-sm">
               <Star className="h-3.5 w-3.5 fill-yellow-400 text-yellow-400" />
