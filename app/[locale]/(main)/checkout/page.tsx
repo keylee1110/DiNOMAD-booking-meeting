@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 import { useTranslation } from "@/lib/i18n/context"
 import { useBooking } from "@/lib/store/booking-store"
 import type { Booking, TimeSlot } from "@/lib/types"
-import { generateBookingId, formatVND } from "@/lib/format"
+import { formatVND } from "@/lib/format"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
@@ -14,7 +14,7 @@ import { Label } from "@/components/ui/label"
 import { CreditCard, Smartphone, Check, Loader2, ShieldCheck, Clock, Sparkles } from "lucide-react"
 import { createClient } from "@/utils/supabase/client"
 import { toast } from "sonner"
-import { cancelPendingBooking } from "@/lib/api/bookings"
+import { cancelPendingBooking, createBookingHold, updatePendingBooking } from "@/lib/api/bookings"
 
 import { BookingSummary } from "./_components/booking-summary"
 import { GuestInfoForm } from "./_components/guest-info-form"
@@ -351,54 +351,18 @@ export default function CheckoutPage({ params }: { params: Promise<{ locale: str
       }
 
       setIsSavingBooking(true)
-      const newId = generateBookingId()
-      const generateFrontCode = () => {
-        const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-        let code = "DN-"
-        for (let i = 0; i < 6; i++) {
-          code += chars.charAt(Math.floor(Math.random() * chars.length))
+      try {
+        const data = await createBookingHold({ roomId: room.id, date: state.selectedDate, startTime: timeRange.startTime, endTime: timeRange.endTime, pointsRedeemed: pointsDiscount })
+        const newId = data.id
+        const newCode = data.booking_code
+        const createdAtStr = data.created_at
+        sessionStorage.setItem("dinomad_active_hold", JSON.stringify({ bookingId: newId, bookingCode: newCode, roomId: room.id, date: state.selectedDate, slots: state.selectedSlots, createdAt: createdAtStr }))
+        if (active) {
+          setBookingId(newId); setBookingCode(newCode); setTimeLeft(300); setCountdownKey(prev => prev + 1)
+          setSoftLockExpired(false); dispatch({ type: "SET_BOOKING_ID", id: newId }); setIsSavingBooking(false)
         }
-        return code
-      }
-      const newCode = generateFrontCode()
-
-      const toVietnamUTC = (dateStr: string, timeStr: string) => {
-        const [h, m] = timeStr.split(":").map(Number)
-        const [year, month, day] = dateStr.split("-").map(Number)
-        const utcDate = new Date(Date.UTC(year, month - 1, day, h - 7, m, 0, 0))
-        return utcDate.toISOString()
-      }
-
-      const startISO = toVietnamUTC(state.selectedDate, timeRange.startTime)
-      const endISO = toVietnamUTC(state.selectedDate, timeRange.endTime)
-
-      const insertPayload = {
-        id: newId,
-        room_id: room.id,
-        customer_id: user.id,
-        booking_date: state.selectedDate,
-        start_time: startISO,
-        end_time: endISO,
-        status: "pending" as const,
-        price_per_hour: room.pricePerHour,
-        subtotal: fees.roomFee,
-        platform_fee: fees.platformFee,
-        total_amount: finalPayableTotal,
-        points_redeemed: pointsDiscount,
-        points_earned: pointsEarned,
-        booking_code: newCode,
-        payment_status: "pending",
-      }
-
-      console.info("[Booking] Creating soft-lock pending booking in DB:", newId, newCode)
-      const { data, error } = await supabase
-        .from("bookings")
-        .insert(insertPayload)
-        .select("created_at")
-        .single()
-
-      if (error) {
-        console.error("[Booking] Soft-lock creation error:", error.message)
+      } catch (error) {
+        console.error("[Booking] Soft-lock creation error:", error)
         toast.error(
           locale === "vi"
             ? "Mục giờ này đã được đặt hoặc đang được giữ bởi người khác. Vui lòng chọn giờ khác!"
@@ -408,30 +372,6 @@ export default function CheckoutPage({ params }: { params: Promise<{ locale: str
           setSoftLockExpired(true)
           setIsSavingBooking(false)
         }
-        return
-      }
-
-      const createdAtStr = data?.created_at || new Date().toISOString()
-      sessionStorage.setItem(
-        "dinomad_active_hold",
-        JSON.stringify({
-          bookingId: newId,
-          bookingCode: newCode,
-          roomId: room.id,
-          date: state.selectedDate,
-          slots: state.selectedSlots,
-          createdAt: createdAtStr,
-        })
-      )
-
-      if (active) {
-        setBookingId(newId)
-        setBookingCode(newCode)
-        setTimeLeft(300)
-        setCountdownKey(prev => prev + 1)
-        setSoftLockExpired(false)
-        dispatch({ type: "SET_BOOKING_ID", id: newId })
-        setIsSavingBooking(false)
       }
     }
 
@@ -545,28 +485,9 @@ export default function CheckoutPage({ params }: { params: Promise<{ locale: str
     dispatch({ type: "SET_GUEST_INFO", name: fullName.trim(), phone: phone.trim(), email: email.trim() })
 
     try {
-      const updatePayload = {
-        total_amount: finalPayableTotal,
-        points_redeemed: pointsDiscount,
-        points_earned: pointsEarned,
-        updated_at: new Date().toISOString(),
-      }
-
-      const { error } = await supabase
-        .from("bookings")
-        .update(updatePayload)
-        .eq("id", bookingId)
-          
-      if (error) {
-        console.error("[Booking] Supabase update error:", error.message)
-        toast.error(
-          locale === "vi"
-            ? `Không thể cập nhật đơn đặt: ${error.message}`
-            : `Failed to update booking: ${error.message}`
-        )
-        setIsSavingBooking(false)
-        return
-      }
+      await updatePendingBooking(bookingId, {
+        pointsRedeemed: pointsDiscount,
+      })
       
       console.info("[Booking] Updated booking details and opening payment dialog:", bookingId)
       setIsPaymentDialogOpen(true)

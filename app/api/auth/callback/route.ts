@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
                 request.cookies.set(name, value)
                 response.cookies.set(name, value, options)
               })
-            } catch (err) {
+            } catch {
               // The `setAll` method was called from a Server Component.
               // This can be ignored if you have middleware refreshing sessions.
             }
@@ -92,18 +92,19 @@ export async function GET(request: NextRequest) {
 
         actualRole = updatedProfile?.role || actualRole
 
-        // Deciding Redirection based on actualRole and request target url
-        if (next === "/" || next === `/${locale}` || !next) {
-          if (actualRole === "admin") {
-            targetRedirect = `/${locale}/admin`
-          } else if (actualRole === "supplier") {
-            targetRedirect = `/${locale}/partner`
-          } else if (mode === "signup" && roleParam === "supplier") {
-            // If they registered as supplier, redirect to profile page where they see pending state
-            targetRedirect = `/${locale}/profile?pending=true`
-          } else {
-            targetRedirect = `/${locale}`
-          }
+        const roleHome = actualRole === "admin"
+          ? `/${locale}/admin`
+          : actualRole === "supplier" ? `/${locale}/partner` : `/${locale}`
+        const canUseRequestedRedirect = next.startsWith(`/${locale}/admin`)
+          ? actualRole === "admin"
+          : next.startsWith(`/${locale}/partner`)
+            ? actualRole === "supplier" || actualRole === "admin"
+            : next.startsWith(`/${locale}`)
+
+        if (mode === "signup" && roleParam === "supplier" && actualRole !== "supplier") {
+          targetRedirect = `/${locale}/profile?pending=true`
+        } else {
+          targetRedirect = canUseRequestedRedirect ? next : roleHome
         }
       }
 

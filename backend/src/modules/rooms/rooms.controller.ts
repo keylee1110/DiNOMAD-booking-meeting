@@ -16,6 +16,24 @@ import { RoomsService } from "./rooms.service"
 export class RoomsController {
   constructor(private readonly roomsService: RoomsService) {}
 
+  @Get("admin/all")
+  @Roles("admin")
+  findAllForAdmin() {
+    return this.roomsService.findAllForAdmin()
+  }
+
+  @Patch("admin/:roomId/status")
+  @Roles("admin")
+  updateStatusForAdmin(@Param("roomId") roomId: string, @Body() dto: UpdateRoomStatusDto) {
+    return this.roomsService.updateStatusForAdmin(roomId, dto)
+  }
+
+  @Delete("admin/:roomId")
+  @Roles("admin")
+  archiveForAdmin(@Param("roomId") roomId: string) {
+    return this.roomsService.archiveForAdmin(roomId)
+  }
+
   @Get(":roomId/slots")
   getSlots(
     @Param("roomId") roomId: string,

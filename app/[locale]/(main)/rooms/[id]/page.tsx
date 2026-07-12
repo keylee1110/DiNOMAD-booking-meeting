@@ -1,11 +1,11 @@
 "use client"
 
-import { useState, useMemo, useEffect, use, Suspense } from "react"
+import { useState, useEffect, use, Suspense } from "react"
 import Image from "next/image"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useTranslation } from "@/lib/i18n/context"
 
-import { getPublicRoomById } from "@/lib/api/public-rooms"
+import { getPublicRoomById, getPublicRoomSlots } from "@/lib/api/public-rooms"
 import { getRoomReviews } from "@/lib/api/reviews"
 import type { ApiReview } from "@/lib/api/reviews"
 import { generateTimeSlots } from "@/lib/data/time-slots"
@@ -17,7 +17,6 @@ import { VerifiedBadge } from "@/components/verified-badge"
 import { CountdownTimer } from "@/components/countdown-timer"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { Star, MapPin, Users, ChevronLeft, ChevronRight, ExternalLink, Minus, Plus, Heart } from "lucide-react"
 import type { Room, TimeSlot } from "@/lib/types"
@@ -28,7 +27,7 @@ function RoomDetailContent({ params }: { params: Promise<{ locale: string; id: s
   const { locale, id } = use(params)
   const { t } = useTranslation()
   const router = useRouter()
-  const { state, dispatch, wishlist, toggleWishlist } = useBooking()
+  const { dispatch, wishlist, toggleWishlist } = useBooking()
   const isFavorited = wishlist ? wishlist.includes(id) : false
 
   const [room, setRoom] = useState<Room | null>(null)
@@ -51,6 +50,8 @@ function RoomDetailContent({ params }: { params: Promise<{ locale: string; id: s
 
   const [selectedDate, setSelectedDate] = useState(initialDate)
   const [selectedSlots, setSelectedSlots] = useState<TimeSlot[]>([])
+  const [slots, setSlots] = useState<TimeSlot[]>([])
+  const [slotsLoading, setSlotsLoading] = useState(false)
   const [holdExpired, setHoldExpired] = useState(false)
   const [holdTimerKey, setHoldTimerKey] = useState(0)
 
@@ -60,12 +61,21 @@ function RoomDetailContent({ params }: { params: Promise<{ locale: string; id: s
   useEffect(() => {
     getPublicRoomById(id)
       .then((publicRoom) => {
-        setRoom(publicRoom)
-        if (publicRoom) setSplitPeople(publicRoom.capacity)
+        if (publicRoom) {
+          setRoom(locale === "vi" ? {
+            ...publicRoom,
+            name: publicRoom.nameVi || publicRoom.name,
+            venueName: publicRoom.venueNameVi || publicRoom.venueName,
+            description: publicRoom.descriptionVi || publicRoom.description,
+            address: publicRoom.addressVi || publicRoom.address,
+            specs: publicRoom.specsVi || publicRoom.specs,
+          } : publicRoom)
+          setSplitPeople(publicRoom.capacity)
+        }
       })
       .catch((error) => console.warn("Could not load published room:", error))
       .finally(() => setRoomLoading(false))
-  }, [id])
+  }, [id, locale])
 
   useEffect(() => {
     getRoomReviews(id)
@@ -74,10 +84,17 @@ function RoomDetailContent({ params }: { params: Promise<{ locale: string; id: s
       .finally(() => setReviewsLoading(false))
   }, [id])
 
-  const slots = useMemo(
-    () => room ? generateTimeSlots(selectedDate, room.id) : [],
-    [selectedDate, room],
-  )
+  useEffect(() => {
+    if (!room) return
+    setSlotsLoading(true)
+    getPublicRoomSlots(room.id, selectedDate)
+      .then((realSlots: TimeSlot[]) => setSlots(realSlots.map((slot: TimeSlot) => ({ ...slot, price: room.pricePerHour / 2 }))))
+      .catch((error) => {
+        console.warn("Could not load live availability:", error)
+        setSlots(generateTimeSlots(selectedDate, room.id))
+      })
+      .finally(() => setSlotsLoading(false))
+  }, [selectedDate, room])
 
   const handleToggleSlot = (slot: TimeSlot) => {
     setSelectedSlots((prev) => {
@@ -207,7 +224,7 @@ function RoomDetailContent({ params }: { params: Promise<{ locale: string; id: s
                 </div>
                 <p className="flex items-center gap-1 text-muted-foreground">
                   <MapPin className="h-4 w-4" />
-                  {room.venueName} &middot; {room.district}
+                  {room.venueName} &middot; {room.address} ({room.district})
                 </p>
               </div>
               <div className="flex items-center gap-2">
@@ -292,7 +309,13 @@ function RoomDetailContent({ params }: { params: Promise<{ locale: string; id: s
                 {Object.entries(room.specs).map(([key, value]) => (
                   value && (
                     <div key={key} className="flex items-center justify-between rounded-lg bg-muted/50 px-4 py-2.5">
-                      <span className="text-sm capitalize text-muted-foreground">{key.replace(/([A-Z])/g, " $1").trim()}</span>
+                      <span className="text-sm text-muted-foreground">{{
+                        tvModel: locale === "vi" ? "Màn hình / TV" : "Display / TV",
+                        hdmiVersion: locale === "vi" ? "Kết nối trình chiếu" : "Display connection",
+                        whiteboardType: locale === "vi" ? "Bảng viết" : "Whiteboard",
+                        wifiSpeed: locale === "vi" ? "Tốc độ Wi-Fi" : "Wi-Fi speed",
+                        acType: locale === "vi" ? "Điều hòa" : "Air conditioning",
+                      }[key] ?? key.replace(/([A-Z])/g, " $1").trim()}</span>
                       <span className="text-sm font-medium text-foreground">{value}</span>
                     </div>
                   )
@@ -383,6 +406,7 @@ function RoomDetailContent({ params }: { params: Promise<{ locale: string; id: s
               selectedDate={selectedDate}
               onDateChange={handleDateChange}
             />
+            {slotsLoading && <p className="mt-2 text-xs text-muted-foreground">{locale === "vi" ? "Đang cập nhật lịch trống..." : "Refreshing availability..."}</p>}
 
             {selectedSlots.length > 0 && (
               <div className="mt-4 rounded-xl bg-muted/30 p-3.5 border border-border/40">

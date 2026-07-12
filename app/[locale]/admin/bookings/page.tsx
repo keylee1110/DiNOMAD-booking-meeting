@@ -1,14 +1,9 @@
-import { CalendarCheck, CheckCircle2, Clock, XCircle, AlertCircle } from "lucide-react"
+"use client"
 
-const mockBookings = [
-  { id: "BK-001", user: "Nguyen Van A", room: "Focus Pod A", venue: "The Coffee Lab", date: "2026-03-22", time: "09:00 – 11:00", total: 160000, status: "confirmed" },
-  { id: "BK-002", user: "Tran Thi B", room: "Collab Room B", venue: "The Coffee Lab", date: "2026-03-22", time: "10:00 – 12:00", total: 300000, status: "checked_in" },
-  { id: "BK-003", user: "Le Minh C", room: "Sunshine Meeting Room", venue: "Nomad Hub D10", date: "2026-03-22", time: "13:00 – 15:00", total: 240000, status: "pending" },
-  { id: "BK-004", user: "Pham Thi D", room: "Executive Board Room", venue: "Workspace Saigon", date: "2026-03-22", time: "14:00 – 16:00", total: 500000, status: "confirmed" },
-  { id: "BK-005", user: "Hoang Van E", room: "Rooftop Pod", venue: "BookCafe Central", date: "2026-03-21", time: "16:00 – 17:00", total: 100000, status: "cancelled" },
-  { id: "BK-006", user: "Dao Thi F", room: "Library Room", venue: "BookCafe Central", date: "2026-03-21", time: "08:00 – 10:00", total: 400000, status: "completed" },
-  { id: "BK-007", user: "Bui Van G", room: "Private Study Booth", venue: "Nomad Hub D10", date: "2026-03-20", time: "15:00 – 17:00", total: 120000, status: "completed" },
-]
+import { useEffect, useState } from "react"
+import { CalendarCheck, CheckCircle2, Clock, AlertCircle, Loader2 } from "lucide-react"
+import { getAdminBookings } from "@/lib/api/admin"
+import type { AdminBooking } from "@/lib/types"
 
 const statusConfig: Record<string, { label: string; icon: React.ElementType; className: string }> = {
   confirmed:  { label: "Confirmed",  icon: CheckCircle2, className: "text-emerald-600 bg-emerald-50 dark:bg-emerald-500/10 dark:text-emerald-400" },
@@ -19,6 +14,10 @@ const statusConfig: Record<string, { label: string; icon: React.ElementType; cla
 }
 
 export default function AdminBookingsPage() {
+  const [bookings, setBookings] = useState<AdminBooking[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState("")
+  useEffect(() => { getAdminBookings().then(setBookings).catch((e) => setError(e.message)).finally(() => setLoading(false)) }, [])
   return (
     <div className="space-y-6">
       <div>
@@ -40,19 +39,22 @@ export default function AdminBookingsPage() {
               </tr>
             </thead>
             <tbody>
-              {mockBookings.map((booking, i) => {
-                const s = statusConfig[booking.status]
+              {loading && <tr><td colSpan={6} className="py-12 text-center"><Loader2 className="mx-auto h-5 w-5 animate-spin" /></td></tr>}
+              {!loading && error && <tr><td colSpan={6} className="py-12 text-center text-destructive">{error}</td></tr>}
+              {!loading && !error && bookings.length === 0 && <tr><td colSpan={6} className="py-12 text-center text-muted-foreground">No bookings found</td></tr>}
+              {bookings.map((booking, i) => {
+                const s = statusConfig[booking.status] ?? statusConfig.pending
                 return (
-                  <tr key={booking.id} className={i < mockBookings.length - 1 ? "border-b border-border hover:bg-muted/30 transition-colors" : "hover:bg-muted/30 transition-colors"}>
-                    <td className="px-5 py-3.5 font-mono text-xs text-muted-foreground">{booking.id}</td>
-                    <td className="px-5 py-3.5 font-medium text-foreground">{booking.user}</td>
+                  <tr key={booking.id} className={i < bookings.length - 1 ? "border-b border-border hover:bg-muted/30 transition-colors" : "hover:bg-muted/30 transition-colors"}>
+                    <td className="px-5 py-3.5 font-mono text-xs text-muted-foreground">{booking.bookingCode}</td>
+                    <td className="px-5 py-3.5 font-medium text-foreground">{booking.customerName}</td>
                     <td className="px-5 py-3.5 text-muted-foreground hidden md:table-cell">
-                      <div>{booking.room}</div>
-                      <div className="text-xs">{booking.venue}</div>
+                      <div>{booking.roomName}</div>
+                      <div className="text-xs">{booking.venueName}</div>
                     </td>
                     <td className="px-5 py-3.5 text-muted-foreground hidden lg:table-cell">
-                      <div>{booking.date}</div>
-                      <div className="text-xs">{booking.time}</div>
+                      <div>{booking.bookingDate}</div>
+                      <div className="text-xs">{booking.startTime} – {booking.endTime}</div>
                     </td>
                     <td className="px-5 py-3.5 font-medium text-foreground hidden sm:table-cell">
                       {booking.total.toLocaleString("vi-VN")}₫

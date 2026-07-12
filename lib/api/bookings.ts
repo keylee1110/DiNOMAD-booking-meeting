@@ -49,3 +49,17 @@ export function cancelPendingBooking(bookingId: string): Promise<{ success: bool
     method: "PATCH",
   })
 }
+
+export function updatePendingBooking(bookingId: string, payload: { pointsRedeemed: number }) {
+  return apiFetch<{ success: boolean }>(`/bookings/${bookingId}/pending`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  })
+}
+
+export function createBookingHold(payload: { roomId: string; date: string; startTime: string; endTime: string; pointsRedeemed: number }) {
+  return apiFetch<{ id: string; booking_code: string; created_at: string }>("/bookings/hold", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  })
+}
