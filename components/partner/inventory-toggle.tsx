@@ -67,10 +67,10 @@ interface TimelineStripProps {
 }
 
 function TimelineStrip({ slots, selectedIds, onToggle, disabled }: TimelineStripProps) {
-  if (slots.length === 0) return null
-
   // Tooltip state
   const [hoveredId, setHoveredId] = useState<string | null>(null)
+
+  if (slots.length === 0) return null
 
   // Compute hour boundaries for ruler
   const firstHour = parseInt(slots[0].startTime.split(":")[0], 10)

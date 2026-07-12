@@ -3,7 +3,7 @@
 import { useState, Suspense } from "react"
 import { useTranslation } from "@/lib/i18n/context"
 import { useRouter, useSearchParams } from "next/navigation"
-import { LogIn, ArrowRight, UserCircle, Briefcase, Lock, Mail, Loader2, Sparkles, ArrowLeft, Shield } from "lucide-react"
+import { ArrowRight, Lock, Mail, Loader2, ArrowLeft } from "lucide-react"
 import Link from "next/link"
 import Image from "next/image"
 import { createClient } from "@/utils/supabase/client"
@@ -19,7 +19,6 @@ function LoginForm() {
   
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
-  const [role, setRole] = useState<"customer" | "supplier" | "admin">("customer")
   const [isLoading, setIsLoading] = useState(false)
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -69,35 +68,19 @@ function LoginForm() {
           .eq("id", data.user?.id || "")
           .single()
         
-        if (profileData?.role) {
-          actualRole = profileData.role as any
+        if (profileErr || !profileData?.role || !["customer", "supplier", "admin"].includes(profileData.role)) {
+          throw new Error("ROLE_VALIDATION_FAILED")
         }
-      } catch (profileErr) {
-        // Keep default "customer" role if profile query fails
-      }
-
-      // 2. Strict Role Enforcement (Two-Way Checks)
-      if (role === "admin" && actualRole !== "admin") {
-        toast.error(locale === "vi" 
-          ? "Tài khoản của bạn không có quyền truy cập trang quản trị." 
-          : "Your account does not have admin access privileges."
-        )
+        actualRole = profileData.role as "customer" | "supplier" | "admin"
+      } catch {
         await supabase.auth.signOut()
+        toast.error(locale === "vi" ? "Không thể xác định quyền tài khoản. Vui lòng thử lại." : "Could not verify your account role. Please try again.")
         setIsLoading(false)
         return
       }
 
-      if (role === "supplier") {
-        if (actualRole !== "supplier") {
-          toast.error(locale === "vi"
-            ? "Tài khoản này không phải là tài khoản Đối tác."
-            : "This account is not a Partner account."
-          )
-          await supabase.auth.signOut()
-          setIsLoading(false)
-          return
-        }
-
+      // Supplier accounts must also have an active, approved supplier membership.
+      if (actualRole === "supplier") {
         // Additional Partner application status check
         try {
           const { data: memberData } = await supabase
@@ -107,7 +90,7 @@ function LoginForm() {
             .eq("is_active", true)
           
           if (memberData && memberData.length > 0) {
-            const supplier = (memberData[0] as any).suppliers
+            const supplier = (memberData[0] as unknown as { suppliers: { status?: string } | null }).suppliers
             const status = supplier?.status
 
             if (status === "pending") {
@@ -136,23 +119,12 @@ function LoginForm() {
             setIsLoading(false)
             return
           }
-        } catch (checkErr) {
-          // Allow login if verification throws unexpected DB errors
+        } catch {
+          await supabase.auth.signOut()
+          toast.error(locale === "vi" ? "Không thể xác minh trạng thái đối tác. Vui lòng thử lại." : "Could not verify partner status. Please try again.")
+          setIsLoading(false)
+          return
         }
-      }
-
-      if (role === "customer" && actualRole !== "customer") {
-        toast.error(locale === "vi"
-          ? `Tài khoản này là tài khoản ${actualRole === "admin" ? "Quản trị" : "Đối tác"}. Vui lòng chọn đúng vai trò để đăng nhập.`
-          : `This account is a ${actualRole === "admin" ? "Admin" : "Partner"} account. Please select the correct role to log in.`
-        )
-        await supabase.auth.signOut()
-        setIsLoading(false)
-        return
-      }
-
-      if (typeof window !== "undefined") {
-        localStorage.removeItem("dinomad_demo_admin")
       }
 
       toast.success(locale === "vi" ? "Đăng nhập thành công!" : "Logged in successfully!")
@@ -160,32 +132,32 @@ function LoginForm() {
       router.refresh()
       
       setTimeout(() => {
-        let targetRedirect = searchParams.get("redirect_to")
-        
-        if (!targetRedirect || targetRedirect === `/${locale}` || targetRedirect === "/") {
-          if (actualRole === "admin") {
-            targetRedirect = `/${locale}/admin`
-          } else if (actualRole === "supplier") {
-            targetRedirect = `/${locale}/partner`
-          } else {
-            targetRedirect = `/${locale}`
-          }
-        }
+        const roleHome = actualRole === "admin"
+          ? `/${locale}/admin`
+          : actualRole === "supplier" ? `/${locale}/partner` : `/${locale}`
+        const requestedRedirect = searchParams.get("redirect_to")
+        const canUseRequestedRedirect = requestedRedirect?.startsWith(`/${locale}/admin`)
+          ? actualRole === "admin"
+          : requestedRedirect?.startsWith(`/${locale}/partner`)
+            ? actualRole === "supplier" || actualRole === "admin"
+            : Boolean(requestedRedirect?.startsWith(`/${locale}`))
+        const targetRedirect = canUseRequestedRedirect ? requestedRedirect! : roleHome
 
         router.push(targetRedirect)
       }, 800)
       
-    } catch (err: any) {
-      if (err?.message === "Failed to fetch") {
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : ""
+      if (message === "Failed to fetch") {
         toast.error(locale === "vi" ? "Không thể kết nối đến máy chủ. Vui lòng thử lại sau." : "Cannot connect to server. Please try again.")
       } else {
-        toast.error(locale === "vi" ? "Đăng nhập thất bại. Vui lòng thử lại." : err?.message)
+        toast.error(locale === "vi" ? "Đăng nhập thất bại. Vui lòng thử lại." : message || "Login failed")
       }
       setIsLoading(false)
     }
   }
 
-  const handleOAuthLogin = async (provider: "google" | "facebook") => {
+  const handleOAuthLogin = async () => {
     setIsLoading(true)
     try {
       const supabase = createClient()
@@ -194,7 +166,7 @@ function LoginForm() {
       callbackUrl.searchParams.set("mode", "login")
       
       const { error } = await supabase.auth.signInWithOAuth({
-        provider,
+        provider: "google",
         options: {
           redirectTo: callbackUrl.toString(),
         }
@@ -203,8 +175,9 @@ function LoginForm() {
         toast.error(error.message)
         setIsLoading(false)
       }
-    } catch (err: any) {
-      if (err?.message === "Failed to fetch") {
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : ""
+      if (message === "Failed to fetch") {
         toast.error(locale === "vi" ? "Không thể kết nối đến máy chủ. Vui lòng thử lại sau." : "Cannot connect to server. Please try again.")
       } else {
         toast.error(locale === "vi" ? "Đăng nhập thất bại!" : "OAuth login failed!")
@@ -228,46 +201,6 @@ function LoginForm() {
         <p className="text-sm text-muted-foreground">
           {locale === "vi" ? "Đăng nhập vào tài khoản của bạn" : "Sign in to your account"}
         </p>
-      </div>
-
-      {/* Role Selection Toggle */}
-      <div className="grid grid-cols-3 gap-2 mb-6 bg-muted/50 p-1 rounded-xl border border-border/40">
-        <button
-          type="button"
-          onClick={() => setRole("customer")}
-          className={`flex items-center justify-center gap-1 py-2 px-2 rounded-lg text-xs font-semibold transition-all ${
-            role === "customer"
-              ? "bg-card text-foreground shadow-sm border border-border/20 scale-[1.01]"
-              : "text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          <UserCircle className="h-3.5 w-3.5" />
-          <span>{t("auth.customer").split(" ")[0]}</span>
-        </button>
-        <button
-          type="button"
-          onClick={() => setRole("supplier")}
-          className={`flex items-center justify-center gap-1 py-2 px-2 rounded-lg text-xs font-semibold transition-all ${
-            role === "supplier"
-              ? "bg-card text-foreground shadow-sm border border-border/20 scale-[1.01]"
-              : "text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          <Briefcase className="h-3.5 w-3.5" />
-          <span>{t("auth.partner").split(" ")[0]}</span>
-        </button>
-        <button
-          type="button"
-          onClick={() => setRole("admin")}
-          className={`flex items-center justify-center gap-1 py-2 px-2 rounded-lg text-xs font-semibold transition-all ${
-            role === "admin"
-              ? "bg-card text-foreground shadow-sm border border-border/20 scale-[1.01]"
-              : "text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          <Shield className="h-3.5 w-3.5" />
-          <span>{t("auth.admin").split(" ")[0]}</span>
-        </button>
       </div>
 
       <form onSubmit={handleLogin} className="flex flex-col gap-5">
@@ -341,11 +274,11 @@ function LoginForm() {
       </div>
 
       {/* Social Logins */}
-      <div className="grid grid-cols-2 gap-3 mt-1">
+      <div className="mt-1">
         <Button
           type="button"
           variant="outline"
-          onClick={() => handleOAuthLogin("google")}
+          onClick={handleOAuthLogin}
           disabled={isLoading}
           className="h-10 rounded-xl hover:bg-muted font-bold text-xs flex items-center justify-center gap-2 border-border/80 cursor-pointer transition-all duration-200"
         >
@@ -368,18 +301,6 @@ function LoginForm() {
             />
           </svg>
           <span>Google</span>
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() => handleOAuthLogin("facebook")}
-          disabled={isLoading}
-          className="h-10 rounded-xl hover:bg-muted font-bold text-xs flex items-center justify-center gap-2 border-border/80 cursor-pointer transition-all duration-200"
-        >
-          <svg className="h-4.5 w-4.5 shrink-0 fill-[#1877F2]" viewBox="0 0 24 24">
-            <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
-          </svg>
-          <span>Facebook</span>
         </Button>
       </div>
 

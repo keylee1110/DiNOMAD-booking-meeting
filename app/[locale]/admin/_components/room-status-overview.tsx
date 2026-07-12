@@ -1,6 +1,12 @@
-import { rooms } from "@/lib/data/rooms"
+"use client"
+
+import { useEffect, useState } from "react"
+import { getAdminRooms } from "@/lib/api/admin"
+import type { AdminRoom } from "@/lib/types"
 
 export function RoomStatusOverview() {
+  const [rooms, setRooms] = useState<AdminRoom[]>([])
+  useEffect(() => { getAdminRooms().then(setRooms).catch(() => setRooms([])) }, [])
   return (
     <div className="px-5 py-4 border-t border-border">
       <h3 className="text-sm font-semibold text-foreground mb-3">Room Status Today</h3>
@@ -12,14 +18,10 @@ export function RoomStatusOverview() {
             </span>
             <span 
               className={`font-medium shrink-0 ${
-                room.slotsLeftToday > 3 
-                  ? "text-emerald-500" 
-                  : room.slotsLeftToday > 0 
-                  ? "text-amber-500" 
-                  : "text-red-500"
+                room.status === "published" ? "text-emerald-500" : "text-amber-500"
               }`}
             >
-              {room.slotsLeftToday} slots left
+              {room.status === "published" ? "Published" : "Unavailable"}
             </span>
           </div>
         ))}

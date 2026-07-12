@@ -38,6 +38,7 @@ export function TimeSlotPicker({ slots, selectedSlots, onToggleSlot, selectedDat
   const parsedDate = selectedDate ? new Date(selectedDate + "T00:00:00") : undefined
 
   const hasPastSlots = slots.some((s) => s.isPast)
+  const hasHeldSlots = slots.some((s) => s.status === "held")
 
   return (
     <div className="flex flex-col gap-6">
@@ -103,6 +104,12 @@ export function TimeSlotPicker({ slots, selectedSlots, onToggleSlot, selectedDat
                 {locale === "vi" ? "Đã qua" : "Past"}
               </span>
             )}
+            {hasHeldSlots && (
+              <span className="flex items-center gap-1.5">
+                <span className="inline-block h-3.5 w-3.5 rounded-full border border-amber-300 bg-amber-100" />
+                {locale === "vi" ? "Đang được giữ" : "Held by another user"}
+              </span>
+            )}
             <span className="flex items-center gap-1.5">
               <span className="inline-block h-3.5 w-3.5 rounded-full border border-border/40 bg-muted/60 opacity-60 relative after:content-[''] after:absolute after:inset-0 after:bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI4IiBoZWlnaHQ9IjgiPjxwYXRoIGQ9Ik0wLDggTDgsMCBaIiBzdHJva2U9IiNkMWQ1ZGIiIHN0cm9rZS13aWR0aD0iMC41IiBvcGFjaXR5PSIwLjMiLz48L3N2Zz4=')] after:bg-repeat" />
               {t("room.booked")}
@@ -118,7 +125,8 @@ export function TimeSlotPicker({ slots, selectedSlots, onToggleSlot, selectedDat
           {slots.map((slot) => {
             const isSelected = selectedSlots.some((s) => s.id === slot.id)
             const isPast = slot.isPast === true
-            const isBooked = !slot.available && !isPast
+            const isHeld = slot.status === "held"
+            const isBooked = !slot.available && !isPast && !isHeld
 
             return (
               <Button
@@ -127,13 +135,14 @@ export function TimeSlotPicker({ slots, selectedSlots, onToggleSlot, selectedDat
                 size="sm"
                 disabled={!slot.available}
                 onClick={() => slot.available && onToggleSlot(slot)}
-                title={isPast ? (locale === "vi" ? "Khung giờ đã qua" : "This time slot has passed") : undefined}
+                title={isPast ? (locale === "vi" ? "Khung giờ đã qua" : "This time slot has passed") : isHeld ? (locale === "vi" ? "Một khách khác đang giữ khung giờ này" : "Another customer is holding this slot") : undefined}
                 className={cn(
                   "h-12 px-2 py-2 text-sm font-semibold rounded-xl border transition-colors duration-150 flex flex-col gap-0.5",
                   // Past slot: muted style with clock icon feel
                   isPast && "cursor-not-allowed bg-muted/20 border-border/30 text-muted-foreground/40 opacity-50 shadow-none",
                   // Booked slot: cross-hatch pattern
                   isBooked && "cursor-not-allowed bg-muted/30 border-border/40 text-muted-foreground/60 opacity-50 relative after:content-[''] after:absolute after:inset-0 after:rounded-xl after:bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI4IiBoZWlnaHQ9IjgiPjxwYXRoIGQ9Ik0wLDggTDgsMCBaIiBzdHJva2U9IiNkMWQ1ZGIiIHN0cm9rZS13aWR0aD0iMC41IiBvcGFjaXR5PSIwLjMiLz48L3N2Zz4=')] after:bg-repeat shadow-none",
+                  isHeld && "cursor-not-allowed border-amber-300 bg-amber-50 text-amber-800 opacity-80 shadow-none",
                   // Available slot
                   slot.available && !isSelected && "border-border/60 bg-background text-foreground hover:border-primary/50 hover:bg-primary/5 shadow-sm active:scale-[0.98]",
                   // Selected slot
@@ -147,6 +156,11 @@ export function TimeSlotPicker({ slots, selectedSlots, onToggleSlot, selectedDat
                       <Clock className="h-2 w-2" />
                       {locale === "vi" ? "Đã qua" : "Past"}
                     </span>
+                  </>
+                ) : isHeld ? (
+                  <>
+                    <span className="text-[11px] leading-none">{formatTime(slot.startTime)}</span>
+                    <span className="text-[9px] leading-none font-bold">{locale === "vi" ? "ĐANG GIỮ" : "HELD"}</span>
                   </>
                 ) : (
                   formatTime(slot.startTime)
