@@ -257,11 +257,11 @@ const [isOpen, setIsOpen] = useState(false)
 
 ## Time Slot Rules
 
-Slots are always **30-minute increments** from **07:00 to 22:00**.
+Slots are always **1-hour increments** from **07:00 to 22:00** (changed from 30-min — see `SLOT_MINUTES` in `backend/src/modules/rooms/rooms.service.ts`).
 
 ```ts
 // Slot selection must be CONTINUOUS — no gap allowed between selected slots
-// ✅ Valid:   09:00 → 09:30 → 10:00 → 10:30  (contiguous block)
+// ✅ Valid:   09:00 → 10:00 → 11:00  (contiguous block)
 // ❌ Invalid: 09:00 selected, then 11:00 selected (gap in between)
 ```
 

@@ -210,7 +210,9 @@
     "room": "Room",
     "venue": "Venue",
     "dateTime": "Date & Time",
-    "copied": "Copied!"
+    "copied": "Copied!",
+    "notAvailablePending": "This booking hasn't been paid yet, so there's no check-in code.",
+    "notAvailableCancelled": "This booking was cancelled, so the check-in code is no longer available."
   },
   "partner": {
     "dashboard": "Dashboard",
@@ -270,6 +272,9 @@
     "cameraComingSoon": "Camera (Coming Soon)",
     "scannerTitle": "Check-in Verification",
     "scannerSubtitle": "Verify guest bookings using Booking ID and Access Code.",
+    "scannerPermissionDenied": "Please allow camera access to scan QR codes.",
+    "scannerNoCamera": "No suitable camera found on this device. Please enter the code manually.",
+    "scannerStartFailed": "Could not start the camera. Please enter the code manually.",
     "roomStatusBusy": "Busy",
     "roomStatusAvailable": "Available",
     "roomBlockReason": "Reason for Blocking",

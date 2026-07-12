@@ -119,9 +119,30 @@ export default function CheckoutSuccessPage({
     router.push(`/${locale}`)
   }
 
+  // The check-in QR/access code must never be shown for a booking that isn't
+  // actually confirmed — pending (unpaid) and cancelled bookings have no valid
+  // access, regardless of how this page was reached (link, direct URL, etc).
+  if (confirmedBooking.status === "pending" || confirmedBooking.status === "cancelled") {
+    return (
+      <div className="mx-auto max-w-lg px-4 py-16 text-center">
+        <p className="text-base font-semibold text-foreground">
+          {confirmedBooking.status === "cancelled"
+            ? t("confirmation.notAvailableCancelled")
+            : t("confirmation.notAvailablePending")}
+        </p>
+        <button
+          onClick={handleBackHome}
+          className="mt-6 text-sm font-medium text-primary hover:underline"
+        >
+          {t("confirmation.backHome")}
+        </button>
+      </div>
+    )
+  }
+
   return (
     <div className="mx-auto max-w-4xl px-4 py-8">
-      <ConfirmationView 
+      <ConfirmationView
         booking={confirmedBooking}
         room={room}
         onBackHome={handleBackHome}
