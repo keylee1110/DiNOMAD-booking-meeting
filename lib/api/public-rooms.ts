@@ -14,9 +14,9 @@ interface ApiSlot {
 }
 
 const PUBLIC_ROOM_SELECT = `
-  id, venue_id, name, description, capacity, price_per_hour,
-  category, verified, noise_level, specs,
-  venues!inner(name, address, district, lat, lng, status),
+  id, venue_id, name, name_vi, description, description_vi, capacity, price_per_hour,
+  category, verified, noise_level, specs, specs_vi,
+  venues!inner(name, name_vi, address, address_vi, district, lat, lng, status),
   room_amenities(amenity),
   room_vibe_tags(vibe_tag),
   room_images(image_url, sort_order),
@@ -48,6 +48,17 @@ export async function getPublicRooms(): Promise<Room[]> {
   cachedRooms = rooms
   cacheTimestamp = now
   return rooms
+}
+
+export async function getPublicRoomSlots(roomId: string, date: string) {
+  const base = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:4000/api"
+  const response = await fetch(`${base}/rooms/${roomId}/slots?date=${encodeURIComponent(date)}`)
+  if (!response.ok) throw new Error(`Could not load availability (${response.status})`)
+  const json = await response.json()
+  return (json.data ?? json) as Array<{
+    id: string; startTime: string; endTime: string; available: boolean
+    status: "available" | "held" | "booked" | "blocked"; heldUntil: string | null; price: number
+  }>
 }
 
 /** Optimized query for landing page: fetches fewer rooms with same joins */

@@ -33,6 +33,43 @@ export class RoomsService {
     private readonly venuesService: VenuesService,
   ) {}
 
+  async findAllForAdmin() {
+    const { data, error } = await this.supabase.admin
+      .from("rooms")
+      .select("*, venues(name, address, district, lat, lng), room_amenities(amenity), room_vibe_tags(vibe_tag), room_images(image_url, sort_order)")
+      .neq("status", "archived")
+      .order("created_at", { ascending: false })
+    if (error) throw new Error(error.message)
+
+    return (data ?? []).map((room: any) => ({
+      ...this.venuesService.toRoomResponse(room),
+      venueName: room.venues?.name ?? "Venue",
+      address: room.venues?.address ?? "",
+      district: room.venues?.district ?? "",
+      lat: room.venues?.lat ?? 0,
+      lng: room.venues?.lng ?? 0,
+      images: (room.room_images ?? []).sort((a: any, b: any) => a.sort_order - b.sort_order).map((image: any) => image.image_url),
+      rating: 0,
+      reviewCount: 0,
+      slotsLeftToday: 0,
+      status: room.status,
+    }))
+  }
+
+  async updateStatusForAdmin(roomId: string, dto: UpdateRoomStatusDto) {
+    const { data, error } = await this.supabase.admin.from("rooms")
+      .update({ status: dto.status }).eq("id", roomId)
+      .select("*, venues(name, address, district, lat, lng), room_amenities(amenity), room_vibe_tags(vibe_tag)").single()
+    if (error || !data) throw new NotFoundException("Room not found")
+    return { ...this.venuesService.toRoomResponse(data), status: data.status }
+  }
+
+  async archiveForAdmin(roomId: string) {
+    const { error } = await this.supabase.admin.from("rooms").update({ status: "archived" }).eq("id", roomId)
+    if (error) throw new Error(error.message)
+    return { success: true }
+  }
+
   private async verifyRoomOwnership(roomId: string, userId: string): Promise<RoomRow> {
     const { data: room, error } = await this.supabase.admin
       .from("rooms")

@@ -88,6 +88,25 @@ export interface TimeSlot {
   available: boolean
   price: number
   isPast?: boolean
+  status?: "available" | "held" | "booked" | "occupied" | "blocked"
+  heldUntil?: string | null
+}
+
+export interface AdminBooking {
+  id: string
+  bookingCode: string
+  customerName: string
+  roomName: string
+  venueName: string
+  bookingDate: string
+  startTime: string
+  endTime: string
+  total: number
+  status: BookingStatus | "no_show"
+}
+
+export interface AdminRoom extends Room {
+  status: "published" | "unavailable" | "archived"
 }
 
 export interface Booking {

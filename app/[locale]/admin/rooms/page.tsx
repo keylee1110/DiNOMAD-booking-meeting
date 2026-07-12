@@ -1,10 +1,37 @@
-import { rooms } from "@/lib/data/rooms"
-import { CheckCircle2, XCircle, Search, Plus, Star, Users } from "lucide-react"
+"use client"
+
+import { useEffect, useMemo, useState } from "react"
+import { getAdminRooms, archiveAdminRoom, setAdminRoomStatus } from "@/lib/api/admin"
+import type { AdminRoom } from "@/lib/types"
+import { CheckCircle2, XCircle, Search, Star, Users, Loader2 } from "lucide-react"
 
 export default function AdminRoomsPage() {
+  const [rooms, setRooms] = useState<AdminRoom[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState("")
+  const [search, setSearch] = useState("")
+  const [district, setDistrict] = useState("")
+  const [status, setStatus] = useState("")
+  useEffect(() => { getAdminRooms().then(setRooms).catch((e) => setError(e.message)).finally(() => setLoading(false)) }, [])
+  const filteredRooms = useMemo(() => rooms.filter((room) =>
+    (!search || `${room.name} ${room.venueName}`.toLowerCase().includes(search.toLowerCase())) &&
+    (!district || room.district === district) && (!status || room.status === status)
+  ), [rooms, search, district, status])
   const totalRooms = rooms.length
-  const verifiedRooms = rooms.filter((r) => r.verified).length
-  const pendingRooms = totalRooms - verifiedRooms
+  const verifiedRooms = rooms.filter((r) => r.status === "published").length
+  const pendingRooms = rooms.filter((r) => r.status === "unavailable").length
+
+  const togglePublished = async (room: AdminRoom) => {
+    try {
+      const updated = await setAdminRoomStatus(room.id, room.status === "published" ? "unavailable" : "published")
+      setRooms((current) => current.map((item) => item.id === room.id ? { ...item, ...updated } : item))
+    } catch (e) { setError(e instanceof Error ? e.message : String(e)) }
+  }
+  const remove = async (room: AdminRoom) => {
+    if (!window.confirm(`Archive ${room.name}?`)) return
+    try { await archiveAdminRoom(room.id); setRooms((current) => current.filter((item) => item.id !== room.id)) }
+    catch (e) { setError(e instanceof Error ? e.message : String(e)) }
+  }
 
   return (
     <div className="space-y-6">
@@ -16,10 +43,6 @@ export default function AdminRoomsPage() {
             {totalRooms} rooms across {new Set(rooms.map((r) => r.venueId)).size} venues
           </p>
         </div>
-        <button className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground text-sm font-medium rounded-md hover:opacity-90 transition-opacity shrink-0">
-          <Plus className="w-4 h-4" />
-          Add Room
-        </button>
       </div>
 
       {/* Quick Stats */}
@@ -44,20 +67,22 @@ export default function AdminRoomsPage() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <input
             type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
             placeholder="Search rooms by name or venue..."
             className="w-full pl-9 pr-4 py-2 text-sm bg-muted border border-border rounded-md outline-none focus:ring-2 focus:ring-ring text-foreground placeholder:text-muted-foreground"
           />
         </div>
-        <select className="text-sm bg-muted border border-border rounded-md px-3 py-2 text-foreground outline-none focus:ring-2 focus:ring-ring w-full sm:w-auto">
+        <select value={district} onChange={(e) => setDistrict(e.target.value)} className="text-sm bg-muted border border-border rounded-md px-3 py-2 text-foreground outline-none focus:ring-2 focus:ring-ring w-full sm:w-auto">
           <option value="">All Districts</option>
           {[...new Set(rooms.map((r) => r.district))].map((d) => (
             <option key={d} value={d}>{d}</option>
           ))}
         </select>
-        <select className="text-sm bg-muted border border-border rounded-md px-3 py-2 text-foreground outline-none focus:ring-2 focus:ring-ring w-full sm:w-auto">
+        <select value={status} onChange={(e) => setStatus(e.target.value)} className="text-sm bg-muted border border-border rounded-md px-3 py-2 text-foreground outline-none focus:ring-2 focus:ring-ring w-full sm:w-auto">
           <option value="">All Status</option>
-          <option value="verified">Verified</option>
-          <option value="pending">Pending</option>
+          <option value="published">Published</option>
+          <option value="unavailable">Unavailable</option>
         </select>
       </div>
 
@@ -77,8 +102,11 @@ export default function AdminRoomsPage() {
               </tr>
             </thead>
             <tbody>
-              {rooms.map((room, i) => (
-                <tr key={room.id} className={i < rooms.length - 1 ? "border-b border-border hover:bg-muted/30 transition-colors" : "hover:bg-muted/30 transition-colors"}>
+              {loading && <tr><td colSpan={7} className="py-12 text-center"><Loader2 className="mx-auto h-5 w-5 animate-spin" /></td></tr>}
+              {!loading && error && <tr><td colSpan={7} className="py-12 text-center text-destructive">{error}</td></tr>}
+              {!loading && !error && filteredRooms.length === 0 && <tr><td colSpan={7} className="py-12 text-center text-muted-foreground">No rooms found</td></tr>}
+              {filteredRooms.map((room, i) => (
+                <tr key={room.id} className={i < filteredRooms.length - 1 ? "border-b border-border hover:bg-muted/30 transition-colors" : "hover:bg-muted/30 transition-colors"}>
                   <td className="px-5 py-4">
                     <div className="font-medium text-foreground">{room.name}</div>
                     <div className="text-xs text-muted-foreground mt-0.5">{room.venueName}</div>
@@ -101,7 +129,7 @@ export default function AdminRoomsPage() {
                     </span>
                   </td>
                   <td className="px-5 py-4">
-                    {room.verified ? (
+                    {room.status === "published" ? (
                       <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full text-emerald-600 bg-emerald-50 dark:bg-emerald-500/10 dark:text-emerald-400">
                         <CheckCircle2 className="w-3 h-3" />
                         Verified
@@ -115,9 +143,9 @@ export default function AdminRoomsPage() {
                   </td>
                   <td className="px-5 py-4">
                     <div className="flex items-center gap-2">
-                      <button className="text-xs font-medium text-primary hover:underline">Edit</button>
+                      <button onClick={() => togglePublished(room)} className="text-xs font-medium text-primary hover:underline">{room.status === "published" ? "Unpublish" : "Publish"}</button>
                       <span className="text-border">·</span>
-                      <button className="text-xs font-medium text-destructive-foreground hover:underline">Remove</button>
+                      <button onClick={() => remove(room)} className="text-xs font-medium text-destructive hover:underline">Archive</button>
                     </div>
                   </td>
                 </tr>

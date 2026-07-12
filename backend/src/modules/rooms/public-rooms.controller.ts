@@ -38,6 +38,11 @@ export class PublicRoomsController {
     })
   }
 
+  @Get(":id/slots")
+  getSlots(@Param("id") id: string, @Query("date") date?: string) {
+    return this.publicRoomsService.getSlots(id, date ?? new Date().toISOString().slice(0, 10))
+  }
+
   @Get(":id")
   getById(@Param("id") id: string) {
     return this.publicRoomsService.getById(id)
