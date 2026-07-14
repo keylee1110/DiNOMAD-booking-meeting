@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect, useCallback, useRef } from "react"
 import { useTranslation } from "@/lib/i18n/context"
 import {
   TrendingUp, AlertCircle, Check, QrCode, Search, Activity, ArrowRight,
-  ArrowUpRight, BarChart3, Clock, ArrowDownRight, Zap, CalendarCheck,
+  ArrowUpRight, BarChart3, Clock, ArrowDownRight, CalendarCheck,
   UserCheck, RefreshCw, Loader2,
 } from "lucide-react"
 import Link from "next/link"
@@ -87,41 +87,49 @@ export default function PartnerDashboard() {
     ? ["T2", "T3", "T4", "T5", "T6", "T7", "CN"]
     : ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 
+  // Real day-over-day revenue trend from the chart data — no fabricated percentages
+  const revenueTrend = useMemo(() => {
+    if (revenueChart.length < 2) return null
+    const today = revenueChart[revenueChart.length - 1].revenue
+    const prev = revenueChart[revenueChart.length - 2].revenue
+    if (prev <= 0) return null
+    const pct = Math.round(((today - prev) / prev) * 100)
+    return {
+      label: `${pct >= 0 ? "+" : ""}${pct}%`,
+      status: (pct > 0 ? "up" : pct < 0 ? "down" : "neutral") as MetricStatus,
+    }
+  }, [revenueChart])
+
   const metricCards = useMemo(() => [
     {
       label: t("partner.checkInsToday"),
       value: loading ? "—" : metrics.checkInsToday.toString(),
       sparkData: revenueLast7, // reuse revenue trend as proxy for activity
-      trend: "+0%",
+      trend: null as string | null,
       status: "neutral" as MetricStatus,
     },
     {
       label: t("partner.bookingsToday"),
       value: loading ? "—" : metrics.bookingsToday.toString(),
       sparkData: revenueLast7,
-      trend: "+0%",
+      trend: null as string | null,
       status: "neutral" as MetricStatus,
     },
     {
       label: t("partner.revenueToday"),
       value: loading ? "—" : (metrics.revenueToday > 0 ? formatVND(metrics.revenueToday) : "0 ₫"),
       sparkData: revenueLast7,
-      trend: "+12%",
-      status: "up" as MetricStatus,
+      trend: revenueTrend?.label ?? null,
+      status: revenueTrend?.status ?? ("neutral" as MetricStatus),
     },
     {
       label: t("partner.activeWalkIns"),
       value: loading ? "—" : metrics.activeWalkIns.toString(),
       sparkData: [],
-      trend: "0%",
+      trend: null as string | null,
       status: "neutral" as MetricStatus,
     },
-  ], [loading, metrics, revenueLast7, t])
-
-  const actionItems = [
-    { id: "A1", title: t("partner.actionPendingApproval"), desc: t("partner.actionPendingApprovalDesc"), urgency: "high", action: t("partner.actionReview") },
-    { id: "A2", title: t("partner.actionRoomCleaning"), desc: t("partner.actionRoomCleaningDesc"), urgency: "medium", action: t("partner.actionMarkClean") },
-  ]
+  ], [loading, metrics, revenueLast7, revenueTrend, t])
 
   const feedIcon = (type: DashboardActivityItem["type"]) => {
     if (type === "check-in") return <ArrowRight className="h-4 w-4 text-[#84cc16]" />
@@ -206,14 +214,16 @@ export default function PartnerDashboard() {
             <span className="text-xs font-semibold text-muted-foreground tracking-tight mb-2.5">{m.label}</span>
             <span className="text-2xl md:text-3xl font-bold tracking-tight text-foreground">{m.value}</span>
             <div className="flex items-center justify-between mt-4">
-              <div className={`flex items-center gap-1.5 text-[10px] md:text-xs font-semibold self-start px-2.5 py-1 rounded-full border ${
-                m.status === "up" ? "text-green-700 bg-green-500/10 border-green-500/20" :
-                m.status === "down" ? "text-red-700 bg-red-500/10 border-red-500/20" :
-                "text-muted-foreground bg-muted border-border/40"
-              }`}>
-                {m.status === "up" ? <ArrowUpRight className="h-3.5 w-3.5" /> : m.status === "down" ? <ArrowDownRight className="h-3.5 w-3.5" /> : <TrendingUp className="h-3.5 w-3.5 opacity-50" />}
-                {m.trend}
-              </div>
+              {m.trend !== null ? (
+                <div className={`flex items-center gap-1.5 text-[10px] md:text-xs font-semibold self-start px-2.5 py-1 rounded-full border ${
+                  m.status === "up" ? "text-green-700 bg-green-500/10 border-green-500/20" :
+                  m.status === "down" ? "text-red-700 bg-red-500/10 border-red-500/20" :
+                  "text-muted-foreground bg-muted border-border/40"
+                }`}>
+                  {m.status === "up" ? <ArrowUpRight className="h-3.5 w-3.5" /> : m.status === "down" ? <ArrowDownRight className="h-3.5 w-3.5" /> : <TrendingUp className="h-3.5 w-3.5 opacity-50" />}
+                  {m.trend}
+                </div>
+              ) : <span />}
               {m.sparkData.length >= 2 && (
                 <Sparkline
                   data={m.sparkData}
@@ -229,45 +239,6 @@ export default function PartnerDashboard() {
 
         {/* Main column (2/3) */}
         <div className="lg:col-span-2 flex flex-col gap-8">
-
-          {/* Requires Action */}
-          <div className="rounded-2xl border border-border/50 bg-card p-6 md:p-8 shadow-[0_8px_30px_rgb(0,0,0,0.02)] flex flex-col gap-6">
-            <h2 className="text-lg md:text-xl font-semibold tracking-tight flex items-center gap-3 border-b border-border/50 pb-4 text-foreground">
-              <Zap className="h-5 w-5 text-orange-500 fill-orange-500" /> {t("partner.requiresAction")}
-              {actionItems.filter(a => a.urgency === "high").length > 0 && (
-                <span className="ml-auto flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white animate-bounce">
-                  {actionItems.filter(a => a.urgency === "high").length}
-                </span>
-              )}
-            </h2>
-            <div className="flex flex-col gap-4">
-              {actionItems.map(action => (
-                <div
-                  key={action.id}
-                  className={`flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 md:p-5 rounded-xl border transition-all duration-200 ${
-                    action.urgency === "high"
-                      ? "border-red-100 bg-red-50/50 hover:bg-red-50"
-                      : "border-border/60 bg-background/50 hover:bg-muted/30"
-                  }`}
-                >
-                  <div className="flex flex-col gap-1.5">
-                    <span className="font-semibold text-sm md:text-base flex items-center gap-2 text-foreground">
-                      {action.urgency === "high" && <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />}
-                      {action.title}
-                    </span>
-                    <span className="text-xs text-muted-foreground font-medium">{action.desc}</span>
-                  </div>
-                  <Button
-                    size="sm"
-                    variant={action.urgency === "high" ? "destructive" : "default"}
-                    className="rounded-xl px-5 font-semibold text-xs shadow-sm w-full sm:w-auto"
-                  >
-                    {action.action}
-                  </Button>
-                </div>
-              ))}
-            </div>
-          </div>
 
           {/* Pending Check-ins */}
           <div className="rounded-2xl border border-border/50 bg-card p-6 md:p-8 shadow-[0_8px_30px_rgb(0,0,0,0.02)] flex flex-col gap-6">

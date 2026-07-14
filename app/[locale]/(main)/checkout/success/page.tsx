@@ -22,46 +22,52 @@ export default function CheckoutSuccessPage({
   const { id } = use(searchParams)
   const { t } = useTranslation()
   const router = useRouter()
-  const { state, dispatch, myBookings } = useBooking()
+  const { state, dispatch, myBookings, bookingsLoaded } = useBooking()
 
   const [room, setRoom] = useState<Room | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
+  const [roomLoadDone, setRoomLoadDone] = useState(false)
 
   // Load from state or query parameter
   const confirmedBooking = id ? myBookings.find(b => b.id === id) : state.confirmedBooking
 
+  // When opened via ?id= (from my-bookings, a shared link, or a reload), the
+  // bookings list loads asynchronously — don't treat "not found yet" as
+  // "doesn't exist" or the user gets bounced to the homepage.
+  const waitingForBookings = Boolean(id) && !bookingsLoaded && !confirmedBooking
+
+  // Derived, so the redirect effect below can never observe a stale value
+  // between "booking found" and "room fetch started".
+  const isLoading = waitingForBookings || (Boolean(confirmedBooking) && !roomLoadDone)
+
   useEffect(() => {
+    let cancelled = false
     async function loadRoom() {
-      if (!confirmedBooking) {
-        setIsLoading(false)
-        return
-      }
-
-
+      if (!confirmedBooking) return
 
       // Try state selection if matches
       if (state.selectedRoom && state.selectedRoom.id === confirmedBooking.roomId) {
         setRoom(state.selectedRoom)
-        setIsLoading(false)
+        setRoomLoadDone(true)
         return
       }
 
       // Fallback: Fetch from database
       try {
         const dbRoom = await getPublicRoomById(confirmedBooking.roomId)
-        setRoom(dbRoom)
+        if (!cancelled) setRoom(dbRoom)
       } catch (error) {
         console.error("Failed to load room from database:", error)
       } finally {
-        setIsLoading(false)
+        if (!cancelled) setRoomLoadDone(true)
       }
     }
 
     loadRoom()
+    return () => { cancelled = true }
   }, [confirmedBooking, state.selectedRoom])
 
   useEffect(() => {
-    if (isLoading) return
+    if (isLoading || waitingForBookings) return
 
     // If no booking data is found in store, redirect to home.
     if (!confirmedBooking || !room) {
@@ -97,9 +103,9 @@ export default function CheckoutSuccessPage({
 
       return () => clearInterval(interval);
     }
-  }, [confirmedBooking, room, isLoading, router, locale, id])
+  }, [confirmedBooking, room, isLoading, waitingForBookings, router, locale, id])
 
-  if (isLoading) {
+  if (isLoading || waitingForBookings) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[50vh] gap-4">
         <div className="h-10 w-10 animate-spin rounded-full border-4 border-primary border-t-transparent" />

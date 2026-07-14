@@ -6,7 +6,7 @@ import { Separator } from "@/components/ui/separator"
 import { Button } from "@/components/ui/button"
 import { QrCode as DinomadQrCode } from "@/components/qr-code"
 import { Users, QrCode as QrCodeIcon, CheckCircle2 } from "lucide-react"
-import { formatVND, formatDate } from "@/lib/format"
+import { formatVND, formatDate, formatDistrict } from "@/lib/format"
 import { formatTime } from "@/lib/data/time-slots"
 import type { Booking, Room } from "@/lib/types"
 
@@ -63,7 +63,7 @@ export function ConfirmationView({
                     <span className="text-sm text-muted-foreground">{t("confirmation.venue")}</span>
                     <span className="font-medium">
                       {booking.venueName}
-                      <span className="text-xs text-muted-foreground"> ({room.district})</span>
+                      <span className="text-xs text-muted-foreground"> ({formatDistrict(room.district, locale)})</span>
                     </span>
                   </div>
                   <div className="flex items-start justify-between gap-4">
