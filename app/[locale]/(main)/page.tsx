@@ -81,7 +81,7 @@ export default function LandingPage() {
                 { icon: ShieldCheck, title: locale === "vi" ? "Bảo mật Đặt cọc" : "Safe Deposits", desc: locale === "vi" ? "Chính sách cọc 20% linh hoạt" : "Flexible 20% booking locks" },
                 { icon: Zap, title: locale === "vi" ? "Check-in Tức thì" : "Instant Check-in", desc: locale === "vi" ? "Mã QR mở cửa trong 2 giây" : "Get in with a quick scan" },
                 { icon: Building, title: locale === "vi" ? "Không gian Đa dạng" : "Diverse Spaces", desc: locale === "vi" ? "Solo Nooks & Phòng họp lớn" : "For focused work & teams" },
-                { icon: Award, title: locale === "vi" ? "Không phí dịch vụ" : "Zero Hidden Fees", desc: locale === "vi" ? "Cam kết giá gốc tốt nhất" : "Best rates directly guaranteed" },
+                { icon: Award, title: locale === "vi" ? "Không phí ẩn" : "Zero Hidden Fees", desc: locale === "vi" ? "Cam kết giá gốc tốt nhất" : "Best rates directly guaranteed" },
               ].map((f, i) => {
                 const Icon = f.icon
                 return (
@@ -486,7 +486,7 @@ export default function LandingPage() {
             <div className="flex flex-col items-center sm:items-start gap-0.5">
               <span className="text-xs font-semibold text-muted-foreground">{t("landing.ctaPartner")}</span>
               <button
-                onClick={() => router.push(`/${locale}/signup?role=supplier`)}
+                onClick={() => router.push(`/${locale}/become-partner`)}
                 className="text-sm font-bold text-primary hover:underline underline-offset-2 transition-all cursor-pointer"
               >
                 {t("landing.ctaPartnerLink")}

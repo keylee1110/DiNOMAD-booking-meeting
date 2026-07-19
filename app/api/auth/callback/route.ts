@@ -54,43 +54,7 @@ export async function GET(request: NextRequest) {
           .eq("id", user.id)
           .single()
 
-        let actualRole = profile?.role || "customer"
-
-        // If the user signed up as a supplier, and is registering
-        if (mode === "signup" && roleParam === "supplier") {
-          // Check if they are already linked to a supplier
-          const { data: memberData } = await supabase
-            .from("supplier_members")
-            .select("supplier_id")
-            .eq("user_id", user.id)
-
-          if (!memberData || memberData.length === 0) {
-            // Call the RPC to submit supplier application
-            const fullName = user.user_metadata?.full_name || user.email?.split("@")[0] || "New Partner"
-            const phone = user.user_metadata?.phone || ""
-            
-            const { error: rpcError } = await supabase.rpc("submit_supplier_application", {
-              legal_name: fullName,
-              display_name: `${fullName} Space`,
-              business_email: user.email || "",
-              business_phone: phone,
-              onboarding_note: "Auto-submitted during OAuth Partner registration"
-            })
-
-            if (rpcError) {
-              console.error("Partner creation RPC failed in OAuth callback:", rpcError)
-            }
-          }
-        }
-
-        // Fetch profile role again in case it changed
-        const { data: updatedProfile } = await supabase
-          .from("profiles")
-          .select("role")
-          .eq("id", user.id)
-          .single()
-
-        actualRole = updatedProfile?.role || actualRole
+        const actualRole = profile?.role || "customer"
 
         const roleHome = actualRole === "admin"
           ? `/${locale}/admin`
@@ -102,7 +66,9 @@ export async function GET(request: NextRequest) {
             : next.startsWith(`/${locale}`)
 
         if (mode === "signup" && roleParam === "supplier" && actualRole !== "supplier") {
-          targetRedirect = `/${locale}/profile?pending=true`
+          // Partners submit real business details on the application page —
+          // no auto-created placeholder application anymore.
+          targetRedirect = `/${locale}/become-partner`
         } else {
           targetRedirect = canUseRequestedRedirect ? next : roleHome
         }
