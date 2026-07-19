@@ -109,6 +109,19 @@ export interface AdminRoom extends Room {
   status: "published" | "unavailable" | "archived"
 }
 
+export interface AdminUser {
+  id: string
+  email: string
+  fullName: string | null
+  phone: string | null
+  avatarUrl: string | null
+  role: "customer" | "supplier" | "admin"
+  status: "active" | "blocked" | "deleted"
+  points: number | null
+  createdAt: string
+  bookingsCount: number
+}
+
 export interface Booking {
   id: string
   roomId: string
