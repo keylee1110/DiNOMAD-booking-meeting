@@ -1,0 +1,66 @@
+name: CI & Deploy backend to Render
+
+# Runs when a PR is merged into main (a merge is just a push to main).
+# Frontend deploys are handled by Vercel's own GitHub integration; this
+# workflow type-checks both packages and, if the checks pass and backend
+# files changed, triggers the Render deploy hook for the NestJS service.
+#
+# Requires one repository secret (Settings -> Secrets and variables -> Actions):
+#   RENDER_DEPLOY_HOOK_BACKEND    Deploy Hook URL of the NestJS service
+# and Auto-Deploy switched OFF on the Render service (otherwise every
+# merge deploys twice — once by Render's watcher, once by this workflow).
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: deploy-main
+  cancel-in-progress: false
+
+jobs:
+  changes:
+    name: Detect backend changes
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            backend:
+              - 'backend/**'
+              - 'pnpm-lock.yaml'
+              - 'pnpm-workspace.yaml'
+
+  checks:
+    name: Type-check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Type-check frontend
+        run: pnpm exec tsc --noEmit -p tsconfig.json
+      - name: Type-check backend
+        run: pnpm exec tsc --noEmit -p backend/tsconfig.json
+
+  deploy-backend:
+    name: Deploy backend to Render
+    needs: [changes, checks]
+    if: needs.changes.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Render deploy hook
+        run: |
+          curl --fail --silent --show-error --request POST "$DEPLOY_HOOK"
+        env:
+          DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_BACKEND }}
