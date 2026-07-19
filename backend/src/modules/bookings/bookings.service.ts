@@ -36,22 +36,28 @@ export class BookingsService {
   async findAllForAdmin() {
     const { data, error } = await this.supabase.admin
       .from("bookings")
-      .select("id, booking_code, booking_date, start_time, end_time, subtotal, platform_fee, status, profiles(full_name, email), rooms(name, venues(name))")
+      .select("id, booking_code, booking_date, start_time, end_time, subtotal, platform_fee, status, guest_name, profiles(full_name, email), rooms(name, venues(name))")
       .order("created_at", { ascending: false })
 
     if (error) throw new Error(error.message)
     return (data ?? []).map((booking: any) => ({
       id: booking.id,
       bookingCode: booking.booking_code ?? booking.id.slice(0, 8).toUpperCase(),
-      customerName: booking.profiles?.full_name ?? booking.profiles?.email ?? "Guest",
+      customerName: booking.profiles?.full_name ?? booking.profiles?.email ?? booking.guest_name ?? "Guest",
       roomName: booking.rooms?.name ?? "Room",
       venueName: booking.rooms?.venues?.name ?? "Venue",
       bookingDate: booking.booking_date,
-      startTime: String(booking.start_time).slice(0, 5),
-      endTime: String(booking.end_time).slice(0, 5),
+      startTime: this.formatVietnamTime(booking.start_time),
+      endTime: this.formatVietnamTime(booking.end_time),
       total: Number(booking.subtotal ?? 0) + Number(booking.platform_fee ?? 0),
       status: booking.status,
     }))
+  }
+
+  /** timestamptz → "HH:mm" in Vietnam time (UTC+7). */
+  private formatVietnamTime(timestamp: string): string {
+    const vn = new Date(new Date(timestamp).getTime() + 7 * 3600000)
+    return `${String(vn.getUTCHours()).padStart(2, "0")}:${String(vn.getUTCMinutes()).padStart(2, "0")}`
   }
 
   async cancelPending(bookingId: string, customerId: string) {

@@ -44,17 +44,35 @@ export class UsersService {
   }
 
   async findAll() {
-    const { data, error } = await this.supabase.admin
-      .from("profiles")
-      .select("*")
-      .order("created_at", { ascending: false })
-      .returns<ProfileRow[]>()
+    const [{ data, error }, { data: bookingRows, error: bookingsError }] = await Promise.all([
+      this.supabase.admin
+        .from("profiles")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .returns<ProfileRow[]>(),
+      this.supabase.admin
+        .from("bookings")
+        .select("customer_id")
+        .not("customer_id", "is", null)
+        .returns<{ customer_id: string }[]>(),
+    ])
 
     if (error) {
       throw new Error(error.message)
     }
+    if (bookingsError) {
+      throw new Error(bookingsError.message)
+    }
 
-    return data.map((profile) => this.toProfileResponse(profile))
+    const bookingCounts = new Map<string, number>()
+    for (const row of bookingRows ?? []) {
+      bookingCounts.set(row.customer_id, (bookingCounts.get(row.customer_id) ?? 0) + 1)
+    }
+
+    return data.map((profile) => ({
+      ...this.toProfileResponse(profile),
+      bookingsCount: bookingCounts.get(profile.id) ?? 0,
+    }))
   }
 
   private async findProfileById(userId: string) {

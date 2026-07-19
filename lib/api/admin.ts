@@ -1,5 +1,5 @@
 import { createClient } from "@/utils/supabase/client"
-import type { AdminBooking, AdminRoom, Supplier, SupplierStatus } from "@/lib/types"
+import type { AdminBooking, AdminRoom, AdminUser, Supplier, SupplierStatus } from "@/lib/types"
 
 const BASE = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:4000/api"
 
@@ -78,6 +78,7 @@ export async function rejectSupplier(id: string): Promise<Supplier> {
 }
 
 export const getAdminBookings = () => apiFetch<AdminBooking[]>("/bookings/admin/all")
+export const getAdminUsers = () => apiFetch<AdminUser[]>("/users")
 export const getAdminRooms = () => apiFetch<AdminRoom[]>("/partner/rooms/admin/all")
 export const setAdminRoomStatus = (id: string, status: AdminRoom["status"]) =>
   apiFetch<AdminRoom>(`/partner/rooms/admin/${id}/status`, { method: "PATCH", body: JSON.stringify({ status }) })

@@ -88,7 +88,16 @@ function RoomDetailContent({ params }: { params: Promise<{ locale: string; id: s
     if (!room) return
     setSlotsLoading(true)
     getPublicRoomSlots(room.id, selectedDate)
-      .then((realSlots: TimeSlot[]) => setSlots(realSlots.map((slot: TimeSlot) => ({ ...slot, price: room.pricePerHour / 2 }))))
+      .then((realSlots) => setSlots(realSlots.map((slot): TimeSlot => ({
+        id: slot.id,
+        startTime: slot.startTime,
+        endTime: slot.endTime,
+        available: slot.available,
+        price: room.pricePerHour, // slots are 1 hour each
+        isPast: slot.status === "past",
+        status: slot.status === "past" ? undefined : slot.status,
+        heldUntil: slot.heldUntil,
+      }))))
       .catch((error) => {
         console.warn("Could not load live availability:", error)
         setSlots([])

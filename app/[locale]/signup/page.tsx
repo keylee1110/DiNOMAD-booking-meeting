@@ -126,28 +126,6 @@ function SignupForm() {
       const session = authData.session
       const user = authData.user
 
-      // If the user registered as a Partner/Supplier, automatically submit application
-      if (role === "supplier" && user) {
-        if (session) {
-          // Explicitly set session to populate headers for the RPC call
-          await supabase.auth.setSession(session)
-
-          const { error: rpcError } = await supabase.rpc("submit_supplier_application", {
-            legal_name: fullName.trim(),
-            display_name: `${fullName.trim()} Space`,
-            business_email: email,
-            business_phone: phone,
-            onboarding_note: "Auto-submitted during partner registration"
-          })
-
-          if (rpcError) {
-            console.error("Partner creation RPC failed:", rpcError)
-          }
-        } else {
-          console.warn("No active session returned (Email verification might be enabled). Partner registration RPC skipped.")
-        }
-      }
-
       // If email verification is active (no active session yet)
       if (!session && user) {
         setIsRegisteredSuccess(true)
@@ -155,24 +133,28 @@ function SignupForm() {
         return
       }
 
+      // Partners fill in their real business details on the application page —
+      // no auto-submitted placeholder application anymore.
       if (role === "supplier") {
         toast.success(
           locale === "vi"
-            ? "Đã gửi đơn đăng ký đối tác! Vui lòng chờ admin xét duyệt."
-            : "Partner application submitted! Please wait for admin approval."
+            ? "Tạo tài khoản thành công! Hãy điền thông tin doanh nghiệp để đăng ký đối tác."
+            : "Account created! Now fill in your business details to apply as a partner."
         )
       } else {
         toast.success(t("auth.signupSuccess") || "Registration successful!")
       }
-      
+
       // Determine Redirect Path:
       const isCheckoutOrBooking = redirectTo && (
-        redirectTo.includes("checkout") || 
-        redirectTo.includes("booking") || 
+        redirectTo.includes("checkout") ||
+        redirectTo.includes("booking") ||
         redirectTo.includes("search")
       )
 
-      const targetPath = isCheckoutOrBooking ? redirectTo : `/${locale}/profile`
+      const targetPath = role === "supplier"
+        ? `/${locale}/become-partner`
+        : isCheckoutOrBooking ? redirectTo : `/${locale}/profile`
 
       // Refresh session state and redirect
       router.refresh()
