@@ -202,28 +202,40 @@ export class RoomsService {
     const endDayUtc = new Date(new Date(date + "T00:00:00Z").getTime() + 17 * 3600000).toISOString()
     const { data: activeBookings } = await this.supabase.admin
       .from("bookings")
-      .select("start_time, end_time")
+      .select("start_time, end_time, status, created_at")
       .eq("room_id", roomId)
       .gte("start_time", startDayUtc)
       .lt("start_time", endDayUtc)
       .neq("status", "cancelled")
 
-    // Convert each booking's UTC range into Vietnam-local minutes-since-midnight
-    const bookingRanges = (activeBookings ?? []).map(bk => {
+    // Convert each booking's UTC range into Vietnam-local minutes-since-midnight.
+    // Pending bookings are soft-locks: shown as "held" while inside the 5-minute
+    // hold window, ignored once expired (HoldCleanupService cancels them shortly).
+    const bookingRanges: { start: number; end: number }[] = []
+    const heldRanges: { start: number; end: number; heldUntil: string }[] = []
+    const nowIso = new Date().toISOString()
+    for (const bk of activeBookings ?? []) {
       const startVn = new Date(bk.start_time as string).getTime() + 7 * 3600000
       const endVn = new Date(bk.end_time as string).getTime() + 7 * 3600000
       const startD = new Date(startVn)
       const endD = new Date(endVn)
-      return {
+      const range = {
         start: startD.getUTCHours() * 60 + startD.getUTCMinutes(),
         end: endD.getUTCHours() * 60 + endD.getUTCMinutes(),
       }
-    })
+      if (bk.status === "pending") {
+        const heldUntil = new Date(new Date(bk.created_at as string).getTime() + 5 * 60000).toISOString()
+        if (heldUntil <= nowIso) continue // expired hold — slot is effectively free
+        heldRanges.push({ ...range, heldUntil })
+      } else {
+        bookingRanges.push(range)
+      }
+    }
 
     // Generate slots on-demand from venue hours — zero DB rows needed for available slots
     const nowVn = this.getNowVietnam()
     const nowMinutes = date === nowVn.date ? nowVn.hour * 60 + nowVn.minute : null
-    return this.buildSlotList(openTime, closeTime, blockRanges, bookingRanges, nowMinutes)
+    return this.buildSlotList(openTime, closeTime, blockRanges, bookingRanges, nowMinutes, heldRanges)
   }
 
   async updateSlots(roomId: string, userId: string, dto: UpdateSlotsDto) {
@@ -272,10 +284,11 @@ export class RoomsService {
     blockRanges: { id: string; start: number; end: number }[],
     bookingRanges: { start: number; end: number }[] = [],
     nowMinutes: number | null = null,
+    heldRanges: { start: number; end: number; heldUntil: string }[] = [],
   ) {
     const slots: {
       id: string; startTime: string; endTime: string
-      status: string; available: boolean; heldUntil: null
+      status: string; available: boolean; heldUntil: string | null
     }[] = []
 
     let current = this.timeToMinutes(openTime)
@@ -289,14 +302,15 @@ export class RoomsService {
       // and ends after the slot starts.
       const block    = blockRanges.find(b => b.start < slotEnd && b.end > current)
       const isBooked = bookingRanges.some(b => b.start < slotEnd && b.end > current)
+      const held     = heldRanges.find(h => h.start < slotEnd && h.end > current)
       const isPast   = nowMinutes !== null && current < nowMinutes
       slots.push({
-        id:        block ? block.id : isBooked ? `booked-${start}` : `virtual-${start}`,
+        id:        block ? block.id : isBooked ? `booked-${start}` : held ? `held-${start}` : `virtual-${start}`,
         startTime: start,
         endTime:   end,
-        status:    isPast ? "past" : block ? "blocked" : isBooked ? "booked" : "available",
-        available: !isPast && !block && !isBooked,
-        heldUntil: null,
+        status:    isPast ? "past" : block ? "blocked" : isBooked ? "booked" : held ? "held" : "available",
+        available: !isPast && !block && !isBooked && !held,
+        heldUntil: !isPast && !block && !isBooked && held ? held.heldUntil : null,
       })
       current += SLOT_MINUTES
     }

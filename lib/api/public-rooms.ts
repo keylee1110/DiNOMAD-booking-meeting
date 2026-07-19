@@ -42,6 +42,7 @@ export async function getPublicRooms(): Promise<Room[]> {
   return rooms
 }
 
+// Slots are 1-hour increments (SLOT_MINUTES in backend rooms.service.ts).
 export async function getPublicRoomSlots(roomId: string, date: string) {
   const base = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:4000/api"
   const response = await fetch(`${base}/rooms/${roomId}/slots?date=${encodeURIComponent(date)}`)
@@ -49,7 +50,7 @@ export async function getPublicRoomSlots(roomId: string, date: string) {
   const json = await response.json()
   return (json.data ?? json) as Array<{
     id: string; startTime: string; endTime: string; available: boolean
-    status: "available" | "held" | "booked" | "blocked"; heldUntil: string | null; price: number
+    status: "available" | "held" | "booked" | "blocked" | "past"; heldUntil: string | null
   }>
 }
 
