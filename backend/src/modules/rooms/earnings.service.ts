@@ -1,5 +1,6 @@
 import { Injectable } from "@nestjs/common"
 import { SupabaseService } from "../../database/supabase.service"
+import { roomFeeHeldByPlatform } from "../../common/pricing"
 import { VenuesService } from "./venues.service"
 
 type BookingRow = {
@@ -9,12 +10,16 @@ type BookingRow = {
   start_time: string
   end_time: string
   status: string
+  payment_status: string | null
   subtotal: number
   platform_fee: number
   checked_in_at: string | null
   rooms: { name: string }
   profiles: { full_name: string | null; email: string }
 }
+
+/** Booking statuses that represent money actually earned (guest has paid). */
+const EARNED_STATUSES = ["confirmed", "checked_in", "completed"]
 
 @Injectable()
 export class EarningsService {
@@ -55,6 +60,7 @@ export class EarningsService {
         start_time,
         end_time,
         status,
+        payment_status,
         subtotal,
         platform_fee,
         checked_in_at,
@@ -64,14 +70,16 @@ export class EarningsService {
       .in("room_id", roomIds)
       .gte("booking_date", startDate)
       .lte("booking_date", endDate)
-      .neq("status", "cancelled")
+      .in("status", EARNED_STATUSES)
       .order("booking_date", { ascending: false })
 
     if (error) throw new Error(error.message)
 
+    // Only paid bookings count as earnings — unpaid holds and cancelled
+    // bookings are never the venue's money.
     const bookings = (rawBookings ?? []) as unknown as BookingRow[]
 
-    // Chart: revenue + commission grouped by day
+    // Chart: room-fee revenue + guest-paid platform fee grouped by day
     const dayMap = new Map<string, { revenue: number; commission: number }>()
     for (const b of bookings) {
       const prev = dayMap.get(b.booking_date) ?? { revenue: 0, commission: 0 }
@@ -91,19 +99,27 @@ export class EarningsService {
       cur.setUTCDate(cur.getUTCDate() + 1)
     }
 
+    // The platform fee is charged to the guest on top of the room fee
+    // (total = roomFee + platformFee), so the venue keeps the full room fee.
+    // It is reported here only so partners can see what the guest paid.
     const totalRevenue = bookings.reduce((s, b) => s + b.subtotal, 0)
     const totalCommission = bookings.reduce((s, b) => s + b.platform_fee, 0)
-    // Pending payout = net for confirmed-but-not-yet-settled bookings
-    const pendingPayout = bookings
-      .filter(b => b.status === "confirmed")
-      .reduce((s, b) => s + (b.subtotal - b.platform_fee), 0)
+
+    // Where the room fee physically sits: deposit bookings leave the remaining
+    // share to be collected by the venue at the counter; fully-paid bookings
+    // are held by DiNOMAD in full until settlement.
+    const heldByPlatform = (b: BookingRow) => roomFeeHeldByPlatform(b)
+
+    const pendingPayout = bookings.reduce((s, b) => s + heldByPlatform(b), 0)
+    const collectedAtCounter = bookings.reduce((s, b) => s + (b.subtotal - heldByPlatform(b)), 0)
 
     return {
       summary: {
         totalRevenue,
         totalCommission,
-        totalNet: totalRevenue - totalCommission,
+        totalNet: totalRevenue,
         pendingPayout,
+        collectedAtCounter,
       },
       chartData,
       bookings: bookings.map(b => ({
@@ -115,9 +131,12 @@ export class EarningsService {
         startTime: this.utcToVietnam(b.start_time),
         endTime: this.utcToVietnam(b.end_time),
         status: b.status,
+        paymentStatus: b.payment_status,
         subtotal: b.subtotal,
         platformFee: b.platform_fee,
-        net: b.subtotal - b.platform_fee,
+        net: b.subtotal,
+        heldByPlatform: heldByPlatform(b),
+        dueAtCounter: b.subtotal - heldByPlatform(b),
         checkedInAt: b.checked_in_at,
       })),
     }
@@ -133,7 +152,13 @@ export class EarningsService {
 
   private emptyResponse() {
     return {
-      summary: { totalRevenue: 0, totalCommission: 0, totalNet: 0, pendingPayout: 0 },
+      summary: {
+        totalRevenue: 0,
+        totalCommission: 0,
+        totalNet: 0,
+        pendingPayout: 0,
+        collectedAtCounter: 0,
+      },
       chartData: [],
       bookings: [],
     }

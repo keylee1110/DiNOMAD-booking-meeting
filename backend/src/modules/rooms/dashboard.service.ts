@@ -1,5 +1,6 @@
 import { Injectable } from "@nestjs/common"
 import { SupabaseService } from "../../database/supabase.service"
+import { amountDueAtCounter } from "../../common/pricing"
 import { VenuesService } from "./venues.service"
 
 @Injectable()
@@ -31,12 +32,14 @@ export class DashboardService {
 
     if (roomIds.length === 0) return this.emptyResponse()
 
-    const today = new Date().toISOString().slice(0, 10)
+    // Venues operate on Vietnam time — using the UTC date would show the wrong
+    // day's bookings between 00:00 and 07:00 local time.
+    const today = this.vietnamToday()
 
     // Step 3: today's bookings
     const { data: todayBookings } = await this.supabase.admin
       .from("bookings")
-      .select("id, booking_code, booking_date, start_time, end_time, status, checked_in_at, subtotal, platform_fee, room_id, customer_id, rooms(name), profiles(full_name, email)")
+      .select("id, booking_code, booking_date, start_time, end_time, status, checked_in_at, subtotal, platform_fee, total_amount, points_redeemed, payment_status, room_id, customer_id, rooms(name), profiles(full_name, email)")
       .in("room_id", roomIds)
       .eq("booking_date", today)
       .neq("status", "cancelled")
@@ -45,17 +48,18 @@ export class DashboardService {
     const bookings = (todayBookings ?? []) as any[]
 
     // Step 4: last 7 days revenue chart
-    const sevenDaysAgo = new Date()
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6)
+    const sevenDaysAgo = new Date(Date.now() + 7 * 3600_000)
+    sevenDaysAgo.setUTCDate(sevenDaysAgo.getUTCDate() - 6)
     const chartStart = sevenDaysAgo.toISOString().slice(0, 10)
 
+    // Same earned-revenue rule as revenueToday below: unpaid holds are not revenue
     const { data: chartBookings } = await this.supabase.admin
       .from("bookings")
       .select("booking_date, subtotal")
       .in("room_id", roomIds)
       .gte("booking_date", chartStart)
       .lte("booking_date", today)
-      .neq("status", "cancelled")
+      .in("status", ["confirmed", "checked_in", "completed"])
 
     // Build chart data (fill gaps)
     const dayMap = new Map<string, number>()
@@ -89,6 +93,9 @@ export class DashboardService {
         startTime: this.utcToVietnam(b.start_time),
         endTime: this.utcToVietnam(b.end_time),
         status: b.status,
+        paymentStatus: b.payment_status,
+        // Cash to collect when this guest arrives (0 if they paid in full online)
+        amountDueAtCounter: amountDueAtCounter(b),
       }))
 
     // Activity feed: last 6 events
@@ -119,6 +126,11 @@ export class DashboardService {
       activityFeed,
       revenueChart,
     }
+  }
+
+  /** Today's calendar date in Vietnam (UTC+7), as YYYY-MM-DD. */
+  private vietnamToday(): string {
+    return new Date(Date.now() + 7 * 3600_000).toISOString().slice(0, 10)
   }
 
   private utcToVietnam(iso: string): string {

@@ -12,7 +12,6 @@ import {
   type EarningsBookingRow,
 } from "@/lib/api/partner"
 
-const COMMISSION_RATE = 0.10
 type Period = "daily" | "weekly" | "monthly"
 
 function getDateRange(period: Period): { startDate: string; endDate: string } {
@@ -38,6 +37,7 @@ const emptyResponse: EarningsResponse = {
     totalCommission: 0,
     totalNet: 0,
     pendingPayout: 0,
+    collectedAtCounter: 0,
   },
   chartData: [],
   bookings: [],
@@ -95,7 +95,7 @@ export default function EarningsPage() {
   }, [])
 
   const data = earnings ?? emptyResponse
-  const { totalRevenue, totalCommission, pendingPayout } = data.summary
+  const { totalRevenue, pendingPayout, collectedAtCounter } = data.summary
 
   const revenueChange = lastMonthRevenue > 0
     ? ((totalRevenue - lastMonthRevenue) / lastMonthRevenue) * 100
@@ -128,9 +128,9 @@ export default function EarningsPage() {
       icon: Clock,
     },
     {
-      label: t("partner.commission"),
-      value: formatVND(totalCommission),
-      sub: t("partner.commissionRate"),
+      label: t("partner.collectedAtCounter"),
+      value: formatVND(collectedAtCounter),
+      sub: t("partner.collectedAtCounterHint"),
       trend: "neutral" as const,
       icon: DollarSign,
     },
@@ -153,19 +153,28 @@ export default function EarningsPage() {
     const monthLabel = now.toLocaleString("en", { month: "long", year: "numeric" })
     const filename = `dinomad-earnings-${monthLabel.replace(" ", "-")}.csv`
 
-    const header = ["Booking Code", "Room", "Guest", "Date", "Revenue", "Commission", "Net"].join(",")
-    const rows = data.bookings.map(b => {
-      const commission = Math.round(b.subtotal * COMMISSION_RATE)
-      return [
+    const header = [
+      "Booking Code",
+      "Room",
+      "Guest",
+      "Date",
+      "Room Fee (your earnings)",
+      "Platform Fee (paid by guest)",
+      "Held by DiNOMAD",
+      "Collected at Counter",
+    ].join(",")
+    const rows = data.bookings.map(b =>
+      [
         b.bookingCode,
         `"${b.roomName}"`,
         `"${b.guestName}"`,
         b.date,
-        b.subtotal,
-        commission,
         b.net,
-      ].join(",")
-    })
+        b.platformFee,
+        b.heldByPlatform,
+        b.dueAtCounter,
+      ].join(","),
+    )
     const csv = [header, ...rows].join("\n")
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" })
     const url = URL.createObjectURL(blob)
@@ -310,14 +319,14 @@ export default function EarningsPage() {
                   <th className="text-left text-xs font-semibold text-muted-foreground px-5 py-3 whitespace-nowrap">{t("confirmation.bookingId")}</th>
                   <th className="text-left text-xs font-semibold text-muted-foreground px-4 py-3 whitespace-nowrap">{t("confirmation.room")}</th>
                   <th className="text-left text-xs font-semibold text-muted-foreground px-4 py-3 whitespace-nowrap">{t("landing.date")}</th>
-                  <th className="text-right text-xs font-semibold text-muted-foreground px-4 py-3 whitespace-nowrap">{t("checkout.roomFee")}</th>
-                  <th className="text-right text-xs font-semibold text-muted-foreground px-4 py-3 whitespace-nowrap">{t("partner.commission")}</th>
+                  <th className="text-right text-xs font-semibold text-muted-foreground px-4 py-3 whitespace-nowrap">{t("partner.guestPlatformFee")}</th>
+                  <th className="text-right text-xs font-semibold text-muted-foreground px-4 py-3 whitespace-nowrap">{t("partner.heldByPlatform")}</th>
+                  <th className="text-right text-xs font-semibold text-muted-foreground px-4 py-3 whitespace-nowrap">{t("partner.dueAtCounter")}</th>
                   <th className="text-right text-xs font-semibold text-muted-foreground px-5 py-3 whitespace-nowrap">{t("partner.netEarnings")}</th>
                 </tr>
               </thead>
               <tbody>
                 {data.bookings.map((b: EarningsBookingRow, i: number) => {
-                  const commission = Math.round(b.subtotal * COMMISSION_RATE)
                   return (
                     <tr
                       key={b.id}
@@ -339,10 +348,13 @@ export default function EarningsPage() {
                         <span className="text-xs text-muted-foreground">{b.date}</span>
                       </td>
                       <td className="px-4 py-3.5 text-right">
-                        <span className="text-xs font-semibold text-foreground">{formatVND(b.subtotal)}</span>
+                        <span className="text-xs text-muted-foreground">{formatVND(b.platformFee)}</span>
                       </td>
                       <td className="px-4 py-3.5 text-right">
-                        <span className="text-xs text-destructive font-medium">−{formatVND(commission)}</span>
+                        <span className="text-xs font-medium text-foreground">{formatVND(b.heldByPlatform)}</span>
+                      </td>
+                      <td className="px-4 py-3.5 text-right">
+                        <span className="text-xs font-medium text-foreground">{formatVND(b.dueAtCounter)}</span>
                       </td>
                       <td className="px-5 py-3.5 text-right">
                         <span className="text-xs font-bold text-emerald-700">{formatVND(b.net)}</span>
