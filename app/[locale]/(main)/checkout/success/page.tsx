@@ -1,9 +1,10 @@
 "use client"
 
-import { use, useEffect, useState } from "react"
+import { use, useEffect, useState, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { useTranslation } from "@/lib/i18n/context"
 import confetti from "canvas-confetti"
+import { toast } from "sonner"
 import { useBooking } from "@/lib/store/booking-store"
 import { ConfirmationView } from "../_components/confirmation-view"
 import { getPublicRoomById } from "@/lib/api/public-rooms"
@@ -60,65 +61,72 @@ export default function CheckoutSuccessPage({
     loadRoom()
   }, [confirmedBooking, state.selectedRoom])
 
+  const emailSentRef = useRef(false)
+
   useEffect(() => {
-    if (isLoading) return
+    if (isLoading || !confirmedBooking || !room) return
 
-    // If no booking data is found in store, redirect to home.
-    if (!confirmedBooking || !room) {
-      router.push(`/${locale}`)
-      return
+    // 1. Confetti explosion
+    const duration = 2.5 * 1000
+    const animationEnd = Date.now() + duration
+    const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 0 }
+    const randomInRange = (min: number, max: number) => Math.random() * (max - min) + min
+
+    const interval: any = setInterval(function () {
+      const timeLeft = animationEnd - Date.now()
+      if (timeLeft <= 0) return clearInterval(interval)
+
+      const particleCount = 50 * (timeLeft / duration)
+      confetti({
+        ...defaults,
+        particleCount,
+        origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 },
+      })
+      confetti({
+        ...defaults,
+        particleCount,
+        origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 },
+      })
+    }, 250)
+
+    // 2. Trigger sending confirmation email (Ensure it runs only once per page load)
+    const targetEmail = confirmedBooking.guestEmail || state.guestEmail
+    if (targetEmail && !emailSentRef.current) {
+      emailSentRef.current = true
+      fetch("/api/email/booking-confirmation", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          customerEmail: targetEmail,
+          customerName: confirmedBooking.guestName || state.guestName || "Khách hàng",
+          bookingCode: confirmedBooking.bookingCode || confirmedBooking.id.substring(0, 8).toUpperCase(),
+          roomName: room.name,
+          venueName: confirmedBooking.venueName || room.venueName || "Dinomad Partner Venue",
+          venueAddress: confirmedBooking.venueAddress || room.address || "Địa chỉ địa điểm",
+          bookingDate: confirmedBooking.date,
+          startTime: confirmedBooking.startTime,
+          endTime: confirmedBooking.endTime,
+          totalPrice: confirmedBooking.totalPrice,
+          paymentMethod: confirmedBooking.paymentMethod,
+        }),
+      })
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.success) {
+            toast.success(
+              locale === "vi"
+                ? `📧 Đã gửi email xác nhận tới ${targetEmail}!`
+                : `📧 Confirmation email sent to ${targetEmail}!`
+            )
+          } else {
+            console.warn("Email API response warning:", data.error)
+          }
+        })
+        .catch((err) => console.error("Auto email trigger error:", err))
     }
 
-    if (!id) {
-      // Trigger a confetti explosion only for new checkout bookings (where id param is not present)
-      const duration = 2.5 * 1000;
-      const animationEnd = Date.now() + duration;
-      const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 0 };
-      
-      const randomInRange = (min: number, max: number) => Math.random() * (max - min) + min;
-
-      const interval: any = setInterval(function() {
-        const timeLeft = animationEnd - Date.now();
-
-        if (timeLeft <= 0) {
-          return clearInterval(interval);
-        }
-
-        const particleCount = 50 * (timeLeft / duration);
-        confetti({
-          ...defaults, particleCount,
-          origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 }
-        });
-        confetti({
-          ...defaults, particleCount,
-          origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 }
-        });
-      }, 250);
-
-      // Trigger sending confirmation email
-      if (confirmedBooking.guestEmail || confirmedBooking.bookingCode) {
-        fetch("/api/email/booking-confirmation", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            customerEmail: confirmedBooking.guestEmail,
-            customerName: confirmedBooking.guestName || "Khách hàng",
-            bookingCode: confirmedBooking.bookingCode || confirmedBooking.id.substring(0, 8).toUpperCase(),
-            roomName: room.name,
-            venueName: confirmedBooking.venueName || room.venueName || "Dinomad Partner Venue",
-            venueAddress: confirmedBooking.venueAddress || room.address || "Địa chỉ địa điểm",
-            bookingDate: confirmedBooking.date,
-            startTime: confirmedBooking.startTime,
-            endTime: confirmedBooking.endTime,
-            totalPrice: confirmedBooking.totalPrice,
-            paymentMethod: confirmedBooking.paymentMethod,
-          }),
-        }).catch((err) => console.error("Auto email trigger error:", err))
-      }
-
-      return () => clearInterval(interval);
-    }
-  }, [confirmedBooking, room, isLoading, router, locale, id])
+    return () => clearInterval(interval)
+  }, [confirmedBooking, room, isLoading, locale, state.guestEmail, state.guestName])
 
   if (isLoading) {
     return (
