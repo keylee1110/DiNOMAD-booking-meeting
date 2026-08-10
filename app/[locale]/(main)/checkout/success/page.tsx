@@ -101,6 +101,27 @@ export default function CheckoutSuccessPage({
         });
       }, 250);
 
+      // Trigger sending confirmation email
+      if (confirmedBooking.guestEmail || confirmedBooking.bookingCode) {
+        fetch("/api/email/booking-confirmation", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            customerEmail: confirmedBooking.guestEmail,
+            customerName: confirmedBooking.guestName || "Khách hàng",
+            bookingCode: confirmedBooking.bookingCode || confirmedBooking.id.substring(0, 8).toUpperCase(),
+            roomName: room.name,
+            venueName: confirmedBooking.venueName || room.venueName || "Dinomad Partner Venue",
+            venueAddress: confirmedBooking.venueAddress || room.address || "Địa chỉ địa điểm",
+            bookingDate: confirmedBooking.date,
+            startTime: confirmedBooking.startTime,
+            endTime: confirmedBooking.endTime,
+            totalPrice: confirmedBooking.totalPrice,
+            paymentMethod: confirmedBooking.paymentMethod,
+          }),
+        }).catch((err) => console.error("Auto email trigger error:", err))
+      }
+
       return () => clearInterval(interval);
     }
   }, [confirmedBooking, room, isLoading, waitingForBookings, router, locale, id])
