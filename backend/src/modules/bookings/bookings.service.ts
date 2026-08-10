@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common"
 import { SupabaseService } from "../../database/supabase.service"
+import { PLATFORM_FEE_RATE, maxPointsRedeemable } from "../../common/pricing"
 
 @Injectable()
 export class BookingsService {
@@ -18,8 +19,8 @@ export class BookingsService {
     if (durationHours <= 0 || durationHours * 2 % 1 !== 0) throw new BadRequestException("Invalid booking duration")
 
     const subtotal = Math.round(Number(room.price_per_hour) * durationHours)
-    const platformFee = Math.round(subtotal * 0.1)
-    const pointsRedeemed = await this.validatePoints(customerId, dto.pointsRedeemed, subtotal + platformFee)
+    const platformFee = Math.round(subtotal * PLATFORM_FEE_RATE)
+    const pointsRedeemed = await this.validatePoints(customerId, dto.pointsRedeemed, platformFee)
     const totalAmount = subtotal + platformFee - pointsRedeemed
     const bookingCode = `DN-${crypto.randomUUID().replace(/-/g, "").slice(0, 6).toUpperCase()}`
     const { data, error } = await this.supabase.admin.from("bookings").insert({
@@ -36,7 +37,7 @@ export class BookingsService {
   async findAllForAdmin() {
     const { data, error } = await this.supabase.admin
       .from("bookings")
-      .select("id, booking_code, booking_date, start_time, end_time, subtotal, platform_fee, status, guest_name, profiles(full_name, email), rooms(name, venues(name))")
+      .select("id, booking_code, booking_date, start_time, end_time, subtotal, platform_fee, status, payment_status, guest_name, profiles(full_name, email), rooms(name, venues(name))")
       .order("created_at", { ascending: false })
 
     if (error) throw new Error(error.message)
@@ -49,8 +50,12 @@ export class BookingsService {
       bookingDate: booking.booking_date,
       startTime: this.formatVietnamTime(booking.start_time),
       endTime: this.formatVietnamTime(booking.end_time),
+      roomFee: Number(booking.subtotal ?? 0),
+      // DiNOMAD's own revenue on this booking; the room fee belongs to the venue.
+      platformFee: Number(booking.platform_fee ?? 0),
       total: Number(booking.subtotal ?? 0) + Number(booking.platform_fee ?? 0),
       status: booking.status,
+      paymentStatus: booking.payment_status ?? null,
     }))
   }
 
@@ -101,7 +106,7 @@ export class BookingsService {
       .select("subtotal, platform_fee").eq("id", bookingId).eq("customer_id", customerId).eq("status", "pending").maybeSingle()
     if (!booking) throw new BadRequestException("Pending booking not found or no longer editable")
     const grossTotal = Number(booking.subtotal) + Number(booking.platform_fee)
-    const pointsRedeemed = await this.validatePoints(customerId, dto.pointsRedeemed, grossTotal)
+    const pointsRedeemed = await this.validatePoints(customerId, dto.pointsRedeemed, Number(booking.platform_fee))
     const totalAmount = grossTotal - pointsRedeemed
     const { data, error } = await this.supabase.admin.from("bookings")
       .update({
@@ -117,10 +122,21 @@ export class BookingsService {
     return { success: true }
   }
 
-  private async validatePoints(customerId: string, requested: number, total: number) {
+  /**
+   * Points are capped at the booking's platform fee — the venue always gets the
+   * full room fee, so anything beyond the fee would be paid out of DiNOMAD's
+   * pocket (and a 100% redemption would leave nothing to transfer, so the
+   * booking could never be confirmed).
+   */
+  private async validatePoints(customerId: string, requested: number, platformFee: number) {
+    if (requested < 0) throw new BadRequestException("Invalid points redemption amount")
     const { data } = await this.supabase.admin.from("profiles").select("points").eq("id", customerId).single()
     const balance = Number(data?.points ?? 0)
-    if (requested > balance || requested > total) throw new BadRequestException("Invalid points redemption amount")
+    const cap = maxPointsRedeemable(platformFee)
+    if (requested > balance) throw new BadRequestException("Not enough points")
+    if (requested > cap) {
+      throw new BadRequestException(`You can redeem at most ${cap} points on this booking`)
+    }
     return requested
   }
 

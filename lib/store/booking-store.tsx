@@ -5,6 +5,7 @@ import type { BookingFlowState, Room, TimeSlot, PaymentMethod, Booking } from "@
 import { createClient } from "@/utils/supabase/client"
 import { toggleWishlist as apiToggleWishlist, getWishlist as apiGetWishlist } from "@/lib/api/wishlist"
 import { buildCheckInQrPayload } from "@/lib/booking/check-in"
+import { depositAmount } from "@/lib/pricing"
 
 const initialState: BookingFlowState = {
   selectedRoom: null,
@@ -152,9 +153,9 @@ export function BookingProvider({ children }: { children: ReactNode }) {
               wifiPassword: `${b.room_id}-wifi-${b.id.slice(-3)}`,
               createdAt: b.created_at,
               paidAmount: b.payment_status === "deposited"
-                ? Math.max(0, Math.round(b.subtotal * 0.2 + b.platform_fee) - b.points_redeemed)
+                ? depositAmount(b.subtotal, b.platform_fee, b.points_redeemed)
                 : b.total_amount,
-              paymentStatus: b.payment_status || "fully_paid",
+              paymentStatus: b.payment_status ?? undefined,
               bookingCode: b.booking_code,
               pointsRedeemed: b.points_redeemed,
               pointsEarned: b.points_earned

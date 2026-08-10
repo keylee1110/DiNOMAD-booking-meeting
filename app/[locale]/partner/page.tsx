@@ -275,6 +275,15 @@ export default function PartnerDashboard() {
                         <Clock className="h-3 w-3" />
                         <span>{b.startTime} → {b.endTime}</span>
                       </div>
+                      {b.amountDueAtCounter > 0 ? (
+                        <span className="mt-0.5 inline-flex w-fit items-center gap-1 rounded-lg bg-amber-50 dark:bg-amber-500/10 px-2 py-1 text-xs font-bold text-amber-700 dark:text-amber-400">
+                          {t("partner.collectFromGuest")}: {formatVND(b.amountDueAtCounter)}
+                        </span>
+                      ) : (
+                        <span className="mt-0.5 inline-flex w-fit items-center gap-1 rounded-lg bg-emerald-50 dark:bg-emerald-500/10 px-2 py-1 text-xs font-semibold text-emerald-700 dark:text-emerald-400">
+                          {t("partner.nothingToCollect")}
+                        </span>
+                      )}
                     </div>
                     <Link href={`/${locale}/partner/scanner`}>
                       <Button size="sm" variant="outline" className="rounded-xl text-xs gap-1.5 w-full sm:w-auto">

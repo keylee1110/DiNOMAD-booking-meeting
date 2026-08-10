@@ -99,10 +99,16 @@ export function ConfirmationView({
                         <span className="font-black text-primary text-base">{formatVND(booking.totalPrice - (booking.paidAmount || 0))}</span>
                       </div>
                     </>
-                  ) : (
+                  ) : booking.paymentStatus === "fully_paid" ? (
                     <div className="flex items-start justify-between gap-4 border-t border-dashed border-border/60 pt-2">
                       <span className="text-xs text-emerald-600 font-bold uppercase tracking-wider">{locale === "vi" ? "Đã thanh toán 100%" : "Paid In Full"}</span>
                       <span className="font-black text-emerald-600">{formatVND(booking.paidAmount || booking.totalPrice)}</span>
+                    </div>
+                  ) : (
+                    /* Unknown/unpaid — never claim money was received */
+                    <div className="flex items-start justify-between gap-4 border-t border-dashed border-border/60 pt-2">
+                      <span className="text-xs text-amber-600 font-bold uppercase tracking-wider">{locale === "vi" ? "Chưa thanh toán" : "Not paid yet"}</span>
+                      <span className="font-black text-amber-600">{formatVND(booking.totalPrice)}</span>
                     </div>
                   )}
                 </div>

@@ -255,10 +255,16 @@ export function updateSlotStatuses(
 // ─── Earnings ─────────────────────────────────────────────────────────────────
 
 export interface EarningsSummary {
+  /** Room fees earned — the venue keeps this in full. */
   totalRevenue: number
+  /** Platform fee the guests paid on top; not deducted from the venue. */
   totalCommission: number
+  /** Equals totalRevenue — kept for compatibility. */
   totalNet: number
+  /** Room-fee share DiNOMAD is holding and still owes the venue. */
   pendingPayout: number
+  /** Room-fee share the venue collects directly at the counter. */
+  collectedAtCounter: number
 }
 
 export interface EarningsChartDay {
@@ -276,9 +282,15 @@ export interface EarningsBookingRow {
   startTime: string
   endTime: string
   status: string
+  paymentStatus: string | null
   subtotal: number
   platformFee: number
+  /** Full room fee — what the venue earns for this booking. */
   net: number
+  /** Part of the room fee DiNOMAD collected upfront and owes the venue. */
+  heldByPlatform: number
+  /** Part of the room fee the guest pays at the counter. */
+  dueAtCounter: number
   checkedInAt: string | null
 }
 
@@ -312,6 +324,9 @@ export interface ScannerBooking {
   guestPhone: string | null
   subtotal: number
   platformFee: number
+  paymentStatus: string | null
+  /** Cash still to collect from this guest at the counter (0 if paid in full). */
+  amountDueAtCounter: number
 }
 
 export function scannerLookup(bookingCode: string): Promise<ScannerBooking> {
@@ -349,6 +364,9 @@ export interface DashboardPendingCheckIn {
   startTime: string
   endTime: string
   status: string
+  paymentStatus: string | null
+  /** Cash to collect from this guest on arrival (0 if paid in full online). */
+  amountDueAtCounter: number
 }
 
 export interface DashboardActivityItem {

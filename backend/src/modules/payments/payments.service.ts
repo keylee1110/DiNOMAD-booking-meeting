@@ -1,5 +1,6 @@
 import { Injectable, Logger } from "@nestjs/common"
 import { SupabaseService } from "../../database/supabase.service"
+import { depositAmount } from "../../common/pricing"
 
 export interface SePayWebhookPayload {
   id: number
@@ -95,8 +96,8 @@ export class PaymentsService {
     const pointsRedeemed = booking.points_redeemed || 0
     const totalAmount = booking.total_amount
 
-    // Expected deposit: 20% room fee + 10% platform fee minus points discount
-    const expectedDeposit = Math.max(0, Math.round(subtotal * 0.2 + platformFee) - pointsRedeemed)
+    // Deposit rule lives in common/pricing.ts — keep every caller on that helper
+    const expectedDeposit = depositAmount(subtotal, platformFee, pointsRedeemed)
     const expectedFull = totalAmount
 
     this.logger.log(

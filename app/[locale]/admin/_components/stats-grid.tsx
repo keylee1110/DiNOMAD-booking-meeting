@@ -29,11 +29,18 @@ export function StatsGrid() {
         const today = todayVietnam()
         const active = bookings.filter((b) => b.status !== "cancelled")
         const bookingsToday = active.filter((b) => b.bookingDate === today).length
-        const revenue = active.reduce((sum, b) => sum + b.total, 0)
-        const revenueLabel =
-          revenue >= 1_000_000
-            ? `₫${(revenue / 1_000_000).toFixed(1).replace(/\.0$/, "")}M`
-            : `₫${revenue.toLocaleString("vi-VN")}`
+
+        // Only paid bookings are revenue — unpaid holds are not money.
+        const paid = active.filter((b) =>
+          ["confirmed", "checked_in", "completed"].includes(b.status),
+        )
+        // DiNOMAD earns the platform fee; the room fee belongs to the venues.
+        const platformRevenue = paid.reduce((sum, b) => sum + b.platformFee, 0)
+        const grossBookingValue = paid.reduce((sum, b) => sum + b.total, 0)
+        const money = (n: number) =>
+          n >= 1_000_000
+            ? `₫${(n / 1_000_000).toFixed(1).replace(/\.0$/, "")}M`
+            : `₫${n.toLocaleString("vi-VN")}`
 
         setStats([
           {
@@ -61,9 +68,9 @@ export function StatsGrid() {
             bg: "bg-amber-500/10",
           },
           {
-            label: "Total Revenue",
-            value: revenueLabel,
-            hint: "excl. cancelled bookings",
+            label: "Platform Revenue",
+            value: money(platformRevenue),
+            hint: `${money(grossBookingValue)} booking value`,
             icon: TrendingUp,
             color: "text-primary",
             bg: "bg-primary/10",
