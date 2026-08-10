@@ -5,7 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
 import { Button } from "@/components/ui/button"
 import { QrCode as DinomadQrCode } from "@/components/qr-code"
-import { Users, QrCode as QrCodeIcon, CheckCircle2 } from "lucide-react"
+import { Users, QrCode as QrCodeIcon, CheckCircle2, Mail } from "lucide-react"
+import { toast } from "sonner"
 import { formatVND, formatDate, formatDistrict } from "@/lib/format"
 import { formatTime } from "@/lib/data/time-slots"
 import type { Booking, Room } from "@/lib/types"
@@ -138,6 +139,44 @@ export function ConfirmationView({
                 </div>
                 <p className="mt-3 text-xs text-muted-foreground">{t("confirmation.showQR")}</p>
               </div>
+
+              <Button
+                variant="outline"
+                className="w-full rounded-xl flex items-center justify-center gap-2 border-primary/30 text-primary hover:bg-primary/5"
+                size="lg"
+                onClick={async () => {
+                  try {
+                    const res = await fetch("/api/email/booking-confirmation", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        customerEmail: booking.guestEmail || "test@example.com",
+                        customerName: booking.guestName || "Khách hàng",
+                        bookingCode: booking.bookingCode || booking.id.substring(0, 8).toUpperCase(),
+                        roomName: booking.roomName || room.name,
+                        venueName: booking.venueName || room.venueName,
+                        venueAddress: booking.venueAddress || room.address,
+                        bookingDate: booking.date,
+                        startTime: booking.startTime,
+                        endTime: booking.endTime,
+                        totalPrice: booking.totalPrice,
+                        paymentMethod: booking.paymentMethod,
+                      }),
+                    })
+                    const data = await res.json()
+                    if (data.success) {
+                      toast.success(locale === "vi" ? `📧 Đã gửi lại email xác nhận đến ${booking.guestEmail || "email người đặt"}!` : `📧 Sent confirmation email!`)
+                    } else {
+                      toast.error(data.error || "Lỗi khi gửi email")
+                    }
+                  } catch (e) {
+                    toast.error("Không thể kết nối đến máy chủ gửi mail")
+                  }
+                }}
+              >
+                <Mail className="h-4 w-4" />
+                {locale === "vi" ? "Gửi lại Email xác nhận" : "Resend Email Confirmation"}
+              </Button>
 
               <Button
                 className="w-full rounded-xl"
