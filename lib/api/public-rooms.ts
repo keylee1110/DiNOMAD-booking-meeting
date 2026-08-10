@@ -1,22 +1,14 @@
 import { createClient } from "@/utils/supabase/client"
 import { mapPublicRoom, type PublicRoomRow } from "@/lib/data/public-room"
-import type { Room, TimeSlot } from "@/lib/types"
+import type { Room } from "@/lib/types"
 
-const BACKEND_BASE = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:4000/api"
-
-interface ApiSlot {
-  id: string
-  startTime: string
-  endTime: string
-  status: "available" | "blocked" | "booked" | "past"
-  available: boolean
-  heldUntil: string | null
-}
-
+// IMPORTANT: never reference *_vi columns here — they were dropped by migration
+// 20260608143000_remove_vi_columns.sql, and PostgREST rejects the entire query
+// when a selected column doesn't exist (the site then shows zero rooms).
 const PUBLIC_ROOM_SELECT = `
-  id, venue_id, name, name_vi, description, description_vi, capacity, price_per_hour,
-  category, verified, noise_level, specs, specs_vi,
-  venues!inner(name, name_vi, address, address_vi, district, lat, lng, status),
+  id, venue_id, name, description, capacity, price_per_hour,
+  category, verified, noise_level, specs,
+  venues!inner(name, address, district, lat, lng, status, open_time, close_time),
   room_amenities(amenity),
   room_vibe_tags(vibe_tag),
   room_images(image_url, sort_order),
@@ -50,6 +42,7 @@ export async function getPublicRooms(): Promise<Room[]> {
   return rooms
 }
 
+// Slots are 1-hour increments (SLOT_MINUTES in backend rooms.service.ts).
 export async function getPublicRoomSlots(roomId: string, date: string) {
   const base = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:4000/api"
   const response = await fetch(`${base}/rooms/${roomId}/slots?date=${encodeURIComponent(date)}`)
@@ -57,7 +50,7 @@ export async function getPublicRoomSlots(roomId: string, date: string) {
   const json = await response.json()
   return (json.data ?? json) as Array<{
     id: string; startTime: string; endTime: string; available: boolean
-    status: "available" | "held" | "booked" | "blocked"; heldUntil: string | null; price: number
+    status: "available" | "held" | "booked" | "blocked" | "past"; heldUntil: string | null
   }>
 }
 
@@ -81,21 +74,3 @@ export async function getPublicRoomById(id: string): Promise<Room | null> {
   return data ? mapPublicRoom(data as unknown as PublicRoomRow) : null
 }
 
-/** Real slot availability for a room — reflects actual bookings/blocks, not mock data. */
-export async function getRoomAvailability(roomId: string, date: string): Promise<TimeSlot[]> {
-  const res = await fetch(`${BACKEND_BASE}/rooms/${roomId}/slots?date=${date}`)
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}))
-    throw new Error(body?.error?.message ?? body?.message ?? `Request failed: ${res.status}`)
-  }
-  const json = await res.json()
-  const slots = (json.data ?? json) as ApiSlot[]
-  return slots.map(s => ({
-    id: s.id,
-    startTime: s.startTime,
-    endTime: s.endTime,
-    available: s.available,
-    price: 0,
-    isPast: s.status === "past",
-  }))
-}

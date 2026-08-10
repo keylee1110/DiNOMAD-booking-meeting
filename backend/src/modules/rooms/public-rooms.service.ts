@@ -2,13 +2,14 @@ import { Injectable, NotFoundException } from "@nestjs/common"
 import { SupabaseService } from "../../database/supabase.service"
 import { VenuesService } from "./venues.service"
 
+// NOTE: the *_vi translation columns were dropped by migration
+// 20260608143000_remove_vi_columns.sql — do not reference them here,
+// selecting a dropped column makes PostgREST reject the whole query.
 type RoomRow = {
   id: string
   venue_id: string
   name: string
-  name_vi: string | null
   description: string
-  description_vi: string | null
   capacity: number
   price_per_hour: number
   category: string | null
@@ -16,7 +17,6 @@ type RoomRow = {
   verified: boolean
   noise_level: number | null
   specs: Record<string, string>
-  specs_vi: Record<string, string>
   created_at: string
   updated_at: string
   room_amenities?: { amenity: string }[]
@@ -25,9 +25,7 @@ type RoomRow = {
   venues?: {
     id: string
     name: string
-    name_vi: string | null
     address: string
-    address_vi: string | null
     district: string
     city: string
     lat: number | null
@@ -73,7 +71,7 @@ export class PublicRoomsService {
         room_amenities(amenity),
         room_vibe_tags(vibe_tag),
         room_images(image_url, sort_order),
-        venues!inner(id, name, name_vi, address, address_vi, district, city, lat, lng, image_url, open_time, close_time)
+        venues!inner(id, name, address, district, city, lat, lng, image_url, open_time, close_time)
         `,
       )
       .eq("status", "published")
@@ -152,7 +150,7 @@ export class PublicRoomsService {
         room_amenities(amenity),
         room_vibe_tags(vibe_tag),
         room_images(image_url, sort_order),
-        venues!inner(id, name, name_vi, address, address_vi, district, city, lat, lng, image_url, open_time, close_time)
+        venues!inner(id, name, address, district, city, lat, lng, image_url, open_time, close_time)
         `,
       )
       .eq("id", id)
@@ -167,72 +165,6 @@ export class PublicRoomsService {
     const agg = aggregations[0]
 
     return this.toPublicRoomResponse(room, agg)
-  }
-
-  async getSlots(roomId: string, date: string) {
-    const { data: room, error: roomError } = await this.supabase.admin
-      .from("rooms")
-      .select("id, venues!inner(open_time, close_time, status)")
-      .eq("id", roomId)
-      .eq("status", "published")
-      .eq("venues.status", "published")
-      .single<{ id: string; venues: { open_time: string; close_time: string; status: string } }>()
-    if (roomError || !room) throw new NotFoundException("Room not found")
-
-    const [{ data: bookings, error: bookingError }, { data: blocks, error: blockError }] = await Promise.all([
-      this.supabase.admin.from("bookings")
-        .select("id, start_time, end_time, status, created_at")
-        .eq("room_id", roomId).eq("booking_date", date).neq("status", "cancelled"),
-      this.supabase.admin.from("room_blocks")
-        .select("id, start_time").eq("room_id", roomId).eq("date", date),
-    ])
-    if (bookingError) throw new Error(bookingError.message)
-    if (blockError) throw new Error(blockError.message)
-
-    const states = new Map<string, { status: "held" | "booked" | "blocked"; id: string; heldUntil: string | null }>()
-    for (const block of blocks ?? []) {
-      states.set(String(block.start_time).slice(0, 5), { status: "blocked", id: block.id, heldUntil: null })
-    }
-    for (const booking of bookings ?? []) {
-      let cursor = new Date(booking.start_time).getTime() + 7 * 3600000
-      const end = new Date(booking.end_time).getTime() + 7 * 3600000
-      const held = booking.status === "pending"
-      const heldUntil = held ? new Date(new Date(booking.created_at).getTime() + 5 * 60000).toISOString() : null
-      if (held && heldUntil! <= new Date().toISOString()) continue
-      while (cursor < end) {
-        const current = new Date(cursor)
-        const key = `${String(current.getUTCHours()).padStart(2, "0")}:${String(current.getUTCMinutes()).padStart(2, "0")}`
-        states.set(key, { status: held ? "held" : "booked", id: booking.id, heldUntil })
-        cursor += 30 * 60000
-      }
-    }
-
-    const slots = []
-    let cursor = this.timeToMinutes(room.venues.open_time)
-    const close = this.timeToMinutes(room.venues.close_time)
-    while (cursor < close) {
-      const startTime = this.minutesToTime(cursor)
-      const state = states.get(startTime)
-      slots.push({
-        id: state?.id ?? `available-${startTime}`,
-        startTime,
-        endTime: this.minutesToTime(cursor + 30),
-        status: state?.status ?? "available",
-        heldUntil: state?.heldUntil ?? null,
-        available: !state,
-      })
-      cursor += 30
-    }
-    return slots
-  }
-
-  private timeToMinutes(time: string) {
-    const [hours, minutes] = time.slice(0, 5).split(":").map(Number)
-    return hours * 60 + minutes
-  }
-
-  private minutesToTime(minutes: number) {
-    return `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`
   }
 
   private async fetchRoomAggregations(roomIds: string[]): Promise<RoomAggregation[]> {
@@ -276,14 +208,10 @@ export class PublicRoomsService {
       id: room.id,
       venueId: room.venue_id,
       venueName: venue.name,
-      venueNameVi: venue.name_vi ?? undefined,
       name: room.name,
-      nameVi: room.name_vi ?? undefined,
       description: room.description,
-      descriptionVi: room.description_vi ?? undefined,
       district: venue.district,
       address: venue.address,
-      addressVi: venue.address_vi ?? undefined,
       capacity,
       pricePerHour: room.price_per_hour,
       amenities: (room.room_amenities ?? []).map((a) => a.amenity),
@@ -294,7 +222,6 @@ export class PublicRoomsService {
       verified: room.verified,
       noiseLevel: room.noise_level ?? undefined,
       specs: (room.specs ?? {}) as Record<string, string>,
-      specsVi: (room.specs_vi ?? {}) as Record<string, string>,
       category: room.category ?? undefined,
       lat: venue.lat ?? 0,
       lng: venue.lng ?? 0,
@@ -302,10 +229,14 @@ export class PublicRoomsService {
     }
   }
 
+  // Slots are 1-hour blocks, so slots left today = remaining open hours
+  // counted from the current hour in Vietnam time (UTC+7)
   private computeSlotsLeft(openTime: string | null, closeTime: string | null): number {
     if (!openTime || !closeTime) return 10
     const openHour = parseInt(openTime.split(":")[0], 10)
     const closeHour = parseInt(closeTime.split(":")[0], 10)
-    return Math.max(0, (closeHour - openHour) * 2)
+    const now = new Date()
+    const vnHour = (now.getUTCHours() + 7) % 24
+    return Math.max(0, closeHour - Math.max(openHour, vnHour))
   }
 }

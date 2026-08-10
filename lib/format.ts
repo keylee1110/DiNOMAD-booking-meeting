@@ -18,6 +18,37 @@ export function formatDate(dateStr: string, locale: string = "en"): string {
   })
 }
 
+// DB stores district names as partner-entered text (usually English, e.g. "District 9",
+// "Hoc Mon"). This maps them to the display language without touching the stored value,
+// so search filters that compare raw district strings keep working.
+const DISTRICT_VI: Record<string, string> = {
+  "thu duc": "Thủ Đức",
+  "binh thanh": "Bình Thạnh",
+  "hoc mon": "Hóc Môn",
+  "go vap": "Gò Vấp",
+  "phu nhuan": "Phú Nhuận",
+  "tan binh": "Tân Bình",
+  "tan phu": "Tân Phú",
+  "binh tan": "Bình Tân",
+  "nha be": "Nhà Bè",
+  "binh chanh": "Bình Chánh",
+  "cu chi": "Củ Chi",
+  "can gio": "Cần Giờ",
+}
+
+export function formatDistrict(district: string, locale: string): string {
+  const trimmed = (district ?? "").trim()
+  if (!trimmed) return trimmed
+  if (locale === "vi") {
+    const numbered = trimmed.match(/^district\s+(\d+)$/i)
+    if (numbered) return `Quận ${numbered[1]}`
+    return DISTRICT_VI[trimmed.toLowerCase()] ?? trimmed
+  }
+  const viNumbered = trimmed.match(/^quận\s+(\d+)$/i)
+  if (viNumbered) return `District ${viNumbered[1]}`
+  return trimmed
+}
+
 export function generateBookingId(): string {
   return typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
     const r = Math.random() * 16 | 0;

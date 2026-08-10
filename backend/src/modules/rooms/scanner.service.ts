@@ -1,6 +1,10 @@
 import { BadRequestException, ForbiddenException, Injectable, InternalServerErrorException, NotFoundException } from "@nestjs/common"
 import { SupabaseService } from "../../database/supabase.service"
+import { amountDueAtCounter } from "../../common/pricing"
 import { VenuesService } from "./venues.service"
+
+const BOOKING_FIELDS =
+  "id, booking_code, booking_date, start_time, end_time, status, checked_in_at, subtotal, platform_fee, total_amount, points_redeemed, payment_status, room_id, customer_id"
 
 type BookingRow = {
   id: string
@@ -12,6 +16,9 @@ type BookingRow = {
   checked_in_at: string | null
   subtotal: number
   platform_fee: number
+  total_amount: number | null
+  points_redeemed: number | null
+  payment_status: string | null
   room_id: string
   customer_id: string
 }
@@ -36,7 +43,7 @@ export class ScannerService {
 
       const { data: booking, error } = await this.supabase.admin
         .from("bookings")
-        .select("id, booking_code, booking_date, start_time, end_time, status, checked_in_at, subtotal, platform_fee, room_id, customer_id")
+        .select(BOOKING_FIELDS)
         .eq("booking_code", bookingCode.trim().toUpperCase())
         .single<BookingRow>()
 
@@ -138,7 +145,7 @@ export class ScannerService {
   private async fetchAndAuthorize(bookingId: string, supplierId: string): Promise<BookingRow> {
     const { data: booking, error } = await this.supabase.admin
       .from("bookings")
-      .select("id, booking_code, booking_date, start_time, end_time, status, checked_in_at, subtotal, platform_fee, room_id, customer_id")
+      .select(BOOKING_FIELDS)
       .eq("id", bookingId)
       .single<BookingRow>()
 
@@ -215,6 +222,9 @@ export class ScannerService {
       guestPhone: b.guestPhone,
       subtotal: b.subtotal,
       platformFee: b.platform_fee,
+      paymentStatus: b.payment_status,
+      /** Cash the venue must still collect from this guest at the counter. */
+      amountDueAtCounter: amountDueAtCounter(b),
     }
   }
 

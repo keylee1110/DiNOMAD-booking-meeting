@@ -11,26 +11,7 @@ import {
   type EarningsResponse,
   type EarningsBookingRow,
 } from "@/lib/api/partner"
-
-const COMMISSION_RATE = 0.10
-type Period = "daily" | "weekly" | "monthly"
-
-function getDateRange(period: Period): { startDate: string; endDate: string } {
-  const now = new Date()
-  const today = now.toISOString().slice(0, 10)
-  if (period === "daily") {
-    const d14 = new Date(now)
-    d14.setDate(d14.getDate() - 13)
-    return { startDate: d14.toISOString().slice(0, 10), endDate: today }
-  }
-  if (period === "weekly") {
-    const d56 = new Date(now)
-    d56.setDate(d56.getDate() - 55)
-    return { startDate: d56.toISOString().slice(0, 10), endDate: today }
-  }
-  // monthly: current calendar month
-  return getMonthRange(0)
-}
+import { EarningsTimeFilter, type TimeFilterValue } from "@/components/ui/earnings-time-filter"
 
 const emptyResponse: EarningsResponse = {
   summary: {
@@ -38,30 +19,32 @@ const emptyResponse: EarningsResponse = {
     totalCommission: 0,
     totalNet: 0,
     pendingPayout: 0,
+    collectedAtCounter: 0,
   },
   chartData: [],
   bookings: [],
 }
 
-function getMonthRange(monthOffset = 0): { startDate: string; endDate: string } {
-  const now = new Date()
-  const y = now.getUTCFullYear()
-  const m = now.getUTCMonth() + 1 + monthOffset  // monthOffset=0 = current, -1 = prev
-  const date = new Date(Date.UTC(y, m - 1, 1))
-  const startDate = date.toISOString().slice(0, 10)
-  if (monthOffset === 0) {
-    return { startDate, endDate: now.toISOString().slice(0, 10) }
-  }
-  // last day of that month
-  const lastDay = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 0))
-  return { startDate, endDate: lastDay.toISOString().slice(0, 10) }
-}
-
 const mockPayouts: any[] = []
 
 export default function EarningsPage() {
-  const { t } = useTranslation()
-  const [period, setPeriod] = useState<Period>("monthly")
+  const { t, locale } = useTranslation()
+  const now = useMemo(() => new Date(), [])
+
+  const currentYear = now.getUTCFullYear()
+  const currentMonth = now.getUTCMonth() + 1
+  const todayStr = useMemo(() => now.toISOString().slice(0, 10), [now])
+
+  const [filterValue, setFilterValue] = useState<TimeFilterValue>(() => {
+    const start = `${currentYear}-${String(currentMonth).padStart(2, "0")}-01`
+    return {
+      period: "monthly",
+      startDate: start,
+      endDate: todayStr,
+      label: locale.startsWith("vi") ? `Tháng Này (${currentMonth}/${currentYear})` : `This Month (${currentMonth}/${currentYear})`,
+    }
+  })
+
   const [earnings, setEarnings] = useState<EarningsResponse | null>(null)
   const [lastMonthRevenue, setLastMonthRevenue] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -70,8 +53,44 @@ export default function EarningsPage() {
     let cancelled = false
     setLoading(true)
 
-    const { startDate, endDate } = getDateRange(period)
-    const { startDate: prevStart, endDate: prevEnd } = getMonthRange(-1)
+    const { startDate, endDate, period } = filterValue
+
+    // Calculate previous period for comparison trend (% vs period trước)
+    let prevStart = startDate
+    let prevEnd = endDate
+
+    if (period === "monthly") {
+      const parts = startDate.split("-")
+      const y = parseInt(parts[0], 10)
+      const m = parseInt(parts[1], 10)
+      const prevM = m === 1 ? 12 : m - 1
+      const prevY = m === 1 ? y - 1 : y
+      prevStart = `${prevY}-${String(prevM).padStart(2, "0")}-01`
+      const lastDayObj = new Date(Date.UTC(prevY, prevM, 0))
+      prevEnd = `${prevY}-${String(prevM).padStart(2, "0")}-${String(lastDayObj.getUTCDate()).padStart(2, "0")}`
+    } else if (period === "daily") {
+      const dStart = new Date(startDate)
+      const dEnd = new Date(endDate)
+      const diffTime = Math.abs(dEnd.getTime() - dStart.getTime())
+      const diffDays = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1)
+
+      const pEnd = new Date(dStart)
+      pEnd.setDate(pEnd.getDate() - 1)
+      const pStart = new Date(pEnd)
+      pStart.setDate(pStart.getDate() - (diffDays - 1))
+
+      prevStart = pStart.toISOString().slice(0, 10)
+      prevEnd = pEnd.toISOString().slice(0, 10)
+    } else if (period === "weekly") {
+      const dStart = new Date(startDate)
+      const pEnd = new Date(dStart)
+      pEnd.setDate(pEnd.getDate() - 1)
+      const pStart = new Date(pEnd)
+      pStart.setDate(pStart.getDate() - 6)
+
+      prevStart = pStart.toISOString().slice(0, 10)
+      prevEnd = pEnd.toISOString().slice(0, 10)
+    }
 
     Promise.all([
       getPartnerEarnings(startDate, endDate),
@@ -92,16 +111,19 @@ export default function EarningsPage() {
       })
 
     return () => { cancelled = true }
-  }, [])
+  }, [filterValue])
 
   const data = earnings ?? emptyResponse
-  const { totalRevenue, totalCommission, pendingPayout } = data.summary
+  const { totalRevenue, pendingPayout, collectedAtCounter } = data.summary
 
   const revenueChange = lastMonthRevenue > 0
     ? ((totalRevenue - lastMonthRevenue) / lastMonthRevenue) * 100
     : 0
 
-  const chartDays = useMemo(() => data.chartData.slice(-14), [data.chartData])
+  const chartDays = useMemo(() => {
+    return data.chartData
+  }, [data.chartData])
+
   const chartMax = useMemo(
     () => Math.max(...chartDays.map(d => d.revenue), 1),
     [chartDays],
@@ -120,17 +142,14 @@ export default function EarningsPage() {
     {
       label: t("partner.lastMonth"),
       value: formatVND(lastMonthRevenue),
-      sub: (() => {
-        const d = new Date(); d.setUTCMonth(d.getUTCMonth() - 1)
-        return d.toLocaleString("en", { month: "long", year: "numeric" })
-      })(),
+      sub: locale.startsWith("vi") ? "Kỳ trước" : "Previous period",
       trend: "neutral" as const,
       icon: Clock,
     },
     {
-      label: t("partner.commission"),
-      value: formatVND(totalCommission),
-      sub: t("partner.commissionRate"),
+      label: t("partner.collectedAtCounter"),
+      value: formatVND(collectedAtCounter),
+      sub: t("partner.collectedAtCounterHint"),
       trend: "neutral" as const,
       icon: DollarSign,
     },
@@ -143,29 +162,33 @@ export default function EarningsPage() {
     },
   ]
 
-  const periods: Period[] = ["daily", "weekly", "monthly"]
-
   // ─── CSV export ───────────────────────────────────────────────────────────
   const handleExportCSV = () => {
     if (data.bookings.length === 0) return
-    const periodLabel = period.charAt(0).toUpperCase() + period.slice(1)
-    const now = new Date()
-    const monthLabel = now.toLocaleString("en", { month: "long", year: "numeric" })
-    const filename = `dinomad-earnings-${monthLabel.replace(" ", "-")}.csv`
+    const filename = `dinomad-earnings-${filterValue.startDate}_${filterValue.endDate}.csv`
 
-    const header = ["Booking Code", "Room", "Guest", "Date", "Revenue", "Commission", "Net"].join(",")
-    const rows = data.bookings.map(b => {
-      const commission = Math.round(b.subtotal * COMMISSION_RATE)
-      return [
+    const header = [
+      "Booking Code",
+      "Room",
+      "Guest",
+      "Date",
+      "Room Fee (your earnings)",
+      "Platform Fee (paid by guest)",
+      "Held by DiNOMAD",
+      "Collected at Counter",
+    ].join(",")
+    const rows = data.bookings.map(b =>
+      [
         b.bookingCode,
         `"${b.roomName}"`,
         `"${b.guestName}"`,
         b.date,
-        b.subtotal,
-        commission,
         b.net,
-      ].join(",")
-    })
+        b.platformFee,
+        b.heldByPlatform,
+        b.dueAtCounter,
+      ].join(","),
+    )
     const csv = [header, ...rows].join("\n")
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" })
     const url = URL.createObjectURL(blob)
@@ -179,7 +202,7 @@ export default function EarningsPage() {
   if (loading) {
     return (
       <div className="flex h-64 items-center justify-center text-muted-foreground gap-3">
-        <Loader2 className="h-5 w-5 animate-spin" />
+        <Loader2 className="h-5 w-5 animate-spin text-primary" />
         <span className="text-sm font-medium">{t("partner.loadingEarnings")}</span>
       </div>
     )
@@ -227,24 +250,18 @@ export default function EarningsPage() {
       <div className="rounded-2xl border border-border/50 bg-card p-6 md:p-8 shadow-[0_8px_30px_rgb(0,0,0,0.02)] flex flex-col gap-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border/50 pb-4">
           <h2 className="text-lg font-semibold tracking-tight flex items-center gap-3 text-foreground">
-            <BarChart3 className="h-5 w-5 text-primary" /> {t("partner.totalEarningsMonth")}
+            <BarChart3 className="h-5 w-5 text-primary" />
+            {locale.startsWith("vi") 
+              ? `Doanh Thu — ${filterValue.label}` 
+              : `Earnings — ${filterValue.label}`}
           </h2>
-          <div className="flex items-center gap-1 rounded-xl border border-border/50 bg-muted/20 p-1">
-            {periods.map(p => (
-              <button
-                key={p}
-                onClick={() => setPeriod(p)}
-                className={cn(
-                  "px-3 py-1.5 text-xs font-semibold rounded-lg transition-all",
-                  period === p
-                    ? "bg-primary text-primary-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground",
-                )}
-              >
-                {t(`partner.${p}`)}
-              </button>
-            ))}
-          </div>
+          
+          {/* Universal Time Filter (Day, Week, Month) */}
+          <EarningsTimeFilter
+            value={filterValue}
+            onChange={(val) => setFilterValue(val)}
+            locale={locale}
+          />
         </div>
 
         {chartDays.length === 0 ? (
@@ -310,14 +327,14 @@ export default function EarningsPage() {
                   <th className="text-left text-xs font-semibold text-muted-foreground px-5 py-3 whitespace-nowrap">{t("confirmation.bookingId")}</th>
                   <th className="text-left text-xs font-semibold text-muted-foreground px-4 py-3 whitespace-nowrap">{t("confirmation.room")}</th>
                   <th className="text-left text-xs font-semibold text-muted-foreground px-4 py-3 whitespace-nowrap">{t("landing.date")}</th>
-                  <th className="text-right text-xs font-semibold text-muted-foreground px-4 py-3 whitespace-nowrap">{t("checkout.roomFee")}</th>
-                  <th className="text-right text-xs font-semibold text-muted-foreground px-4 py-3 whitespace-nowrap">{t("partner.commission")}</th>
+                  <th className="text-right text-xs font-semibold text-muted-foreground px-4 py-3 whitespace-nowrap">{t("partner.guestPlatformFee")}</th>
+                  <th className="text-right text-xs font-semibold text-muted-foreground px-4 py-3 whitespace-nowrap">{t("partner.heldByPlatform")}</th>
+                  <th className="text-right text-xs font-semibold text-muted-foreground px-4 py-3 whitespace-nowrap">{t("partner.dueAtCounter")}</th>
                   <th className="text-right text-xs font-semibold text-muted-foreground px-5 py-3 whitespace-nowrap">{t("partner.netEarnings")}</th>
                 </tr>
               </thead>
               <tbody>
                 {data.bookings.map((b: EarningsBookingRow, i: number) => {
-                  const commission = Math.round(b.subtotal * COMMISSION_RATE)
                   return (
                     <tr
                       key={b.id}
@@ -339,10 +356,13 @@ export default function EarningsPage() {
                         <span className="text-xs text-muted-foreground">{b.date}</span>
                       </td>
                       <td className="px-4 py-3.5 text-right">
-                        <span className="text-xs font-semibold text-foreground">{formatVND(b.subtotal)}</span>
+                        <span className="text-xs text-muted-foreground">{formatVND(b.platformFee)}</span>
                       </td>
                       <td className="px-4 py-3.5 text-right">
-                        <span className="text-xs text-destructive font-medium">−{formatVND(commission)}</span>
+                        <span className="text-xs font-medium text-foreground">{formatVND(b.heldByPlatform)}</span>
+                      </td>
+                      <td className="px-4 py-3.5 text-right">
+                        <span className="text-xs font-medium text-foreground">{formatVND(b.dueAtCounter)}</span>
                       </td>
                       <td className="px-5 py-3.5 text-right">
                         <span className="text-xs font-bold text-emerald-700">{formatVND(b.net)}</span>

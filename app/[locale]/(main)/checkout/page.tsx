@@ -6,6 +6,7 @@ import { useTranslation } from "@/lib/i18n/context"
 import { useBooking } from "@/lib/store/booking-store"
 import type { Booking, TimeSlot } from "@/lib/types"
 import { formatVND, generateBookingId } from "@/lib/format"
+import { PLATFORM_FEE_RATE, depositAmount, maxPointsRedeemable } from "@/lib/pricing"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
@@ -125,15 +126,21 @@ export default function CheckoutPage({ params }: { params: Promise<{ locale: str
 
   const fees = useMemo(() => {
     const roomFee = room ? room.pricePerHour * durationHours : 0
-    const platformFee = Math.round(roomFee * 0.1)
+    const platformFee = Math.round(roomFee * PLATFORM_FEE_RATE)
     return { roomFee, platformFee, totalPrice: roomFee + platformFee }
   }, [room, durationHours])
 
   const checkoutTotal = state.totalPrice > 0 ? state.totalPrice : fees.totalPrice
 
+  // Points are capped at the platform fee — see maxPointsRedeemable in lib/pricing.ts
+  const pointsCap = useMemo(
+    () => Math.min(maxPointsRedeemable(fees.platformFee), userPoints),
+    [fees.platformFee, userPoints],
+  )
+
   const pointsDiscount = useMemo(() => {
-    return redeemPoints ? Math.min(checkoutTotal, userPoints) : 0
-  }, [redeemPoints, checkoutTotal, userPoints])
+    return redeemPoints ? pointsCap : 0
+  }, [redeemPoints, pointsCap])
 
   const finalPayableTotal = useMemo(() => {
     return checkoutTotal - pointsDiscount
@@ -146,7 +153,8 @@ export default function CheckoutPage({ params }: { params: Promise<{ locale: str
   // Calculate specific amount to pay right now (Agoda style)
   const amountToPayNow = useMemo(() => {
     if (paymentMode === "deposit") {
-      return Math.max(0, Math.round(fees.roomFee * 0.2 + fees.platformFee) - pointsDiscount) // 20% room fee + 10% platform fee minus points discount
+      // 20% room fee + full platform fee, minus any points redeemed
+      return depositAmount(fees.roomFee, fees.platformFee, pointsDiscount)
     }
     return finalPayableTotal
   }, [paymentMode, fees, finalPayableTotal, pointsDiscount])
@@ -645,7 +653,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ locale: str
                       : "Pay a small portion now to secure your space. Pay remaining 80% at property."}
                   </span>
                   <div className="text-lg font-black text-foreground mt-3 flex items-baseline gap-1">
-                    {formatVND(fees.roomFee * 0.2 + fees.platformFee)}
+                    {formatVND(depositAmount(fees.roomFee, fees.platformFee))}
                     <span className="text-[10px] font-semibold text-muted-foreground uppercase">{locale === "vi" ? "Đặt cọc" : "Deposit"}</span>
                   </div>
                 </button>
@@ -692,7 +700,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ locale: str
             />
 
             {/* Loyalty Points Section */}
-            {userPoints > 0 && (
+            {userPoints > 0 && pointsCap > 0 && (
               <Card className="overflow-hidden border border-border/50 shadow-sm rounded-2xl p-5 flex flex-col gap-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2.5">
@@ -704,9 +712,14 @@ export default function CheckoutPage({ params }: { params: Promise<{ locale: str
                         {locale === "vi" ? "Điểm thưởng DiNOMAD" : "DiNOMAD Loyalty Points"}
                       </h3>
                       <p className="text-xs text-muted-foreground mt-0.5">
-                        {locale === "vi" 
+                        {locale === "vi"
                           ? `Bạn đang có ${new Intl.NumberFormat("vi-VN").format(userPoints)} điểm (tương đương ${formatVND(userPoints)})`
                           : `You currently have ${new Intl.NumberFormat("vi-VN").format(userPoints)} points (equals ${formatVND(userPoints)})`}
+                      </p>
+                      <p className="text-xs font-medium text-muted-foreground mt-0.5">
+                        {locale === "vi"
+                          ? `Đơn này dùng được tối đa ${formatVND(pointsCap)}`
+                          : `Up to ${formatVND(pointsCap)} usable on this booking`}
                       </p>
                     </div>
                   </div>

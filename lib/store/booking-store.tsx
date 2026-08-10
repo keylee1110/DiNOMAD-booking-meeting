@@ -5,6 +5,7 @@ import type { BookingFlowState, Room, TimeSlot, PaymentMethod, Booking } from "@
 import { createClient } from "@/utils/supabase/client"
 import { toggleWishlist as apiToggleWishlist, getWishlist as apiGetWishlist } from "@/lib/api/wishlist"
 import { buildCheckInQrPayload } from "@/lib/booking/check-in"
+import { depositAmount } from "@/lib/pricing"
 
 const initialState: BookingFlowState = {
   selectedRoom: null,
@@ -64,8 +65,9 @@ interface BookingContextType {
   state: BookingFlowState
   dispatch: React.Dispatch<BookingAction>
   myBookings: Booking[]
+  bookingsLoaded: boolean
   addBooking: (booking: Booking) => void
-  refreshBookings: (passedUser?: any) => void
+  refreshBookings: (passedUser?: any) => Promise<void>
   wishlist: string[]
   toggleWishlist: (roomId: string) => Promise<void>
 }
@@ -78,6 +80,7 @@ const BookingContext = createContext<BookingContextType | null>(null)
 export function BookingProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(bookingReducer, initialState)
   const [myBookings, setMyBookings] = useState<Booking[]>([])
+  const [bookingsLoaded, setBookingsLoaded] = useState(false)
   const [wishlist, setWishlist] = useState<string[]>([])
   const supabase = createClient()
 
@@ -150,9 +153,9 @@ export function BookingProvider({ children }: { children: ReactNode }) {
               wifiPassword: `${b.room_id}-wifi-${b.id.slice(-3)}`,
               createdAt: b.created_at,
               paidAmount: b.payment_status === "deposited"
-                ? Math.max(0, Math.round(b.subtotal * 0.2 + b.platform_fee) - b.points_redeemed)
+                ? depositAmount(b.subtotal, b.platform_fee, b.points_redeemed)
                 : b.total_amount,
-              paymentStatus: b.payment_status || "fully_paid",
+              paymentStatus: b.payment_status ?? undefined,
               bookingCode: b.booking_code,
               pointsRedeemed: b.points_redeemed,
               pointsEarned: b.points_earned
@@ -180,6 +183,7 @@ export function BookingProvider({ children }: { children: ReactNode }) {
       // Guest: Load from localStorage
       loadLocalBookings()
     }
+    setBookingsLoaded(true)
   }
 
   const loadLocalBookings = () => {
@@ -292,7 +296,7 @@ export function BookingProvider({ children }: { children: ReactNode }) {
   }, [])
 
   return (
-    <BookingContext.Provider value={{ state, dispatch, myBookings, addBooking, refreshBookings, wishlist, toggleWishlist }}>
+    <BookingContext.Provider value={{ state, dispatch, myBookings, bookingsLoaded, addBooking, refreshBookings, wishlist, toggleWishlist }}>
       {children}
     </BookingContext.Provider>
   )

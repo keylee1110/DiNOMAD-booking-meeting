@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from "@nestjs/common"
+import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common"
 import { SupabaseService } from "../../database/supabase.service"
 import { CreateSupplierApplicationDto } from "./dto/create-supplier-application.dto"
 import { UpdateSupplierDto } from "./dto/update-supplier.dto"
@@ -30,6 +30,13 @@ export class SuppliersService {
   constructor(private readonly supabase: SupabaseService) {}
 
   async submitApplication(userId: string, dto: CreateSupplierApplicationDto) {
+    // One application per user: an active membership means one already exists
+    // (pending, approved or rejected — re-application is intentionally not allowed).
+    const existing = await this.findMine(userId)
+    if (existing.length > 0) {
+      throw new BadRequestException("You already have a supplier application")
+    }
+
     const { data, error } = await this.supabase.admin.rpc("submit_supplier_application_for_user", {
       target_user_id: userId,
       legal_name: dto.legalName,

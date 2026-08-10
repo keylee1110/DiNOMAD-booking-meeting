@@ -38,19 +38,15 @@ export class PublicRoomsController {
     })
   }
 
+  // Slots are 1-hour increments (SLOT_MINUTES in rooms.service.ts) — single
+  // source of truth shared with the partner-facing slot endpoints.
   @Get(":id/slots")
   getSlots(@Param("id") id: string, @Query("date") date?: string) {
-    return this.publicRoomsService.getSlots(id, date ?? new Date().toISOString().slice(0, 10))
+    return this.roomsService.getPublicSlots(id, date ?? new Date().toISOString().slice(0, 10))
   }
 
   @Get(":id")
   getById(@Param("id") id: string) {
     return this.publicRoomsService.getById(id)
-  }
-
-  @Get(":roomId/slots")
-  getPublicSlots(@Param("roomId") roomId: string, @Query("date") date: string) {
-    const targetDate = date ?? new Date().toISOString().slice(0, 10)
-    return this.roomsService.getPublicSlots(roomId, targetDate)
   }
 }

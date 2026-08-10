@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react"
 import { useTranslation } from "@/lib/i18n/context"
 import {
   QrCode, Search, CheckCircle2, XCircle, Loader2,
-  User, MapPin, Clock, ArrowLeft, UserX, AlertTriangle,
+  User, MapPin, Clock, ArrowLeft, UserX, AlertTriangle, Wallet,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -504,6 +504,27 @@ function BookingCard({ booking }: { booking: ScannerBooking }) {
         <span className="text-muted-foreground">{t("partner.roomFeeLabel")}</span>
         <span className="font-semibold text-foreground">{formatVND(booking.subtotal)}</span>
       </div>
+
+      {booking.amountDueAtCounter > 0 ? (
+        <div className="rounded-xl border-2 border-amber-500/50 bg-amber-50 dark:bg-amber-500/10 p-3 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 min-w-0">
+            <Wallet className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0" />
+            <span className="text-xs font-bold uppercase tracking-wide text-amber-700 dark:text-amber-400">
+              {t("partner.collectFromGuest")}
+            </span>
+          </div>
+          <span className="text-lg font-black text-amber-700 dark:text-amber-400 whitespace-nowrap">
+            {formatVND(booking.amountDueAtCounter)}
+          </span>
+        </div>
+      ) : (
+        <div className="rounded-xl border border-emerald-500/40 bg-emerald-50 dark:bg-emerald-500/10 p-3 flex items-center gap-2">
+          <CheckCircle2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+          <span className="text-xs font-bold uppercase tracking-wide text-emerald-700 dark:text-emerald-400">
+            {t("partner.nothingToCollect")}
+          </span>
+        </div>
+      )}
     </div>
   )
 }

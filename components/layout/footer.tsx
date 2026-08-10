@@ -48,6 +48,11 @@ export function Footer() {
                   {locale === "vi" ? "Đăng nhập Đối tác" : "Partner Login"}
                 </Link>
               </li>
+              <li>
+                <Link href={`/${locale}/become-partner`} className="text-sm text-muted-foreground hover:text-foreground">
+                  {t("partnerApply.title")}
+                </Link>
+              </li>
             </ul>
           </div>
 

@@ -101,12 +101,31 @@ export interface AdminBooking {
   bookingDate: string
   startTime: string
   endTime: string
+  /** Room fee — belongs to the venue, not DiNOMAD. */
+  roomFee: number
+  /** Platform fee the guest paid on top — DiNOMAD's revenue. */
+  platformFee: number
+  /** Gross booking value (roomFee + platformFee) — what the guest is charged. */
   total: number
   status: BookingStatus | "no_show"
+  paymentStatus: string | null
 }
 
 export interface AdminRoom extends Room {
   status: "published" | "unavailable" | "archived"
+}
+
+export interface AdminUser {
+  id: string
+  email: string
+  fullName: string | null
+  phone: string | null
+  avatarUrl: string | null
+  role: "customer" | "supplier" | "admin"
+  status: "active" | "blocked" | "deleted"
+  points: number | null
+  createdAt: string
+  bookingsCount: number
 }
 
 export interface Booking {
@@ -131,7 +150,8 @@ export interface Booking {
   wifiPassword: string
   createdAt: string
   paidAmount?: number
-  paymentStatus?: "deposited" | "fully_paid"
+  /** Never assume "fully_paid" when unknown — that claims money was received. */
+  paymentStatus?: "pending" | "deposited" | "fully_paid"
   bookingCode?: string
   pointsRedeemed?: number
   pointsEarned?: number
